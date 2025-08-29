@@ -10,12 +10,10 @@
 <img align="right" height="160" src="https://media.giphy.com/media/SWoSkN6DxTszqIKEqv/giphy.gif"/>
 
 - 🎓 **CSIE Senior** @ *National Chung Cheng University (2021 - 2025)*  
-  &nbsp;&nbsp;📊 GPA: **4.15** / Rank: **6 / 102**  
+  &nbsp;&nbsp;📊 GPA: **4.16** / Rank: **3 / 55**  
 - 🎓 **Master’s Student** @ *National Yang Ming Chiao Tung University (2025 - now)*  
-- 👨‍💻 Research Assistant & Teaching Assistant  
   (*Program Design I/II, Game Programming, Big Data Analytics*)
-- 🤩 Passionate about **Machine Learning, Backend & DevOps**
-- 🏆 ICPC Bronze • TOPC Silver • CCU Programming Gold • TOEIC 790 • CPE Top 0.6%
+- 🤩 Passionate about **Machine Learning, Backend, DevOps**
 - 🚀 Always eager to **turn ideas into impactful projects**
 
 <div align="center">
@@ -33,7 +31,6 @@
   <img src="https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white&style=for-the-badge" height="35"/>
   <img src="https://techstack-generator.vercel.app/react-icon.svg" alt="react" width="55" height="55" />
   <img src="https://techstack-generator.vercel.app/docker-icon.svg" alt="docker" width="55" height="55" />
-  <img src="https://techstack-generator.vercel.app/graphql-icon.svg" alt="graphql" width="55" height="55" />
   <img src="https://techstack-generator.vercel.app/mysql-icon.svg" alt="mysql" width="55" height="55" />
 </p>
 
