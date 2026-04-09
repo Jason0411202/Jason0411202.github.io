@@ -1,6 +1,459 @@
-<!DOCTYPE html>
-<html>
-    <p>
-        趕工中...
-    </p>
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jason 的文章入口</title>
+<meta name="description" content="Jason 的部落格入口，收錄技術筆記與學習記錄。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0a0a0f;
+  --ink2: #1c1c28;
+  --ink3: #3a3a4a;
+  --muted: #6b6b7e;
+  --faint: #a8a8b8;
+  --paper: #f5f4f0;
+  --paper2: #eeede8;
+  --paper3: #e4e3dc;
+  --white: #fafaf8;
+  --accent: #ff3d1f;
+  --accent2: #ff6b00;
+  --ecc: #7c3aed;
+  --ecc-light: #ede9fe;
+  --ecc-mid: #c4b5fd;
+  --border: #d4d3cc;
+  --border2: #c8c7be;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Noto Sans TC', sans-serif;
+  --display: 'Syne', sans-serif;
+  --shadow: 0 1px 3px rgba(10,10,15,0.08), 0 4px 16px rgba(10,10,15,0.06);
+  --shadow-lg: 0 6px 28px rgba(10,10,15,0.14), 0 1px 4px rgba(10,10,15,0.08);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+a { color: inherit; text-decoration: none; }
+
+.site-hero {
+  background: var(--ink);
+  color: var(--white);
+  padding: 4rem 2rem 3.5rem;
+  position: relative;
+  overflow: hidden;
+}
+.site-hero::before {
+  content: '';
+  position: absolute;
+  top: -120px; right: -80px;
+  width: 360px; height: 360px;
+  background: radial-gradient(circle, rgba(255,61,31,0.2) 0%, transparent 70%);
+  pointer-events: none;
+}
+.site-hero::after {
+  content: '';
+  position: absolute;
+  bottom: -140px; left: 10%;
+  width: 420px; height: 420px;
+  background: radial-gradient(circle, rgba(124,58,237,0.16) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+.hero-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+.hero-title {
+  font-family: var(--display);
+  font-size: clamp(2.4rem, 5vw, 3.8rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin-bottom: 1.2rem;
+}
+.hero-title span { color: var(--accent); }
+.hero-desc {
+  font-size: 15px;
+  color: rgba(250,250,248,0.68);
+  max-width: 560px;
+  margin-bottom: 2rem;
+}
+.hero-badges {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--mono);
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(250,250,248,0.08);
+}
+.hero-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 2.8rem 2rem 5rem;
+  display: grid;
+  grid-template-columns: minmax(0, 2.1fr) minmax(0, 1fr);
+  gap: 2.5rem;
+}
+
+.panel {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: var(--shadow);
+}
+.panel-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.panel-title {
+  font-family: var(--display);
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.panel-subtitle {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 210px;
+}
+.search-label {
+  font-size: 11px;
+  font-family: var(--mono);
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.search input {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  background: var(--paper2);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255,61,31,0.15);
+  background: var(--white);
+}
+
+.post-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.post-card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.4rem 1.6rem;
+  background: var(--white);
+  box-shadow: var(--shadow);
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  overflow: hidden;
+}
+.post-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--accent), var(--accent2));
+}
+.post-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border2);
+  box-shadow: var(--shadow-lg);
+}
+.post-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.post-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+.post-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.post-flag {
+  font-size: 10px;
+  font-family: var(--mono);
+  letter-spacing: 0.12em;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(124,58,237,0.12);
+  color: var(--ecc);
+  border: 1px solid rgba(124,58,237,0.25);
+}
+.post-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.01em;
+}
+.post-desc {
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 1rem;
+}
+.post-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tag {
+  font-size: 11px;
+  font-family: var(--mono);
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--paper3);
+  color: var(--ink3);
+}
+
+.empty {
+  display: none;
+  margin-top: 1rem;
+  padding: 1.4rem;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  background: var(--paper2);
+  color: var(--muted);
+}
+.empty.show { display: block; }
+
+.sidebar {
+  display: grid;
+  gap: 1.5rem;
+}
+.side-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.6rem;
+  box-shadow: var(--shadow);
+}
+.side-title {
+  font-family: var(--display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.8rem;
+}
+.side-text {
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 1rem;
+}
+.side-list {
+  display: grid;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink3);
+}
+.side-stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-family: var(--mono);
+}
+.side-stat span:last-child { color: var(--muted); }
+
+.footer {
+  margin-top: 2rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 960px) {
+  .main { grid-template-columns: 1fr; }
+  .panel-header { flex-direction: column; align-items: flex-start; }
+  .search { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+  <header class="site-hero">
+    <div class="hero-inner">
+      <div class="hero-eyebrow">Blog Index</div>
+      <h1 class="hero-title">Jason 的 <span>技術筆記入口</span></h1>
+      <p class="hero-desc">用一個乾淨、有層次的入口整理所有文章。每篇文章都是一個小小里程碑，這裡會持續更新。</p>
+      <div class="hero-badges">
+        <div class="hero-badge"><span class="dot"></span>AI 工具</div>
+        <div class="hero-badge"><span class="dot"></span>工作流程</div>
+        <div class="hero-badge"><span class="dot"></span>筆記整理</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">最新文章</div>
+          <div class="panel-subtitle">共 <span id="post-count">0</span> 篇，點擊即可閱讀</div>
+        </div>
+        <div class="search">
+          <label class="search-label" for="search">搜尋文章</label>
+          <input id="search" type="text" placeholder="輸入標題或標籤" autocomplete="off">
+        </div>
+      </div>
+      <div id="posts" class="post-grid"></div>
+      <div id="empty" class="empty">目前沒有符合的文章，請調整搜尋條件。</div>
+    </section>
+
+    <aside class="sidebar">
+      <div class="side-card">
+        <div class="side-title">更新摘要</div>
+        <div class="side-text">以專案內的 HTML 文章為主，每新增一篇只要在下方清單加入資料即可。</div>
+        <div class="side-list">
+          <div class="side-stat"><span id="latest-date">--</span><span>最近更新</span></div>
+          <div class="side-stat"><span id="total-posts">0</span><span>總文章數</span></div>
+          <div class="side-stat"><span>手動新增</span><span>維護方式</span></div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="side-title">新增文章方式</div>
+        <div class="side-text">把新文章的檔名與資訊加入下方的 <span style="font-family: var(--mono);">posts</span> 陣列即可。</div>
+        <div class="side-list">
+          <div>1. 新增 HTML 檔案</div>
+          <div>2. 在 posts 陣列填入標題、日期、連結</div>
+          <div>3. 重新整理即可看到新卡片</div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="footer">Jason 的筆記入口 · 建議以桌機閱讀效果最佳</footer>
+
+<script>
+const posts = [
+  {
+    title: 'Claude Code 使用指南',
+    desc: '完整整理 Claude Code 的指令、配置與自訂指令的使用方式。',
+    href: 'claude_code_introduction.html',
+    date: '2026-04-05',
+    minutes: 12,
+    tags: ['Claude', 'Workflow', 'AI 工具'],
+    status: 'NEW'
+  }
+];
+
+const postContainer = document.getElementById('posts');
+const postCount = document.getElementById('post-count');
+const totalPosts = document.getElementById('total-posts');
+const latestDate = document.getElementById('latest-date');
+const emptyState = document.getElementById('empty');
+
+const formatDate = (value) => {
+  if (!value) return '--';
+  const [y, m, d] = value.split('-');
+  return `${y}.${m}.${d}`;
+};
+
+const sortedPosts = [...posts].sort((a, b) => new Date(b.date) - new Date(a.date));
+latestDate.textContent = sortedPosts.length ? formatDate(sortedPosts[0].date) : '--';
+postCount.textContent = sortedPosts.length;
+totalPosts.textContent = sortedPosts.length;
+
+const renderPosts = (items) => {
+  postContainer.innerHTML = items.map((post) => {
+    const tags = post.tags.map((tag) => `<span class="tag">${tag}</span>`).join('');
+    return `
+      <a class="post-card" href="${post.href}">
+        <div class="post-top">
+          <div class="post-meta">
+            <span>${formatDate(post.date)}</span>
+            <span class="post-dot"></span>
+            <span>${post.minutes} min</span>
+          </div>
+          ${post.status ? `<span class="post-flag">${post.status}</span>` : ''}
+        </div>
+        <div class="post-title">${post.title}</div>
+        <div class="post-desc">${post.desc}</div>
+        <div class="post-tags">${tags}</div>
+      </a>
+    `;
+  }).join('');
+
+  emptyState.classList.toggle('show', items.length === 0);
+};
+
+renderPosts(sortedPosts);
+
+const searchInput = document.getElementById('search');
+searchInput.addEventListener('input', (event) => {
+  const query = event.target.value.trim().toLowerCase();
+  if (!query) {
+    renderPosts(sortedPosts);
+    return;
+  }
+  const filtered = sortedPosts.filter((post) => {
+    const haystack = [post.title, post.desc, post.tags.join(' ')].join(' ').toLowerCase();
+    return haystack.includes(query);
+  });
+  renderPosts(filtered);
+});
+</script>
+</body>
 </html>

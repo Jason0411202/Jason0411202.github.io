@@ -1,0 +1,2428 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code 指令完全手冊</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0a0a0f;
+  --ink2: #1c1c28;
+  --ink3: #3a3a4a;
+  --muted: #6b6b7e;
+  --faint: #a8a8b8;
+  --paper: #f5f4f0;
+  --paper2: #eeede8;
+  --paper3: #e4e3dc;
+  --white: #fafaf8;
+  --accent: #ff3d1f;
+  --accent2: #ff6b00;
+  --ecc: #7c3aed;
+  --ecc-light: #ede9fe;
+  --ecc-mid: #c4b5fd;
+  --builtin: #0f766e;
+  --builtin-light: #ccfbf1;
+  --builtin-mid: #5eead4;
+  --bundled: #92400e;
+  --bundled-light: #fef3c7;
+  --bundled-mid: #fcd34d;
+  --border: #d4d3cc;
+  --border2: #c8c7be;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Noto Sans TC', sans-serif;
+  --display: 'Syne', sans-serif;
+  --shadow: 0 1px 3px rgba(10,10,15,0.08), 0 4px 16px rgba(10,10,15,0.06);
+  --shadow-lg: 0 4px 24px rgba(10,10,15,0.12), 0 1px 4px rgba(10,10,15,0.08);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* ─── HEADER ─── */
+.site-header {
+  background: var(--ink);
+  color: var(--white);
+  padding: 3.5rem 2rem 3rem;
+  position: relative;
+  overflow: hidden;
+}
+.site-header::before {
+  content: '';
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(255,61,31,0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+.site-header::after {
+  content: '';
+  position: absolute;
+  bottom: -80px; left: 30%;
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+.header-inner { max-width: 960px; margin: 0 auto; position: relative; z-index: 1; }
+.header-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+.header-title {
+  font-family: var(--display);
+  font-size: clamp(2.2rem, 5vw, 3.6rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin-bottom: 1.2rem;
+}
+.header-title span { color: var(--accent); }
+.header-desc {
+  font-size: 15px;
+  color: rgba(250,250,248,0.65);
+  max-width: 520px;
+  line-height: 1.7;
+  margin-bottom: 2rem;
+}
+.header-badges { display: flex; gap: 10px; flex-wrap: wrap; }
+.hbadge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px;
+  border-radius: 99px;
+  font-size: 12px; font-weight: 500;
+  font-family: var(--mono);
+}
+.hbadge-builtin { background: rgba(94,234,212,0.15); color: #5eead4; border: 1px solid rgba(94,234,212,0.3); }
+.hbadge-bundled { background: rgba(252,211,77,0.12); color: #fcd34d; border: 1px solid rgba(252,211,77,0.25); }
+.hbadge-ecc { background: rgba(196,181,253,0.12); color: #c4b5fd; border: 1px solid rgba(196,181,253,0.25); }
+.hbadge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ─── NAV ─── */
+.sticky-nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(245,244,240,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+}
+.nav-inner {
+  max-width: 960px; margin: 0 auto;
+  display: flex; gap: 0; overflow-x: auto;
+  scrollbar-width: none;
+}
+.nav-inner::-webkit-scrollbar { display: none; }
+.nav-link {
+  display: flex; align-items: center; gap: 6px;
+  padding: 14px 16px;
+  font-size: 13px; font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+.nav-link:hover { color: var(--ink); }
+.nav-link.active { color: var(--ink); border-bottom-color: var(--accent); }
+.nav-count {
+  font-size: 10px; font-family: var(--mono);
+  background: var(--paper3); color: var(--muted);
+  padding: 2px 6px; border-radius: 99px;
+}
+
+/* ─── LAYOUT ─── */
+.main { max-width: 960px; margin: 0 auto; padding: 2.5rem 2rem 6rem; }
+
+/* ─── SECTION ─── */
+.section { margin-bottom: 4rem; }
+.section-header {
+  display: flex; align-items: flex-end; gap: 16px;
+  margin-bottom: 1.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--ink);
+}
+.section-number {
+  font-family: var(--display);
+  font-size: 3rem; font-weight: 800;
+  color: var(--paper3);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  user-select: none;
+}
+.section-meta {}
+.section-title {
+  font-family: var(--display);
+  font-size: 1.5rem; font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.section-subtitle {
+  font-size: 13px; color: var(--muted);
+  margin-top: 3px;
+}
+
+/* ─── CMD CARD ─── */
+.cmd-list { display: flex; flex-direction: column; gap: 14px; }
+
+.cmd-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.2s, border-color 0.2s;
+  position: relative;
+}
+.cmd-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+}
+.cmd-card.type-builtin::before { background: var(--builtin); }
+.cmd-card.type-bundled::before { background: var(--bundled); }
+.cmd-card.type-ecc::before { background: var(--ecc); }
+.cmd-card:hover { box-shadow: var(--shadow-lg); border-color: var(--border2); }
+
+.cmd-header-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 20px 14px 22px;
+  cursor: pointer;
+}
+.cmd-rank {
+  font-family: var(--mono);
+  font-size: 11px; font-weight: 600;
+  color: var(--faint);
+  min-width: 24px;
+  user-select: none;
+}
+.cmd-name {
+  font-family: var(--mono);
+  font-size: 16px; font-weight: 600;
+  color: var(--ink);
+  flex: 1;
+}
+.cmd-name-alias {
+  font-family: var(--mono);
+  font-size: 12px; color: var(--muted);
+  margin-left: 4px;
+}
+.type-badge {
+  font-size: 10px; font-weight: 600;
+  padding: 3px 8px; border-radius: 99px;
+  font-family: var(--mono);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.type-badge.builtin { background: var(--builtin-light); color: var(--builtin); }
+.type-badge.bundled { background: var(--bundled-light); color: var(--bundled); }
+.type-badge.ecc { background: var(--ecc-light); color: var(--ecc); }
+
+.cmd-brief {
+  font-size: 13.5px; color: var(--ink3);
+  padding: 0 22px 16px 22px;
+  margin-top: -4px;
+}
+
+.cmd-expand {
+  padding: 0 22px 18px;
+}
+.cmd-expand-inner {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.detail-section {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.detail-section:last-child { border-bottom: none; }
+.detail-label {
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--faint);
+  margin-bottom: 6px;
+}
+.detail-body { font-size: 13.5px; color: var(--ink2); line-height: 1.65; }
+
+.usage-grid { display: flex; flex-direction: column; gap: 6px; }
+.usage-item {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 8px 12px;
+  background: var(--white);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.usage-cmd {
+  font-family: var(--mono);
+  font-size: 12.5px; color: var(--ink);
+  min-width: 200px; flex-shrink: 0;
+}
+.usage-desc { font-size: 12.5px; color: var(--muted); }
+
+.tag-list { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag {
+  font-size: 11.5px;
+  padding: 3px 10px;
+  background: var(--paper2);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  color: var(--ink3);
+}
+
+.tip-box {
+  display: flex; gap: 10px;
+  padding: 12px 14px;
+  background: rgba(255,61,31,0.05);
+  border: 1px solid rgba(255,61,31,0.15);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--ink3);
+  margin-top: 8px;
+}
+.tip-icon { flex-shrink: 0; font-size: 14px; }
+
+.flow-steps {
+  display: flex; flex-direction: column; gap: 6px;
+  counter-reset: flow;
+}
+.flow-step {
+  display: flex; align-items: baseline; gap: 10px;
+  font-size: 13.5px; color: var(--ink2);
+  padding: 6px 0;
+}
+.flow-step::before {
+  counter-increment: flow;
+  content: counter(flow);
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 600;
+  min-width: 20px; height: 20px;
+  background: var(--ink); color: var(--white);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transform: translateY(1px);
+}
+
+.expand-toggle {
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  background: var(--paper2);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.2s;
+  font-size: 12px; color: var(--muted);
+  font-family: var(--mono);
+}
+.expand-toggle.open { transform: rotate(45deg); background: var(--ink); color: var(--white); }
+
+.cmd-expand { display: none; }
+.cmd-card.expanded .cmd-expand { display: block; }
+
+/* ─── QUICK REF TABLE ─── */
+.quick-table-wrap {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.quick-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 13px;
+}
+.quick-table th {
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted);
+  background: var(--paper2);
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.quick-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--paper2);
+  vertical-align: middle;
+}
+.quick-table tr:last-child td { border-bottom: none; }
+.quick-table tr:hover td { background: var(--paper); }
+.quick-table .qcmd {
+  font-family: var(--mono); font-size: 12.5px;
+  color: var(--ink); font-weight: 500;
+}
+
+/* ─── SHORTCUT GRID ─── */
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+.shortcut-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: var(--shadow);
+}
+.shortcut-key {
+  display: inline-flex; gap: 3px;
+  margin-bottom: 6px;
+}
+.kbd {
+  font-family: var(--mono);
+  font-size: 11px; font-weight: 600;
+  background: var(--ink);
+  color: var(--white);
+  padding: 3px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+}
+.shortcut-desc { font-size: 13px; color: var(--ink3); }
+
+/* ─── WORKFLOW BOX ─── */
+.workflow-box {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 22px 24px;
+  box-shadow: var(--shadow);
+  margin-bottom: 14px;
+}
+.workflow-title {
+  font-family: var(--display);
+  font-size: 15px; font-weight: 700;
+  margin-bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.workflow-icon { font-size: 18px; }
+.workflow-steps { display: flex; flex-direction: column; gap: 4px; }
+.ws {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 13.5px; padding: 5px 0;
+}
+.ws-cmd {
+  font-family: var(--mono); font-size: 12px;
+  color: var(--white);
+  background: var(--ink);
+  padding: 2px 8px; border-radius: 4px;
+  min-width: 120px; text-align: center;
+  flex-shrink: 0;
+}
+.ws-note { color: var(--ink3); padding-top: 2px; }
+.ws-arrow {
+  text-align: center;
+  color: var(--faint);
+  font-size: 12px;
+  padding: 2px 0;
+}
+
+/* ─── CALLOUT ─── */
+.callout {
+  background: var(--ecc-light);
+  border: 1px solid var(--ecc-mid);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 1.5rem;
+  font-size: 13.5px; color: var(--ink2);
+  line-height: 1.65;
+}
+.callout strong { color: var(--ecc); }
+
+/* ─── FOOTER ─── */
+.site-footer {
+  background: var(--ink2);
+  color: rgba(250,250,248,0.45);
+  text-align: center;
+  padding: 2.5rem;
+  font-size: 12px;
+  font-family: var(--mono);
+}
+
+/* ─── UTILS ─── */
+code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: var(--paper2);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--ink2);
+}
+
+@media (max-width: 600px) {
+  .site-header { padding: 2rem 1.25rem; }
+  .main { padding: 1.5rem 1.25rem 4rem; }
+  .section-number { font-size: 2rem; }
+  .usage-item { flex-direction: column; gap: 3px; }
+  .usage-cmd { min-width: unset; }
+  .cmd-header-row { padding: 14px 14px 10px 16px; }
+  .cmd-brief, .cmd-expand { padding-left: 16px; padding-right: 14px; }
+}
+
+/* ─── ECC TEACH CARDS ─── */
+.ecc-teach-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--ecc);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+}
+.ecc-teach-header {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  padding: 14px 20px;
+  background: linear-gradient(to right, rgba(124,58,237,0.06), transparent);
+  border-bottom: 1px solid var(--ecc-light);
+}
+.ecc-teach-cmd {
+  font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--ecc);
+}
+.ecc-teach-badges { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.scope-pill {
+  font-size: 11px; font-weight: 600; font-family: var(--mono);
+  padding: 3px 10px; border-radius: 99px;
+}
+.scope-auto { background: #fef3c7; color: #92400e; }
+.scope-project { background: #ede9fe; color: #5b21b6; }
+.scope-global { background: #d1fae5; color: #065f46; }
+.scope-both { background: #fef9c3; color: #854d0e; }
+.freq-pill {
+  font-size: 11px; font-weight: 500; font-family: var(--mono);
+  padding: 3px 10px; border-radius: 99px;
+  background: var(--paper2); color: var(--muted);
+}
+.ecc-teach-body { padding: 18px 20px; }
+.ecc-teach-desc { font-size: 14px; color: var(--ink2); line-height: 1.7; margin-bottom: 16px; }
+.teach-syntax {
+  background: var(--ink); border-radius: 8px;
+  padding: 12px 16px; margin-bottom: 16px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.teach-syntax-label {
+  font-family: var(--mono); font-size: 10px;
+  color: rgba(250,250,248,0.35);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  margin-bottom: 4px;
+}
+.teach-syntax-code {
+  font-family: var(--mono); font-size: 12.5px; color: #a5f3fc;
+  background: none; padding: 0; border-radius: 0;
+}
+.teach-compare {
+  border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  margin-bottom: 16px;
+}
+.teach-compare-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 10px 14px; font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.teach-compare-row:last-child { border-bottom: none; }
+.teach-compare-left { min-width: 160px; flex-shrink: 0; color: var(--ink); }
+.teach-compare-arrow { color: var(--faint); flex-shrink: 0; }
+.teach-compare-right { color: var(--muted); }
+.teach-ex-group { margin-bottom: 16px; }
+.teach-ex-header {
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--faint); margin-bottom: 8px;
+}
+.teach-ex {
+  border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  margin-bottom: 8px;
+}
+.teach-ex-level {
+  font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--ecc);
+  background: var(--ecc-light); padding: 5px 12px;
+  border-bottom: 1px solid var(--ecc-mid);
+}
+.teach-ex-code {
+  font-family: var(--mono); font-size: 12px;
+  background: #0d0d1a; color: #c4b5fd;
+  padding: 10px 14px; white-space: pre; overflow-x: auto;
+}
+.teach-ex-note {
+  font-size: 12.5px; color: var(--muted);
+  padding: 8px 12px; background: var(--paper);
+  border-top: 1px solid var(--border);
+}
+.teach-scope-box {
+  background: var(--paper); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px 14px; margin-bottom: 12px;
+}
+.teach-scope-title { font-size: 12px; font-weight: 600; color: var(--ink3); margin-bottom: 8px; }
+.teach-scope-rows { display: flex; flex-direction: column; gap: 7px; }
+.teach-scope-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 13px; color: var(--ink2);
+}
+.scope-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.scope-dot-global { background: #10b981; }
+.scope-dot-project { background: #7c3aed; }
+.scope-dot-promote { background: #f59e0b; }
+.conf-badge {
+  font-size: 10px; font-weight: 700; font-family: var(--mono);
+  padding: 2px 7px; border-radius: 4px; flex-shrink: 0;
+}
+.conf-low { background: #fef3c7; color: #92400e; }
+.conf-mid { background: #d1fae5; color: #065f46; }
+.conf-high { background: #ede9fe; color: #5b21b6; }
+.teach-code-block {
+  font-family: var(--mono); font-size: 11.5px;
+  background: var(--ink); color: #86efac;
+  padding: 12px 14px; border-radius: 6px;
+  white-space: pre; overflow-x: auto; margin-top: 8px;
+}
+.teach-warn {
+  font-size: 13px; color: var(--ink3);
+  background: rgba(124,58,237,0.05);
+  border: 1px solid rgba(124,58,237,0.2);
+  border-radius: 6px; padding: 12px 14px;
+}
+
+/* ─── SCENARIO TABS + PANELS ─── */
+.scenario-tabs {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.scenario-tab {
+  padding: 8px 16px; font-size: 13px; font-weight: 500;
+  font-family: var(--sans);
+  background: var(--white); border: 1px solid var(--border); border-radius: 8px;
+  cursor: pointer; color: var(--muted);
+  transition: all 0.15s;
+}
+.scenario-tab:hover { border-color: var(--border2); color: var(--ink); }
+.scenario-tab.active { background: var(--ink); color: var(--white); border-color: var(--ink); }
+.sc-panel { background: var(--white); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.sc-meta { padding: 16px 22px 12px; background: var(--paper); border-bottom: 1px solid var(--border); }
+.sc-title { font-family: var(--display); font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.sc-info { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+.sc-context { padding: 12px 22px; font-size: 13.5px; color: var(--ink3); background: rgba(255,61,31,0.03); border-bottom: 1px solid var(--border); }
+.sc-steps { padding: 16px 22px 22px; }
+.sc-step { display: flex; gap: 14px; align-items: flex-start; }
+.sc-num {
+  min-width: 28px; height: 28px; background: var(--ecc); color: var(--white);
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  flex-shrink: 0; margin-top: 2px;
+}
+.sc-content { flex: 1; margin-bottom: 4px; }
+.sc-cmd {
+  font-family: var(--mono); font-size: 12.5px;
+  background: #0d0d1a; color: #a5f3fc;
+  padding: 8px 14px; border-radius: 6px; margin-bottom: 6px;
+  white-space: pre-wrap; word-break: break-all;
+}
+.sc-why { font-size: 13px; color: var(--ink3); line-height: 1.6; margin-bottom: 5px; }
+.sc-result { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+.sc-arrow { padding-left: 14px; font-size: 16px; color: var(--faint); margin: 3px 0; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <div class="header-eyebrow">// Claude Code · 指令完全手冊</div>
+    <h1 class="header-title">
+      必學指令<br><span>完全指南</span>
+    </h1>
+    <p class="header-desc">
+      涵蓋 Claude Code 原生指令、內建 Skill、以及 everything-claude-code (ECC) 擴充套件。按常用程度排序，含詳細使用場景與範例。
+    </p>
+    <div class="header-badges">
+      <div class="hbadge hbadge-builtin"><span class="hbadge-dot"></span>原生 Built-in</div>
+      <div class="hbadge hbadge-bundled"><span class="hbadge-dot"></span>內建 Skill</div>
+      <div class="hbadge hbadge-ecc"><span class="hbadge-dot"></span>ECC 擴充</div>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="nav-inner">
+    <a href="#essential" class="nav-link active">🔥 必學指令 <span class="nav-count">4</span></a>
+    <a href="#context" class="nav-link">📦 Context 管理 <span class="nav-count">3</span></a>
+    <a href="#workflow" class="nav-link">🔧 工作流程 <span class="nav-count">4</span></a>
+    <a href="#ecc-deep" class="nav-link">🧠 ECC 深度教學</a>
+    <a href="#scenarios" class="nav-link">🎬 使用場景</a>
+    <a href="#shortcuts" class="nav-link">⌨ 快捷鍵</a>
+    <a href="#quickref" class="nav-link">📄 快速查閱表</a>
+  </div>
+</nav>
+
+<main class="main">
+
+<section class="section" id="essential">
+  <div class="section-header">
+    <div class="section-number">01</div>
+    <div class="section-meta">
+      <div class="section-title">🔥 必學指令</div>
+      <div class="section-subtitle">每天都會用到，不會就是在浪費 token 和時間</div>
+    </div>
+  </div>
+  <div class="cmd-list">
+
+    <div class="cmd-card type-builtin" id="cmd-init">
+      <div class="cmd-header-row" onclick="toggleCard(this)">
+        <span class="cmd-rank">#1</span>
+        <span class="cmd-name">/init</span>
+        <span class="type-badge builtin">原生</span>
+        <span class="expand-toggle">+</span>
+      </div>
+      <p class="cmd-brief">分析 codebase，建立 CLAUDE.md 配置文件 — 任何新專案的第一步</p>
+      <div class="cmd-expand">
+        <div class="cmd-expand-inner">
+          <div class="detail-section">
+            <div class="detail-label">是什麼</div>
+            <div class="detail-body">
+              <code>/init</code> 會掃描你的 repo，讀取 <code>package.json</code>、<code>Cargo.toml</code>、<code>go.mod</code>、CI 配置、README 等關鍵文件，然後和你對話確認細節，最後生成 <code>CLAUDE.md</code> 和 <code>CLAUDE.local.md</code>。這兩個文件會在每次 session 開始時自動載入，讓 Claude 知道你的專案慣例，不需要每次重複說明。
+            </div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">使用範例</div>
+            <div class="usage-grid">
+              <div class="usage-item">
+                <span class="usage-cmd">/init</span>
+                <span class="usage-desc">完整初始化，Claude 會訪談你確認細節</span>
+              </div>
+            </div>
+            <div class="tip-box" style="margin-top:10px;">
+              <span class="tip-icon">💡</span>
+              CLAUDE.md 已存在時再跑 /init，Claude 只會提出「修改建議」不會覆蓋。可以隨時重跑。
+            </div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">生成的文件</div>
+            <div class="usage-grid">
+              <div class="usage-item">
+                <span class="usage-cmd">CLAUDE.md</span>
+                <span class="usage-desc">團隊共享（commit 進 git）—— build/test/lint 指令、架構說明、命名慣例</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">CLAUDE.local.md</span>
+                <span class="usage-desc">個人私有（gitignore）—— 你自己的偏好設定，不影響團隊</span>
+              </div>
+            </div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">何時使用</div>
+            <div class="tag-list">
+              <span class="tag">clone 新 repo 後</span>
+              <span class="tag">加入新專案第一天</span>
+              <span class="tag">專案架構大改後</span>
+              <span class="tag">想更新 Claude 對專案的認知</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cmd-card type-builtin" id="cmd-clear">
+      <div class="cmd-header-row" onclick="toggleCard(this)">
+        <span class="cmd-rank">#2</span>
+        <span class="cmd-name">/clear <span class="cmd-name-alias">alias: /reset /new</span></span>
+        <span class="type-badge builtin">原生</span>
+        <span class="expand-toggle">+</span>
+      </div>
+      <p class="cmd-brief">完全清除對話記錄，開啟全新 session（比退出重啟更快）</p>
+      <div class="cmd-expand">
+        <div class="cmd-expand-inner">
+          <div class="detail-section">
+            <div class="detail-label">是什麼</div>
+            <div class="detail-body">
+              清空所有對話歷史，釋放 context window，從同一個工作目錄重新開始。<strong>不是</strong> /compact，不會做摘要，就是直接清掉。CLAUDE.md 裡的記憶依然保留。
+            </div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">使用範例</div>
+            <div class="usage-grid">
+              <div class="usage-item">
+                <span class="usage-cmd">/clear</span>
+                <span class="usage-desc">完全重置，開始新任務</span>
+              </div>
+            </div>
+            <div class="tip-box" style="margin-top:10px;">
+              <span class="tip-icon">🔥</span>
+              <strong>高頻使用：</strong>每次開始不相關的新任務就清。舊歷史只會消耗 token、讓 Claude 被無關資訊干擾。不要捨不得清。
+            </div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">vs /compact</div>
+            <div class="detail-body">
+              <code>/compact</code> = 保留摘要，繼續同一個任務 &nbsp;|&nbsp; <code>/clear</code> = 完全重置，換新任務
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cmd-card type-builtin" id="cmd-permissions">
+      <div class="cmd-header-row" onclick="toggleCard(this)">
+        <span class="cmd-rank">#3</span>
+        <span class="cmd-name">/permissions <span class="cmd-name-alias">alias: /allowed-tools</span></span>
+        <span class="type-badge builtin">原生</span>
+        <span class="expand-toggle">+</span>
+      </div>
+      <p class="cmd-brief">管理工具允許/禁止清單 — 減少 Claude 每次問你「可以嗎」</p>
+      <div class="cmd-expand">
+        <div class="cmd-expand-inner">
+          <div class="detail-section">
+            <div class="detail-label">是什麼</div>
+            <div class="detail-body">
+              Claude 預設每次執行 bash 指令、修改檔案都會問你。用 /permissions 預先設定「這些操作不用問」，讓工作流更順暢。設定存在 <code>.claude/settings.json</code>。
+            </div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">常用允許規則</div>
+            <div class="usage-grid">
+              <div class="usage-item">
+                <span class="usage-cmd">Bash(git:*)</span>
+                <span class="usage-desc">所有 git 指令不用問</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">Bash(npm:*)</span>
+                <span class="usage-desc">所有 npm 指令不用問</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">Edit(src/**/*.ts)</span>
+                <span class="usage-desc">src 下所有 TS 檔可自由編輯</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">Bash(pnpm test:*)</span>
+                <span class="usage-desc">跑測試不用問</span>
+              </div>
+            </div>
+            <div class="tip-box" style="margin-top:10px;">
+              <span class="tip-icon">⚡</span>
+              把常用操作預先允許，可以讓 Claude 做到你去喝咖啡回來已經完成，而不是一直停下來等你點確認。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cmd-card type-builtin" id="cmd-help">
+      <div class="cmd-header-row" onclick="toggleCard(this)">
+        <span class="cmd-rank">#4</span>
+        <span class="cmd-name">/help</span>
+        <span class="type-badge builtin">原生</span>
+        <span class="expand-toggle">+</span>
+      </div>
+      <p class="cmd-brief">列出當前 session 所有可用指令（含 plugin 和 skill 新增的）</p>
+      <div class="cmd-expand">
+        <div class="cmd-expand-inner">
+          <div class="detail-section">
+            <div class="detail-label">是什麼</div>
+            <div class="detail-body">
+              最權威的指令清單來源。不同 session 可能有不同的 skills 和 plugins，/help 永遠顯示「當前環境」實際可用的所有指令。
+            </div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">何時使用</div>
+            <div class="tag-list">
+              <span class="tag">忘記有什麼指令</span>
+              <span class="tag">裝了新 plugin 確認是否生效</span>
+              <span class="tag">第一次用新環境</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<section class="section" id="context">
+  <div class="section-header">
+    <div class="section-number">02</div>
+    <div class="section-meta">
+      <div class="section-title">📦 Context 管理</div>
+      <div class="section-subtitle">Context window 是最珍貴的資源，要主動管理</div>
+    </div>
+  </div>
+  <div class="cmd-list">
+
+    <div class="cmd-card type-builtin">
+      <div class="cmd-header-row" onclick="toggleCard(this)">
+        <span class="cmd-rank">#1</span>
+        <span class="cmd-name">@filepath</span>
+        <span class="type-badge builtin">原生</span>
+        <span class="expand-toggle">+</span>
+      </div>
+      <p class="cmd-brief">在對話中引用特定檔案，精準控制 context 內容</p>
+      <div class="cmd-expand">
+        <div class="cmd-expand-inner">
+          <div class="detail-section">
+            <div class="detail-label">使用範例</div>
+            <div class="usage-grid">
+              <div class="usage-item">
+                <span class="usage-cmd">@src/auth/login.ts</span>
+                <span class="usage-desc">把這個檔案加入 context</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">@README.md 幫我改進這份說明</span>
+                <span class="usage-desc">引用 + 下指令</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">@src/components/ 有哪些元件？</span>
+                <span class="usage-desc">引用整個目錄</span>
+              </div>
+            </div>
+            <div class="tip-box" style="margin-top:10px;">
+              <span class="tip-icon">💡</span>
+              比「幫我看這個專案的 auth 邏輯」更精準。讓 Claude 只讀你要它讀的，不浪費 context 掃整個 codebase。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cmd-card type-builtin">
+      <div class="cmd-header-row" onclick="toggleCard(this)">
+        <span class="cmd-rank">#2</span>
+        <span class="cmd-name"># text &nbsp;<span class="cmd-name-alias">（對話中快速存入記憶）</span></span>
+        <span class="type-badge builtin">原生</span>
+        <span class="expand-toggle">+</span>
+      </div>
+      <p class="cmd-brief">用 # 開頭快速把規則存入 CLAUDE.md，不中斷工作流程</p>
+      <div class="cmd-expand">
+        <div class="cmd-expand-inner">
+          <div class="detail-section">
+            <div class="detail-label">使用範例</div>
+            <div class="usage-grid">
+              <div class="usage-item">
+                <span class="usage-cmd"># 永遠用 pnpm 不用 npm</span>
+                <span class="usage-desc">存入，下次 session 自動記住</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd"># 用 zod 做所有 API validation</span>
+                <span class="usage-desc">存入技術規範</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd"># 回覆永遠用繁體中文</span>
+                <span class="usage-desc">存入語言偏好</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cmd-card type-builtin">
+      <div class="cmd-header-row" onclick="toggleCard(this)">
+        <span class="cmd-rank">#3</span>
+        <span class="cmd-name">!command &nbsp;<span class="cmd-name-alias">（直接執行 bash）</span></span>
+        <span class="type-badge builtin">原生</span>
+        <span class="expand-toggle">+</span>
+      </div>
+      <p class="cmd-brief">不離開 Claude Code 就能執行 bash 指令，結果自動加入 context</p>
+      <div class="cmd-expand">
+        <div class="cmd-expand-inner">
+          <div class="detail-section">
+            <div class="detail-label">使用範例</div>
+            <div class="usage-grid">
+              <div class="usage-item">
+                <span class="usage-cmd">!ls src/</span>
+                <span class="usage-desc">查看目錄結構</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">!git log --oneline -10</span>
+                <span class="usage-desc">查看最近 commit</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">!cat .env.example</span>
+                <span class="usage-desc">查看環境變數範本</span>
+              </div>
+            </div>
+            <div class="tip-box" style="margin-top:10px;">
+              <span class="tip-icon">💡</span>
+              執行結果會直接出現在對話中，Claude 可以看到並分析。適合查環境狀態、確認指令輸出。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<section class="section" id="workflow">
+  <div class="section-header">
+    <div class="section-number">03</div>
+    <div class="section-meta">
+      <div class="section-title">🔧 工作流程指令</div>
+      <div class="section-subtitle">提升開發品質、自動化重複工作</div>
+    </div>
+  </div>
+  <div class="cmd-list">
+
+    <div class="cmd-card type-bundled">
+      <div class="cmd-header-row" onclick="toggleCard(this)">
+        <span class="cmd-rank">#1</span>
+        <span class="cmd-name">/simplify <span class="cmd-name-alias">[focus]</span></span>
+        <span class="type-badge bundled">內建 Skill</span>
+        <span class="expand-toggle">+</span>
+      </div>
+      <p class="cmd-brief">平行跑 3 個 review agent，自動清理剛寫完的程式碼</p>
+      <div class="cmd-expand">
+        <div class="cmd-expand-inner">
+          <div class="detail-section">
+            <div class="detail-label">是什麼</div>
+            <div class="detail-body">
+              實作完功能後的「自動清潔」。Claude 同時派出三個 agent，分別從 code reuse（有沒有重複邏輯）、code quality（可讀性、命名）、efficiency（效能）三個維度 review 你剛改的檔案，匯總問題後直接修正。
+            </div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">使用範例</div>
+            <div class="usage-grid">
+              <div class="usage-item">
+                <span class="usage-cmd">/simplify</span>
+                <span class="usage-desc">全面清理最近改動</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">/simplify focus on memory efficiency</span>
+                <span class="usage-desc">重點看記憶體效率</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">/simplify focus on type safety</span>
+                <span class="usage-desc">重點看型別安全</span>
+              </div>
+            </div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">最佳時機</div>
+            <div class="tag-list">
+              <span class="tag">實作完一個 feature 後</span>
+              <span class="tag">修完一個 bug 後</span>
+              <span class="tag">提 PR 前清理</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cmd-card type-builtin">
+      <div class="cmd-header-row" onclick="toggleCard(this)">
+        <span class="cmd-rank">#2</span>
+        <span class="cmd-name">/review</span>
+        <span class="type-badge builtin">原生</span>
+        <span class="expand-toggle">+</span>
+      </div>
+      <p class="cmd-brief">Code review 當前改動，找 bug 和 security issue</p>
+      <div class="cmd-expand">
+        <div class="cmd-expand-inner">
+          <div class="detail-section">
+            <div class="detail-label">使用時機</div>
+            <div class="tag-list">
+              <span class="tag">提 PR 前自我 review</span>
+              <span class="tag">完成一個 feature 確認</span>
+              <span class="tag">不確定改動是否安全</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cmd-card type-builtin">
+      <div class="cmd-header-row" onclick="toggleCard(this)">
+        <span class="cmd-rank">#3</span>
+        <span class="cmd-name">/mcp <span class="cmd-name-alias">[enable|disable server-name]</span></span>
+        <span class="type-badge builtin">原生</span>
+        <span class="expand-toggle">+</span>
+      </div>
+      <p class="cmd-brief">管理 MCP server — 讓 Claude 連接資料庫、GitHub、外部 API</p>
+      <div class="cmd-expand">
+        <div class="cmd-expand-inner">
+          <div class="detail-section">
+            <div class="detail-label">常用 MCP</div>
+            <div class="usage-grid">
+              <div class="usage-item">
+                <span class="usage-cmd">github</span>
+                <span class="usage-desc">直接開 PR、查 issue、review PR</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">postgres / sqlite</span>
+                <span class="usage-desc">直接查詢資料庫</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">filesystem</span>
+                <span class="usage-desc">擴充檔案系統存取權限</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">slack</span>
+                <span class="usage-desc">讀寫 Slack 訊息</span>
+              </div>
+            </div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">使用範例</div>
+            <div class="usage-grid">
+              <div class="usage-item">
+                <span class="usage-cmd">/mcp enable github</span>
+                <span class="usage-desc">啟用 GitHub MCP</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">/mcp</span>
+                <span class="usage-desc">查看所有 MCP 狀態</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cmd-card type-builtin">
+      <div class="cmd-header-row" onclick="toggleCard(this)">
+        <span class="cmd-rank">#4</span>
+        <span class="cmd-name">/hooks</span>
+        <span class="type-badge builtin">原生</span>
+        <span class="expand-toggle">+</span>
+      </div>
+      <p class="cmd-brief">查看目前 hook 設定 — 存檔後自動跑 lint/format/typecheck</p>
+      <div class="cmd-expand">
+        <div class="cmd-expand-inner">
+          <div class="detail-section">
+            <div class="detail-label">是什麼</div>
+            <div class="detail-body">
+              Hooks 是在特定事件（如存檔後、bash 執行前）自動觸發的 shell 指令。例如：每次 Claude 修改 .ts 檔案後，自動跑 <code>tsc --noEmit</code> 確認型別正確。
+            </div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">常用 hook 情境</div>
+            <div class="usage-grid">
+              <div class="usage-item">
+                <span class="usage-cmd">PostToolUse (Edit)</span>
+                <span class="usage-desc">存檔後自動跑 prettier</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">PostToolUse (Edit *.ts)</span>
+                <span class="usage-desc">改 TS 後自動 type check</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-cmd">PreToolUse (Bash)</span>
+                <span class="usage-desc">執行 bash 前先驗證安全</span>
+              </div>
+            </div>
+            <div class="tip-box" style="margin-top:10px;">
+              <span class="tip-icon">💡</span>
+              設定好 hooks 後，Claude 改完程式碼，lint/format/typecheck 自動跑，只有通過才接受。品質不用靠人盯。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section class="section" id="ecc-deep">
+  <div class="section-header">
+    <div class="section-number">04</div>
+    <div class="section-meta">
+      <div class="section-title">🔬 ECC 完整教學</div>
+      <div class="section-subtitle">每個 ECC 指令的完整用法、參數說明、由簡到繁的範例與注意事項</div>
+    </div>
+  </div>
+
+  <div style="background:var(--ink2);color:var(--white);border-radius:14px;padding:24px 28px;margin-bottom:28px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-40px;right:-40px;width:200px;height:200px;background:radial-gradient(circle,rgba(124,58,237,0.3) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.12em;color:var(--ecc-mid);margin-bottom:10px;">// CORE CONCEPT</div>
+    <div style="font-family:var(--display);font-size:1.2rem;font-weight:700;margin-bottom:12px;">Instinct 系統：ECC 的大腦</div>
+    <div style="font-size:13.5px;color:rgba(250,250,248,0.75);line-height:1.75;max-width:680px;">
+      ECC 的核心是「instinct」—— 帶信心分數（0.3–0.9）的原子化知識單元，透過 hooks 在 100% 的操作中自動捕捉。<br><br>
+      <strong style="color:var(--ecc-mid);">Scope 規則：</strong>instinct 預設是 <strong style="color:var(--ecc-mid);">project-scoped</strong>（存在 <code style="background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:3px;">~/.claude/homunculus/projects/&lt;git-hash&gt;/</code>）。React 習慣留在 React repo，Python 慣例留在 Python repo。只有「永遠用 pnpm」這類工具偏好，或同一規則在 3+ 個 repo 高信心出現，才自動升為 global。
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
+      <div style="background:rgba(124,58,237,0.2);border:1px solid rgba(196,181,253,0.3);border-radius:99px;padding:5px 14px;font-size:12px;font-family:var(--mono);color:var(--ecc-mid);">project-scoped 預設</div>
+      <div style="background:rgba(124,58,237,0.2);border:1px solid rgba(196,181,253,0.3);border-radius:99px;padding:5px 14px;font-size:12px;font-family:var(--mono);color:var(--ecc-mid);">信心分數 0.3–0.9</div>
+      <div style="background:rgba(124,58,237,0.2);border:1px solid rgba(196,181,253,0.3);border-radius:99px;padding:5px 14px;font-size:12px;font-family:var(--mono);color:var(--ecc-mid);">hooks 100% 可靠捕捉</div>
+      <div style="background:rgba(124,58,237,0.2);border:1px solid rgba(196,181,253,0.3);border-radius:99px;padding:5px 14px;font-size:12px;font-family:var(--mono);color:var(--ecc-mid);">export 給團隊共享</div>
+    </div>
+  </div>
+
+  <div class="ecc-teach-card">
+    <div class="ecc-teach-header">
+      <div class="ecc-teach-cmd">/learn</div>
+      <div class="ecc-teach-badges">
+        <span class="scope-pill scope-auto">🔀 scope 自動判斷</span>
+        <span class="freq-pill">高頻使用</span>
+      </div>
+    </div>
+    <div class="ecc-teach-body">
+      <p class="ecc-teach-desc">主動教 Claude 一條規則，存入 instinct 系統。比 <code># 規則</code> 更智慧：有信心分數、會隨使用演化、可以 export 給團隊。系統自動判斷這條規則適合 project 還是 global scope。</p>
+
+      <div class="teach-syntax">
+        <span class="teach-syntax-label">語法</span>
+        <code class="teach-syntax-code">/learn &lt;自然語言描述的規則&gt;</code>
+      </div>
+
+      <div class="teach-compare">
+        <div class="teach-compare-row">
+          <span class="teach-compare-left"><code># 永遠用 pnpm</code></span>
+          <span class="teach-compare-arrow">→</span>
+          <span class="teach-compare-right">直接寫進 CLAUDE.md，每次 session 全部載入</span>
+        </div>
+        <div class="teach-compare-row">
+          <span class="teach-compare-left"><code>/learn always use pnpm</code></span>
+          <span class="teach-compare-arrow">→</span>
+          <span class="teach-compare-right">存進 instinct 系統，依情境觸發，有信心分數，會演化</span>
+        </div>
+      </div>
+
+      <div class="teach-ex-group">
+        <div class="teach-ex-header">範例 — 由簡單到複雜</div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">Lv.1 &nbsp;工具偏好（自動 → global）</div>
+          <div class="teach-ex-code">/learn always use pnpm, never npm or yarn</div>
+          <div class="teach-ex-note">工具偏好適用所有 repo → 系統自動存為 global scope</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">Lv.2 &nbsp;技術規範（→ project scope）</div>
+          <div class="teach-ex-code">/learn use zod for all input validation in this API; never trust raw request.body directly</div>
+          <div class="teach-ex-note">這個 repo 特有的技術選型 → project scope，只在這裡觸發</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">Lv.3 &nbsp;架構決策（→ project scope）</div>
+          <div class="teach-ex-code">/learn prefer Result&lt;T, E&gt; over throwing exceptions for business logic errors;
+only throw for truly unexpected system failures like DB connection drop</div>
+          <div class="teach-ex-note">錯誤處理模式，Claude 寫函式時自動用 Result 型別</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">Lv.4 &nbsp;複合慣例（→ project scope）</div>
+          <div class="teach-ex-code">/learn in this React app:
+- co-locate tests in __tests__/ next to the component
+- use React Testing Library not Enzyme
+- mock at network boundary with MSW, not at module level
+- test behavior not implementation details</div>
+          <div class="teach-ex-note">整套測試慣例，Claude 新增測試時全部自動遵循</div>
+        </div>
+      </div>
+
+      <div class="teach-scope-box">
+        <div class="teach-scope-title">📂 Scope 自動判斷邏輯</div>
+        <div class="teach-scope-rows">
+          <div class="teach-scope-row">
+            <span class="scope-dot scope-dot-global"></span>
+            <strong>Global：</strong>工具偏好、語言習慣、回覆格式 →「永遠用 pnpm」「回覆用繁體中文」
+          </div>
+          <div class="teach-scope-row">
+            <span class="scope-dot scope-dot-project"></span>
+            <strong>Project：</strong>技術選型、框架慣例、架構決策 →「用 zod」「React 用 RTL」
+          </div>
+          <div class="teach-scope-row">
+            <span class="scope-dot scope-dot-promote"></span>
+            <strong>自動晉升：</strong>同一規則在 3+ repo 高信心出現 → /instinct-evolve 建議 promote to global
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ecc-teach-card">
+    <div class="ecc-teach-header">
+      <div class="ecc-teach-cmd">/evolve &nbsp;<span style="font-size:14px;font-weight:400;color:var(--ecc-mid);">alias: /instinct-evolve</span></div>
+      <div class="ecc-teach-badges">
+        <span class="scope-pill scope-project">project → global</span>
+        <span class="freq-pill">中頻使用</span>
+      </div>
+    </div>
+    <div class="ecc-teach-body">
+      <p class="ecc-teach-desc">讓 Claude 分析這次 session 的 observations，主動提取 pattern 存為 instinct，並把信心分數夠高的 instinct 晉升為 skill 或 command。ECC 持續學習的主動觸發器。</p>
+
+      <div class="teach-syntax">
+        <span class="teach-syntax-label">語法</span>
+        <code class="teach-syntax-code">/evolve</code>
+      </div>
+
+      <div class="teach-ex-group">
+        <div class="teach-ex-header">完整使用流程</div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">步驟 1 &nbsp;正常工作（hooks 自動記錄）</div>
+          <div class="teach-ex-code"># 正常和 Claude 工作
+# ECC hooks 在背景把每次 prompt 和 tool use 寫入：
+# ~/.claude/homunculus/projects/&lt;hash&gt;/observations.jsonl</div>
+          <div class="teach-ex-note">你完全不需要做任何事，hooks 100% 可靠，不會漏掉任何操作</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">步驟 2 &nbsp;完成某件事後執行</div>
+          <div class="teach-ex-code">/evolve</div>
+          <div class="teach-ex-note">Claude 分析 observations：找你糾正 Claude 的地方、重複出現的 pattern、成功解決問題的方法 → 生成 instinct</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">步驟 3 &nbsp;審閱並管理</div>
+          <div class="teach-ex-code">/instinct-status
+# → 列出所有 instinct，含 confidence score 和 scope
+# 可以手動刪除不想要的</div>
+          <div class="teach-ex-note">確認 Claude 學到的是你要的，不對的就刪掉</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">步驟 4 &nbsp;晉升高信心 instinct</div>
+          <div class="teach-ex-code">/instinct-evolve
+# → 建議哪些 instinct 可以 promote 為 skill 或 command
+# confidence 接近 0.9 的會被建議晉升</div>
+          <div class="teach-ex-note">晉升後整個 team 都能用（需要 /instinct-export 然後 commit）</div>
+        </div>
+      </div>
+
+      <div class="teach-scope-box">
+        <div class="teach-scope-title">📂 存放路徑</div>
+        <pre class="teach-code-block">~/.claude/homunculus/
+├── projects/
+│   └── a1b2c3d4/                    ← git remote URL hash
+│       ├── observations.jsonl        ← hooks 自動寫入
+│       └── instincts/personal/       ← /evolve 生成在這
+│           ├── prefer-zod.yaml
+│           └── rtl-testing.yaml
+└── instincts/personal/              ← global（promote 後到這）
+    └── always-use-pnpm.yaml</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="ecc-teach-card">
+    <div class="ecc-teach-header">
+      <div class="ecc-teach-cmd">/instinct-status &nbsp;/export &nbsp;/evolve &nbsp;/prune</div>
+      <div class="ecc-teach-badges">
+        <span class="scope-pill scope-both">project / global</span>
+        <span class="freq-pill">低頻維護</span>
+      </div>
+    </div>
+    <div class="ecc-teach-body">
+      <p class="ecc-teach-desc">管理 instinct 系統的四個維護指令，定期整理確保系統乾淨有效。</p>
+
+      <div class="teach-ex-group">
+        <div class="teach-ex-header">四個指令詳解</div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">/instinct-status &nbsp;—&nbsp; 查看現狀</div>
+          <div class="teach-ex-code">/instinct-status
+# 輸出範例：
+# [project] prefer-zod        confidence: 0.82  trigger: "API validation"
+# [project] rtl-testing        confidence: 0.71  trigger: "writing tests"
+# [global]  always-pnpm        confidence: 0.95  trigger: "package install"
+# [project] avoid-any-type     confidence: 0.45  trigger: "TypeScript"</div>
+          <div class="teach-ex-note">了解 Claude 學到什麼，信心分數多高，哪些已達晉升標準</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">/instinct-export &nbsp;—&nbsp; 匯出給 team</div>
+          <div class="teach-ex-code">/instinct-export
+# → 生成 .claude/instincts/team.yaml
+# commit 進 repo → 其他成員 git pull 後自動載入
+# 可以 import 到其他 repo：
+/instinct-import .claude/instincts/team.yaml</div>
+          <div class="teach-ex-note">知識共享：你學到的 pattern，整個 team 的 Claude 都能受益</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">/instinct-evolve &nbsp;—&nbsp; 強制 evolution cycle</div>
+          <div class="teach-ex-code">/instinct-evolve
+# 重新評估所有 instinct 的 confidence
+# 更新分數（用了且有效 → 升，用了但效果差 → 降）
+# 建議晉升：confidence >= 0.85 的 → 可以 promote 為 skill</div>
+          <div class="teach-ex-note">每隔幾週跑一次，保持 instinct 系統的準確性</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">/instinct-prune &nbsp;—&nbsp; 清理雜訊</div>
+          <div class="teach-ex-code">/instinct-prune
+# 刪除 confidence &lt;= 0.3 的 instinct
+# 這些是：從未被觸發過的、或被觸發後沒有幫助的
+# 定期跑避免系統因雜訊累積而變慢</div>
+          <div class="teach-ex-note">建議每個月跑一次，保持系統精簡</div>
+        </div>
+      </div>
+
+      <div class="teach-scope-box">
+        <div class="teach-scope-title">Confidence Score 說明</div>
+        <div class="teach-scope-rows">
+          <div class="teach-scope-row"><span class="conf-badge conf-low">0.3</span>剛建立，試探性，可能不準確，不會強力影響 Claude 行為</div>
+          <div class="teach-scope-row"><span class="conf-badge conf-mid">0.6</span>已被使用多次且有正面效果，開始穩定影響行為</div>
+          <div class="teach-scope-row"><span class="conf-badge conf-high">0.85+</span>高度可信，建議晉升為 skill 或 command，正式加入工具箱</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ecc-teach-card">
+    <div class="ecc-teach-header">
+      <div class="ecc-teach-cmd">/checkpoint</div>
+      <div class="ecc-teach-badges">
+        <span class="scope-pill scope-project">project</span>
+        <span class="freq-pill">中頻使用</span>
+      </div>
+    </div>
+    <div class="ecc-teach-body">
+      <p class="ecc-teach-desc">在工作流程中建立具名存檔點，記錄 session context、進度、關鍵決策。之後可以回溯或從這個點分支。類似 git tag，但針對 Claude session 狀態。</p>
+
+      <div class="teach-syntax">
+        <span class="teach-syntax-label">語法</span>
+        <code class="teach-syntax-code">/checkpoint &lt;name&gt;</code>
+        <code class="teach-syntax-code">/checkpoint &nbsp;&nbsp;# 不給名稱用時間戳</code>
+      </div>
+
+      <div class="teach-ex-group">
+        <div class="teach-ex-header">範例 — 由簡單到複雜</div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">Lv.1 &nbsp;完成某個功能後存檔</div>
+          <div class="teach-ex-code">/checkpoint auth-feature-done
+# 之後告訴 Claude："回到 auth-feature-done 的狀態"
+# Claude 會讀取這個 checkpoint 的 context 繼續工作</div>
+          <div class="teach-ex-note">簡單好習慣，完成 milestone 就存一個</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">Lv.2 &nbsp;高風險操作前</div>
+          <div class="teach-ex-code">git stash  # 先把 code 狀態也存起來
+/checkpoint before-db-migration
+
+# 開始跑危險的 migration...
+ALTER TABLE users ADD COLUMN subscription_tier VARCHAR(20)...
+
+# 如果出問題：
+# "請回到 before-db-migration，我們重新規劃 migration 策略"</div>
+          <div class="teach-ex-note">高風險操作前的雙重保險：git stash + checkpoint</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">Lv.3 &nbsp;多方案探索</div>
+          <div class="teach-ex-code"># 探索方案 A
+/checkpoint exploring-approach-A
+# 實作方案 A...
+
+# 方案 A 不理想，換 B
+/checkpoint exploring-approach-B
+# 實作方案 B...
+
+# 方案 B 也不對，回到 A 繼續改進
+# "回到 exploring-approach-A，繼續在那個方向優化"</div>
+          <div class="teach-ex-note">架構設計時，平行探索不同方向，不用怕走錯路</div>
+        </div>
+      </div>
+
+      <div class="teach-warn">
+        💡 <strong>和 git 搭配用：</strong>checkpoint 記錄的是 Claude session context，git 記錄的是 code 狀態。兩個都要，才能完整回溯。
+      </div>
+    </div>
+  </div>
+
+  <div class="ecc-teach-card">
+    <div class="ecc-teach-header">
+      <div class="ecc-teach-cmd">/sessions</div>
+      <div class="ecc-teach-badges">
+        <span class="scope-pill scope-global">global</span>
+        <span class="freq-pill">中頻使用</span>
+      </div>
+    </div>
+    <div class="ecc-teach-body">
+      <p class="ecc-teach-desc">查看、搜尋、匯出過去的 session 記錄。Session 存在 <code>~/.claude/session-data/</code>，跨 repo、跨時間都可以搜尋。</p>
+
+      <div class="teach-syntax">
+        <span class="teach-syntax-label">語法（多個子指令）</span>
+        <code class="teach-syntax-code">/sessions &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 列出最近 sessions</code>
+        <code class="teach-syntax-code">/sessions search &lt;keyword&gt; &nbsp;# 搜尋包含關鍵字的 session</code>
+        <code class="teach-syntax-code">/sessions branch &lt;id&gt; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 從某個 session 分支出來</code>
+        <code class="teach-syntax-code">/sessions export &lt;id&gt; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 匯出成 markdown 文件</code>
+        <code class="teach-syntax-code">/sessions metrics &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 使用量統計</code>
+        <code class="teach-syntax-code">/sessions compact &lt;id&gt; &nbsp;&nbsp;&nbsp;&nbsp;# 壓縮舊 session 節省空間</code>
+      </div>
+
+      <div class="teach-ex-group">
+        <div class="teach-ex-header">常見使用情境</div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">找回上次的解法</div>
+          <div class="teach-ex-code">/sessions search "race condition"
+# → 找到 2 週前的 session，當時解決了 mutex 問題
+
+/sessions branch sess_20260315_142301
+# → 從那個 session 分支，帶著當時的 context 繼續</div>
+          <div class="teach-ex-note">不用重新解釋問題背景，直接繼承當時的 context</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">把 session 變成設計文件</div>
+          <div class="teach-ex-code">/sessions export sess_20260320_090000
+# → 輸出 design-decision-2026-03-20.md
+# 包含：決策過程、討論的方案、最終選擇的理由
+
+# 存進 docs/ADR/（Architecture Decision Records）</div>
+          <div class="teach-ex-note">重要的架構討論不要讓它消失在 session history 裡</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">查成本統計</div>
+          <div class="teach-ex-code">/sessions metrics
+# 輸出：
+# 本週 sessions: 23 個
+# 總 token 使用: 2.4M input / 890K output
+# 最常用指令: /compact (18次), /review (12次)
+# 最長 session: 4.2hr on 2026-04-02</div>
+          <div class="teach-ex-note">了解自己的使用模式，找出哪裡可以優化</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ecc-teach-card">
+    <div class="ecc-teach-header">
+      <div class="ecc-teach-cmd">/code-review</div>
+      <div class="ecc-teach-badges">
+        <span class="scope-pill scope-project">project</span>
+        <span class="freq-pill">中頻使用</span>
+      </div>
+    </div>
+    <div class="ecc-teach-body">
+      <p class="ecc-teach-desc">完整的 PR review pipeline：讀 PR 全文（非只看 diff hunk）、跑 CI 驗證、輸出帶決策的結構化報告，存到 <code>.claude/PRPs/reviews/</code>。</p>
+
+      <div class="teach-syntax">
+        <span class="teach-syntax-label">語法</span>
+        <code class="teach-syntax-code">/code-review &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# review 當前 branch</code>
+        <code class="teach-syntax-code">/code-review PR#123 &nbsp;# review 指定 PR</code>
+      </div>
+
+      <div class="teach-ex-group">
+        <div class="teach-ex-header">輸出範例</div>
+        <div class="teach-ex">
+          <div class="teach-ex-level">典型輸出結構</div>
+          <div class="teach-ex-code">PR #47: Add payment processing module
+Decision: REQUEST_CHANGES
+Issues: 2 critical, 1 high, 3 medium, 0 low
+Validation: 4/6 checks passed
+
+Critical Issues:
+  [security] API key hardcoded in src/payment/client.ts:23
+             → Move to environment variable, rotate immediately
+  [logic]    Race condition: concurrent payments can double-charge
+             → Add distributed lock or idempotency key
+
+High Issues:
+  [test]     No error handling tests for network failures (timeout, 5xx)
+
+Validation Results:
+  ✅ TypeScript typecheck — passed
+  ✅ ESLint              — 0 errors
+  ❌ Test coverage       — 62% (required: 80%)
+  ✅ Build               — succeeded
+  ❌ Security scan       — 1 hardcoded secret found
+  ✅ No console.log      — clean
+
+Report saved: .claude/PRPs/reviews/pr-47-review.md</div>
+          <div class="teach-ex-note">APPROVE / REQUEST_CHANGES / BLOCK 三種決策。Critical issue → 自動 BLOCK</div>
+        </div>
+      </div>
+
+      <div class="teach-compare">
+        <div class="teach-compare-row">
+          <span class="teach-compare-left">原生 <code>/review</code></span>
+          <span class="teach-compare-arrow">→</span>
+          <span class="teach-compare-right">快速，看 diff 給意見，不跑 CI，無正式報告</span>
+        </div>
+        <div class="teach-compare-row">
+          <span class="teach-compare-left">ECC <code>/code-review</code></span>
+          <span class="teach-compare-arrow">→</span>
+          <span class="teach-compare-right">讀全文脈、跑所有 CI、輸出結構化決策報告到檔案</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ecc-teach-card">
+    <div class="ecc-teach-header">
+      <div class="ecc-teach-cmd">/loop-start &nbsp;&amp;&nbsp; /loop-status</div>
+      <div class="ecc-teach-badges">
+        <span class="scope-pill scope-project">project</span>
+        <span class="freq-pill">中頻使用</span>
+      </div>
+    </div>
+    <div class="ecc-teach-body">
+      <p class="ecc-teach-desc">啟動自動迭代迴圈：Claude 持續執行，直到你指定的條件達成。有明確完成條件的任務可以完全自動化，你可以去做別的事。</p>
+
+      <div class="teach-syntax">
+        <span class="teach-syntax-label">語法</span>
+        <code class="teach-syntax-code">/loop-start &lt;完成條件描述&gt;</code>
+        <code class="teach-syntax-code">/loop-status &nbsp;&nbsp;&nbsp;# 查看迴圈目前狀態</code>
+      </div>
+
+      <div class="teach-ex-group">
+        <div class="teach-ex-header">範例 — 由簡單到複雜</div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">Lv.1 &nbsp;跑測試直到全通過</div>
+          <div class="teach-ex-code">/loop-start run pnpm test until all tests pass
+# Claude 自動：跑測試 → 看失敗 → 修 code → 再跑 → ...
+# 直到全綠才停止</div>
+          <div class="teach-ex-note">最常用。寫完 code 讓 Claude 自動跑到 green，你去泡茶</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">Lv.2 &nbsp;修 lint 直到乾淨</div>
+          <div class="teach-ex-code">/loop-start fix all ESLint errors until `pnpm lint` exits with code 0
+# 查看進度：
+/loop-status
+# → Round 3/? | Fixed 12 errors | 4 remaining | ETA ~2min</div>
+          <div class="teach-ex-note">大量 lint 錯誤時很有用，不需要一個一個手動修</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">Lv.3 &nbsp;多重完成條件</div>
+          <div class="teach-ex-code">/loop-start keep iterating until ALL of these pass:
+1. pnpm typecheck exits 0 (no TypeScript errors)
+2. pnpm test exits 0 with coverage >= 80%
+3. pnpm lint exits 0 (no ESLint errors)
+4. pnpm build exits 0 (production build succeeds)</div>
+          <div class="teach-ex-note">CI pre-check：確保所有關卡通過後再 commit。適合跑完整個晚上</div>
+        </div>
+      </div>
+
+      <div class="teach-warn">
+        ⚠️ <strong>注意：</strong>沒有內建次數上限。Claude 陷入死循環時（修了 A 壞了 B，修了 B 壞了 A）要手動 Ctrl+C 中斷。建議在 git feature branch 上跑，保護 main branch。
+      </div>
+    </div>
+  </div>
+
+  <div class="ecc-teach-card">
+    <div class="ecc-teach-header">
+      <div class="ecc-teach-cmd">/quality-gate</div>
+      <div class="ecc-teach-badges">
+        <span class="scope-pill scope-project">project</span>
+        <span class="freq-pill">一次設定</span>
+      </div>
+    </div>
+    <div class="ecc-teach-body">
+      <p class="ecc-teach-desc">定義這個 repo 的最低品質標準。設定後，Claude 每次完成工作都自動驗證，未通過會繼續修。一次設定，永久生效，存在 <code>.claude/settings.json</code>。</p>
+
+      <div class="teach-syntax">
+        <span class="teach-syntax-label">語法</span>
+        <code class="teach-syntax-code">/quality-gate &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 互動式設定</code>
+        <code class="teach-syntax-code">/quality-gate status &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 查看當前設定</code>
+        <code class="teach-syntax-code">/quality-gate set: &lt;描述&gt; &nbsp;&nbsp;# 直接描述關卡</code>
+      </div>
+
+      <div class="teach-ex-group">
+        <div class="teach-ex-header">設定範例</div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">互動式設定（推薦新手）</div>
+          <div class="teach-ex-code">/quality-gate
+# Claude 引導你選擇：
+# ✓ TypeScript typecheck
+# ✓ ESLint (zero errors)
+# ✓ Unit tests pass
+# ○ Test coverage >= ?  →  你輸入：80
+# ✓ Build succeeds
+# ○ Security scan
+# → 設定完成，存入 .claude/settings.json</div>
+          <div class="teach-ex-note">互動式，Claude 會建議常用關卡讓你選擇</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">進階：直接描述</div>
+          <div class="teach-ex-code">/quality-gate set:
+- pnpm typecheck must exit 0
+- pnpm lint must exit 0 with zero errors
+- pnpm test must pass with coverage >= 80%
+- pnpm build must succeed
+- no console.log in src/ (except debug files)
+- no hardcoded secrets (run git-secrets scan)</div>
+          <div class="teach-ex-note">完整的 production-grade 品質標準</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">查看現況</div>
+          <div class="teach-ex-code">/quality-gate status
+# 輸出：
+# Gate: typecheck  ✅  last run: 2 min ago
+# Gate: lint       ✅  last run: 2 min ago
+# Gate: test       ✅  coverage: 84%
+# Gate: build      ✅  last run: 2 min ago
+# Gate: secrets    ❌  1 issue found → details below</div>
+          <div class="teach-ex-note">一眼看出哪個關卡沒過</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ecc-teach-card">
+    <div class="ecc-teach-header">
+      <div class="ecc-teach-cmd">/harness-audit</div>
+      <div class="ecc-teach-badges">
+        <span class="scope-pill scope-both">project + global</span>
+        <span class="freq-pill">低頻診斷</span>
+      </div>
+    </div>
+    <div class="ecc-teach-body">
+      <p class="ecc-teach-desc">全面審計 ECC 環境健康狀態，帶分數的診斷報告加具體建議。剛裝 ECC、感覺 Claude 行為怪怪的、懷疑設定沒生效時跑。</p>
+
+      <div class="teach-ex-group">
+        <div class="teach-ex-header">輸出範例</div>
+        <div class="teach-ex">
+          <div class="teach-ex-level">典型輸出（評分 74/100）</div>
+          <div class="teach-ex-code">ECC Harness Audit Report — Score: 74/100
+
+✅ CLAUDE.md        Valid, 342 chars, loaded correctly
+✅ Hooks            3 active (PostToolUse ×2, PreToolUse ×1)
+⚠️  Skills          8/12 loaded; 4 skipped (char budget 16k exceeded)
+❌ Quality Gate     Not configured → run /quality-gate
+✅ Instincts        14 project, 3 global, avg confidence: 0.71
+⚠️  MCP             github: connected / postgres: unreachable (timeout)
+✅ Permissions      Bash(git:*) Bash(pnpm:*) Edit(src/**)
+
+Recommendations (priority order):
+  1. /quality-gate — No quality standards set, add them now
+  2. Set SLASH_COMMAND_TOOL_CHAR_BUDGET=32000 or trim skill descriptions
+  3. Check postgres MCP: verify connection string in .claude/settings.json</div>
+          <div class="teach-ex-note">每個問題都有具體的修復建議，照著做就對了</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ecc-teach-card">
+    <div class="ecc-teach-header">
+      <div class="ecc-teach-cmd">/update-docs</div>
+      <div class="ecc-teach-badges">
+        <span class="scope-pill scope-project">project</span>
+        <span class="freq-pill">中頻使用</span>
+      </div>
+    </div>
+    <div class="ecc-teach-body">
+      <p class="ecc-teach-desc">分析最近的 code 改動，找出哪些文件需要同步更新，然後自動更新。解決「改了 code 忘記更新文件」這個永恆的問題。</p>
+
+      <div class="teach-syntax">
+        <span class="teach-syntax-label">語法</span>
+        <code class="teach-syntax-code">/update-docs &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 分析所有最近改動</code>
+        <code class="teach-syntax-code">/update-docs @src/api/payment.ts &nbsp;&nbsp;# 只針對這個檔案</code>
+      </div>
+
+      <div class="teach-ex-group">
+        <div class="teach-ex-header">自動偵測並更新的文件類型</div>
+        <div class="teach-ex">
+          <div class="teach-ex-level">涵蓋範圍</div>
+          <div class="teach-ex-code">README.md          ← 功能說明、安裝步驟、使用範例
+docs/API.md        ← API endpoint 說明、參數、回傳值
+CHANGELOG.md       ← 新增一條對應的 change 條目
+docs/ARCHITECTURE  ← 如果架構有變動
+JSDoc / TSDoc      ← 函式的 inline 文件
+openapi.yaml       ← OpenAPI spec（如果有的話）</div>
+          <div class="teach-ex-note">只更新和你改動相關的部分，不會亂動其他文件</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ecc-teach-card">
+    <div class="ecc-teach-header">
+      <div class="ecc-teach-cmd">/model-route</div>
+      <div class="ecc-teach-badges">
+        <span class="scope-pill scope-global">global</span>
+        <span class="freq-pill">設定一次</span>
+      </div>
+    </div>
+    <div class="ecc-teach-body">
+      <p class="ecc-teach-desc">智慧模型路由（ECC NanoClaw v2 功能）。根據任務複雜度自動選 Opus/Sonnet/Haiku，在品質和成本間取最佳平衡。不用每次手動 /model 切換。</p>
+
+      <div class="teach-ex-group">
+        <div class="teach-ex-header">預設路由規則</div>
+        <div class="teach-ex">
+          <div class="teach-ex-level">自動判斷邏輯</div>
+          <div class="teach-ex-code">架構設計 / 複雜 debug / 安全漏洞分析
+  → claude-opus-4-6  (最強，最貴)
+
+日常 feature 實作 / code review / 一般 Q&A
+  → claude-sonnet-4-6  (均衡，主力)
+
+格式化 / 變數命名 / 簡單問答 / 文件整理
+  → claude-haiku-4-5   (最快，最便宜)</div>
+          <div class="teach-ex-note">「幫我把這個變數改個名字」不需要 Opus，Haiku 就行，便宜 10 倍以上</div>
+        </div>
+
+        <div class="teach-ex">
+          <div class="teach-ex-level">管理指令</div>
+          <div class="teach-ex-code">/model-route status   # 查目前路由設定
+/model-route edit     # 修改路由規則（自訂什麼任務用什麼模型）
+/model-route disable  # 關掉自動路由（全部手動）
+/model-route enable   # 重新開啟</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ecc-teach-card">
+    <div class="ecc-teach-header">
+      <div class="ecc-teach-cmd">/skill-create</div>
+      <div class="ecc-teach-badges">
+        <span class="scope-pill scope-project">project</span>
+        <span class="freq-pill">低頻，值得用</span>
+      </div>
+    </div>
+    <div class="ecc-teach-body">
+      <p class="ecc-teach-desc">分析 git history 和 codebase，自動生成針對這個 repo 特有流程的 SKILL.md。把你 repo 的部署流程、特殊工具、慣例全部提取成 Claude 隨時可以呼叫的 skill。</p>
+
+      <div class="teach-syntax">
+        <span class="teach-syntax-label">語法</span>
+        <code class="teach-syntax-code">/skill-create &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 分析整個 repo</code>
+        <code class="teach-syntax-code">/skill-create --instincts &nbsp;# 同時生成 instinct</code>
+      </div>
+
+      <div class="teach-ex-group">
+        <div class="teach-ex-header">典型生成結果</div>
+        <div class="teach-ex">
+          <div class="teach-ex-level">範例：分析後可能生成的 skills</div>
+          <div class="teach-ex-code"># Claude 分析你的 git log 和 CI 配置後，可能生成：
+.claude/skills/deploy/SKILL.md
+  → 你的 deployment 流程（k8s rollout、smoke test、rollback 步驟）
+
+.claude/skills/db-migration/SKILL.md
+  → 你的 migration 標準流程（先寫 down、測試、申請審核）
+
+.claude/skills/release/SKILL.md
+  → changelog、版本號、git tag、通知 Slack 的完整流程</div>
+          <div class="teach-ex-note">這些 skill 之後只要說「deploy」「migration」「release」Claude 就知道你的完整流程</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+
+<section class="section" id="scenarios">
+  <div class="section-header">
+    <div class="section-number">05</div>
+    <div class="section-meta">
+      <div class="section-title">🎬 使用場景：由簡到繁</div>
+      <div class="section-subtitle">真實情境的完整指令序列，含每步說明和預期結果</div>
+    </div>
+  </div>
+
+  <div class="scenario-tabs">
+    <button type="button" class="scenario-tab active" onclick="showScenario('sc1', this)">🌱 入門第一天</button>
+    <button type="button" class="scenario-tab" onclick="showScenario('sc2', this)">🔧 實作新功能</button>
+    <button type="button" class="scenario-tab" onclick="showScenario('sc3', this)">🧪 測試驅動開發</button>
+    <button type="button" class="scenario-tab" onclick="showScenario('sc4', this)">🚀 大型重構遷移</button>
+    <button type="button" class="scenario-tab" onclick="showScenario('sc5', this)">🐛 複雜 Bug 追查</button>
+    <button type="button" class="scenario-tab" onclick="showScenario('sc6', this)">👥 團隊導入 ECC</button>
+  </div>
+
+  <div class="sc-panel" id="sc1">
+    <div class="sc-meta">
+      <div class="sc-title">🌱 入門第一天 — 拿到陌生 Repo 從零開始</div>
+      <div class="sc-info">難度：入門 ｜ 使用指令：原生 + 少量 ECC ｜ 預計時間：30 分鐘</div>
+    </div>
+    <div class="sc-context">📌 情境：你加入新公司第一天，接手一個完全不熟悉的 codebase，需要快速上手並修第一個 bug。</div>
+    <div class="sc-steps">
+      <div class="sc-step">
+        <div class="sc-num">1</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/init</div>
+          <div class="sc-why">Claude 掃描 repo，讀取 package.json、CI 配置、README，然後問你幾個確認問題，建立 CLAUDE.md。以後每次 session 不需要再解釋「這個 repo 是做什麼的」。</div>
+          <div class="sc-result">📄 產出：<code>CLAUDE.md</code>（build/test 指令、架構說明、特殊慣例）</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">2</div>
+        <div class="sc-content">
+          <div class="sc-cmd"># 回覆永遠用繁體中文
+# 用 pnpm 不用 npm</div>
+          <div class="sc-why">用 <code>#</code> 快速加入個人偏好，這些存進 CLAUDE.local.md（不會 commit，只影響你自己）。</div>
+          <div class="sc-result">✅ 之後所有 session Claude 都用中文回覆</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">3</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/permissions</div>
+          <div class="sc-why">預先允許 git、pnpm 等常用操作，避免 Claude 每次都問你「可以執行這個嗎」。設一次，整個專案受用。</div>
+          <div class="sc-result">⚡ 減少 80% 的確認中斷</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">4</div>
+        <div class="sc-content">
+          <div class="sc-cmd">@src/auth/login.ts @src/middleware/auth.ts
+JWT token 驗證失敗的問題在哪裡？log 顯示 403 但 token 明明還有效</div>
+          <div class="sc-why">用 <code>@</code> 引用相關檔案讓 Claude 有完整 context，問具體問題。比「幫我看 auth」精準，節省 token。</div>
+          <div class="sc-result">🔍 Claude 分析檔案，指出 token expiry 判斷邏輯有 timezone 問題</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">5</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/review</div>
+          <div class="sc-why">修完 bug 後，讓 Claude review 你的改動，確認沒有引入新問題。</div>
+          <div class="sc-result">📋 改動的 review，確認修法正確</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">6</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/clear</div>
+          <div class="sc-why">換下一個任務前清空。不要讓 JWT bug 的 context 污染下一個功能的開發。</div>
+          <div class="sc-result">🆕 全新 session，CLAUDE.md 設定自動保留</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sc-panel" id="sc2" style="display:none;">
+    <div class="sc-meta">
+      <div class="sc-title">🔧 實作新功能 — 標準開發流程 with ECC</div>
+      <div class="sc-info">難度：中等 ｜ 使用指令：原生 + 內建 Skill + ECC ｜ 預計時間：2-4 小時</div>
+    </div>
+    <div class="sc-context">📌 情境：PM 說要加「使用者可以匯出資料為 CSV」的功能。從規劃到 PR merge，完整流程。</div>
+    <div class="sc-steps">
+      <div class="sc-step">
+        <div class="sc-num">1</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/clear</div>
+          <div class="sc-why">新功能 = 新 session。清空上一個任務的 context。</div>
+          <div class="sc-result">🆕 乾淨的 context</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">2</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/checkpoint before-csv-feature</div>
+          <div class="sc-why">（ECC）計畫確認後，開始大動作前存一個點。萬一走錯方向，可以回來。</div>
+          <div class="sc-result">💾 存檔點建立</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">3</div>
+        <div class="sc-content">
+          <div class="sc-cmd">@src/services/ @src/routes/user.ts
+先實作後端：GET /api/users/me/export-csv endpoint，
+用 streaming response 處理大量資料</div>
+          <div class="sc-why">引用相關檔案確保 Claude 了解現有 code 風格，然後按計畫實作。</div>
+          <div class="sc-result">✏️ 後端 API 實作完成</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">4</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/loop-start run pnpm test until all export-related tests pass</div>
+          <div class="sc-why">（ECC）讓 Claude 自動跑測試 → 看失敗 → 修 → 再跑，直到全綠。你可以去喝咖啡。</div>
+          <div class="sc-result">🤖 全自動 test → fix → test 迴圈</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">5</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/simplify</div>
+          <div class="sc-why">（內建 Skill）清理剛寫的 code。3 個 agent 平行 review code reuse、quality、efficiency，通常 1-2 分鐘完成。</div>
+          <div class="sc-result">🧹 重複邏輯消除、命名改善、不必要的複雜度移除</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">6</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/code-review</div>
+          <div class="sc-why">（ECC）提 PR 前的完整 review：讀全文、跑 CI、找 security issue、輸出決策報告。</div>
+          <div class="sc-result">📋 APPROVE / REQUEST_CHANGES 決策 + 問題清單</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">7</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/update-docs</div>
+          <div class="sc-why">（ECC）自動更新 README 的功能說明和 API 文件，新功能要有文件。</div>
+          <div class="sc-result">📄 README 和 API docs 同步更新</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">8</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/evolve</div>
+          <div class="sc-why">（ECC）從這次 feature 開發學習：CSV streaming 的做法、測試策略、API 設計決策，全部沉澱為 instinct。</div>
+          <div class="sc-result">🧠 新 instinct 生成，下次做類似功能更快</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sc-panel" id="sc3" style="display:none;">
+    <div class="sc-meta">
+      <div class="sc-title">🧪 測試驅動開發 (TDD) — 先測試後實作</div>
+      <div class="sc-info">難度：中等 ｜ 使用指令：原生 + ECC ｜ 特點：全程 quality gate 把關</div>
+    </div>
+    <div class="sc-context">📌 情境：要實作 calculateDiscount() 函式，你的 team 要求嚴格 TDD，coverage 必須 ≥ 80%。</div>
+    <div class="sc-steps">
+      <div class="sc-step">
+        <div class="sc-num">1</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/learn 這個 repo 嚴格 TDD：
+先寫 failing tests（Red），再最小實作（Green），最後重構（Refactor）。
+coverage 必須 >= 80%，用 Vitest 不用 Jest</div>
+          <div class="sc-why">（ECC）把 TDD 規則教給 Claude，之後所有實作它都自動遵循，不需要每次重複說明。</div>
+          <div class="sc-result">📚 TDD instinct 建立，project scope</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">2</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/quality-gate set: vitest passes, coverage >= 80%, typecheck passes</div>
+          <div class="sc-why">（ECC）設品質關卡，每次實作完 Claude 自動驗證，不達標繼續修。</div>
+          <div class="sc-result">🚧 Quality gate 設定，從此自動把關</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">3</div>
+        <div class="sc-content">
+          <div class="sc-cmd">只寫 calculateDiscount() 的測試，不要實作。
+需要涵蓋：正常折扣、0%、100%、負數輸入、非數字輸入、
+VIP 折扣疊加、節日折扣疊加</div>
+          <div class="sc-why">TDD 第一步：只寫測試，讓測試先 failing。明確定義「成功」的標準。</div>
+          <div class="sc-result">🔴 8 個 failing tests，等待實作</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">4</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/loop-start implement calculateDiscount() with minimum code until all tests pass with coverage >= 80%</div>
+          <div class="sc-why">（ECC）全自動 TDD Green phase：Claude 實作最小代碼讓測試通過，自動驗證 coverage。</div>
+          <div class="sc-result">🟢 全自動完成 Red → Green，coverage 達標</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">5</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/simplify focus on removing duplication and improving readability</div>
+          <div class="sc-why">TDD 第三步 Refactor：清理剛通過測試的最小實作。測試確保不會 regression。</div>
+          <div class="sc-result">♻️ 更乾淨的實作，測試全部仍然通過</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">6</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/evolve</div>
+          <div class="sc-why">（ECC）TDD 流程的好 pattern（如何拆分測試 case、edge case 清單）沉澱為 instinct。</div>
+          <div class="sc-result">🧠 TDD 知識積累，下次更快</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sc-panel" id="sc4" style="display:none;">
+    <div class="sc-meta">
+      <div class="sc-title">🚀 大型重構 — 全面框架遷移（60+ 個元件）</div>
+      <div class="sc-info">難度：進階 ｜ 大量使用 ECC ｜ 預計時間：1-2 天</div>
+    </div>
+    <div class="sc-context">📌 情境：技術決策要把整個前端從 Solid.js 遷移到 React 18。有 60+ 個元件，全部要改，不能壞功能。</div>
+    <div class="sc-steps">
+      <div class="sc-step">
+        <div class="sc-num">1</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/learn 遷移對應策略（project scope）：
+- Solid signal → useState + useCallback
+- createStore → zustand
+- Show/For 元件 → 三元 + Array.map
+- onMount/onCleanup → useEffect + return cleanup
+- 保留所有測試，改用 @testing-library/react</div>
+          <div class="sc-why">（ECC）把遷移決策存進 instinct，之後 /batch 和所有單獨遷移都自動遵循這套規則。</div>
+          <div class="sc-result">🧠 遷移規則進入 instinct，自動套用</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">2</div>
+        <div class="sc-content">
+          <div class="sc-cmd">git checkout -b feat/react-migration
+/checkpoint before-migration</div>
+          <div class="sc-why">（ECC）在 feature branch 上工作。開始大改前存一個點，萬一出問題可以回頭。</div>
+          <div class="sc-result">💾 遷移前完整狀態快照</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">3</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/quality-gate status</div>
+          <div class="sc-why">（ECC）確認所有 PR 都通過品質關卡（typecheck、lint、test、build）。</div>
+          <div class="sc-result">✅ 品質標準全部達標，或者列出待修問題</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">4</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/update-docs</div>
+          <div class="sc-why">（ECC）更新所有文件：README 技術棧、元件文件、migration guide（給後續維護者看）。</div>
+          <div class="sc-result">📄 文件全面更新，新成員能快速了解架構</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">5</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/evolve
+/instinct-export</div>
+          <div class="sc-why">（ECC）從這次大型遷移沉澱知識：遷移策略、踩過的坑、解決方法。Export 後 commit 進 repo，整個 team 受益。</div>
+          <div class="sc-result">🧠 遷移知識固化，下次類似重構事半功倍</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sc-panel" id="sc5" style="display:none;">
+    <div class="sc-meta">
+      <div class="sc-title">🐛 複雜 Bug 追查 — 生產環境間歇性崩潰</div>
+      <div class="sc-info">難度：進階 ｜ 長時間 session ｜ 預計時間：4-8 小時</div>
+    </div>
+    <div class="sc-context">📌 情境：生產環境每隔幾小時崩潰一次，有 log 但看不出原因，需要系統性追查。</div>
+    <div class="sc-steps">
+      <div class="sc-step">
+        <div class="sc-num">1</div>
+        <div class="sc-content">
+          <div class="sc-cmd">@logs/prod-crash-2026-04-01.log @src/server.ts @src/websocket/connection.ts @src/middleware/
+這是生產崩潰的完整 log。崩潰前 memory usage 一直在爬升，幫我找根本原因</div>
+          <div class="sc-why">一開始就把所有相關檔案引用進來，讓 Claude 有完整 context 再分析。</div>
+          <div class="sc-result">🔍 初步分析：可能原因清單（memory leak 可能性最高）</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">2</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/checkpoint initial-analysis-memory-leak-hypothesis</div>
+          <div class="sc-why">（ECC）初步假說確立後存一個點。之後追查的任何方向，都有這個基準可以回頭。</div>
+          <div class="sc-result">💾 分析基準存檔</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">3</div>
+        <div class="sc-content">
+          <div class="sc-cmd">@src/websocket/connection.ts
+詳細分析這個檔案：WebSocket 連線的生命週期管理、事件 listener 的清理、
+連線池的上限邏輯，找出 memory leak 的具體位置</div>
+          <div class="sc-why">假說指向 WebSocket，針對性深挖。</div>
+          <div class="sc-result">🎯 找到根本原因：close 事件沒有移除 error listener，每個關閉的連線都在 leak</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">4</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/checkpoint found-root-cause-ws-listener-leak
+# 根本原因：WebSocket close 時沒有 removeEventListener('error')
+# 每個連線關閉後 error handler 留在 memory 直到 GC 不回收</div>
+          <div class="sc-why">（ECC）找到根本原因後立即存檔，這是整個 debug session 最重要的節點。</div>
+          <div class="sc-result">💾 根本原因確認，修復前的最後保險</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">5</div>
+        <div class="sc-content">
+          <div class="sc-cmd">修復 WebSocket connection.ts：
+在 close handler 裡加入 removeEventListener('error', this._errorHandler)
+同時檢查所有其他 listener 是否也有相同問題</div>
+          <div class="sc-why">有了明確的根本原因，針對性修復，同時做防禦性掃描。</div>
+          <div class="sc-result">✏️ 修復 + 找出另外 2 個相同模式的 leak</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">6</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/loop-start run load test (1000 concurrent connections for 2 hours) until memory usage stays stable</div>
+          <div class="sc-why">（ECC）讓 Claude 自動跑壓測驗證修復有效，你可以去睡覺。記憶體使用量穩定了才算真的修好。</div>
+          <div class="sc-result">🤖 自動壓測驗證，確認 memory 不再爬升</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">7</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/evolve</div>
+          <div class="sc-why">（ECC）把「間歇性崩潰 + memory 爬升 → 先查 event listener 清理」這個 debug pattern 存為 instinct。下次遇到類似問題，Claude 會先想到這個方向。</div>
+          <div class="sc-result">🧠 Debug 知識沉澱，避免同類問題再踩坑</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sc-panel" id="sc6" style="display:none;">
+    <div class="sc-meta">
+      <div class="sc-title">👥 團隊導入 ECC — 建立共享知識和品質標準</div>
+      <div class="sc-info">難度：進階 ｜ 以 ECC 為核心的團隊工作流 ｜ 一次設定，長期受益</div>
+    </div>
+    <div class="sc-context">📌 情境：你的 team 5 個人要統一導入 ECC，讓所有人的 Claude 都有相同的知識基礎、遵循相同規範。</div>
+    <div class="sc-steps">
+      <div class="sc-step">
+        <div class="sc-num">1</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/harness-audit</div>
+          <div class="sc-why">（ECC）先讓自己的環境健康（分數 80+），確認設定無誤，才推廣給整個 team。</div>
+          <div class="sc-result">📊 環境健康分數和需要修復的問題清單</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">2</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/quality-gate set:
+- pnpm typecheck (0 errors)
+- pnpm lint (0 errors)
+- pnpm test (coverage >= 80%)
+- pnpm build (success)
+- no hardcoded secrets</div>
+          <div class="sc-why">（ECC）設定全 team 共同的品質標準，存進 <code>.claude/settings.json</code>，commit 進 repo，所有人 git pull 後自動生效。</div>
+          <div class="sc-result">🚧 Team 品質標準建立，自動執行</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">3</div>
+        <div class="sc-content">
+          <div class="sc-cmd"># 把 team 的技術規範全部教給 Claude
+/learn 所有 API endpoint 先寫 OpenAPI spec 再實作（spec-first）
+/learn database migration 必須可逆：每個 up 要有對應 down，先在 staging 測試
+/learn PR 最大 400 行；超過要拆成更小的 PR
+/learn 所有 error 要有 error code 和 user-friendly message，不能直接拋 raw error
+/learn 新功能要有對應的 feature flag，用 flagsmith 管理</div>
+          <div class="sc-why">（ECC）把 team 的所有技術規範和 best practice 教給 Claude，之後 Claude 自動遵循，不需要 code review 提醒這些。</div>
+          <div class="sc-result">📚 Team 規範進入 instinct 系統</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">4</div>
+        <div class="sc-content">
+          <div class="sc-cmd">/instinct-export
+git add .claude/instincts/team.yaml
+git commit -m "feat: add team ECC instincts for shared Claude knowledge"
+git push</div>
+          <div class="sc-why">（ECC）把 instinct 匯出成 yaml 檔案，commit 進 repo，其他人 git pull 後 Claude 自動載入。</div>
+          <div class="sc-result">📤 <code>.claude/instincts/team.yaml</code> 建立並共享</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">5</div>
+        <div class="sc-content">
+          <div class="sc-cmd"># 其他 team member 執行（只需這一步）：
+git pull
+# Claude 自動載入 team.yaml
+# 所有 5 個人的 Claude 立刻有相同知識基礎</div>
+          <div class="sc-why">零門檻同步：git pull 就搞定，不需要每個人重新設定。</div>
+          <div class="sc-result">👥 全 team Claude 知識瞬間同步</div>
+        </div>
+      </div>
+      <div class="sc-arrow">↓</div>
+      <div class="sc-step">
+        <div class="sc-num">6</div>
+        <div class="sc-content">
+          <div class="sc-cmd"># 持續知識更新（每個 team member 定期執行）：
+/evolve                  # 讓自己的 Claude 從最近工作學習
+/instinct-export         # 匯出新學到的 pattern
+# → PR 更新 team.yaml → merge → 全 team 受益</div>
+          <div class="sc-why">建立「知識飛輪」：每個人學到好的 pattern，export 出來，PR merge 後整個 team 的 Claude 都變更聰明。</div>
+          <div class="sc-result">♾️ 持續進化的集體知識，compound effect 越用越厲害</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<section class="section" id="shortcuts">
+  <div class="section-header">
+    <div class="section-number">06</div>
+    <div class="section-meta">
+      <div class="section-title">⌨ 鍵盤快捷鍵</div>
+      <div class="section-subtitle">對話中的鍵盤快捷鍵，不需要輸入斜線指令</div>
+    </div>
+  </div>
+  <div class="shortcut-grid">
+    <div class="shortcut-card">
+      <div class="shortcut-key"><span class="kbd">Ctrl</span><span class="kbd">C</span></div>
+      <div class="shortcut-desc">取消當前操作</div>
+    </div>
+    <div class="shortcut-card">
+      <div class="shortcut-key"><span class="kbd">Ctrl</span><span class="kbd">R</span></div>
+      <div class="shortcut-desc">搜尋對話歷史</div>
+    </div>
+    <div class="shortcut-card">
+      <div class="shortcut-key"><span class="kbd">Ctrl</span><span class="kbd">B</span></div>
+      <div class="shortcut-desc">背景執行（讓 Claude 繼續工作，你可以做別的事）</div>
+    </div>
+    <div class="shortcut-card">
+      <div class="shortcut-key"><span class="kbd">Tab</span></div>
+      <div class="shortcut-desc">切換 thinking 模式（顯示思考過程）</div>
+    </div>
+    <div class="shortcut-card">
+      <div class="shortcut-key"><span class="kbd">Shift</span><span class="kbd">Tab</span></div>
+      <div class="shortcut-desc">切換輸入模式</div>
+    </div>
+    <div class="shortcut-card">
+      <div class="shortcut-key"><span class="kbd">Esc</span><span class="kbd">Esc</span></div>
+      <div class="shortcut-desc">倒帶（Rewind，撤銷最後一次動作）</div>
+    </div>
+    <div class="shortcut-card">
+      <div class="shortcut-key"><span class="kbd">↑</span></div>
+      <div class="shortcut-desc">回到上一個訊息（跨 session 也有效）</div>
+    </div>
+    <div class="shortcut-card">
+      <div class="shortcut-key"><span class="kbd">@</span><span style="font-size:13px; color:var(--muted); padding-left:4px;">path</span></div>
+      <div class="shortcut-desc">引用檔案（自動補全路徑）</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="quickref">
+  <div class="section-header">
+    <div class="section-number">07</div>
+    <div class="section-meta">
+      <div class="section-title">📄 快速查閱表</div>
+      <div class="section-subtitle">所有指令一覽，按使用頻率排序</div>
+    </div>
+  </div>
+  <div class="quick-table-wrap">
+    <table class="quick-table">
+      <thead>
+        <tr>
+          <th>指令</th>
+          <th>類型</th>
+          <th>一句話說明</th>
+          <th>使用時機</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="qcmd">/init</td><td><span class="type-badge builtin" style="font-size:10px;">原生</span></td><td>初始化專案，建立 CLAUDE.md</td><td>新 repo 第一步</td></tr>
+        <tr><td class="qcmd">/clear</td><td><span class="type-badge builtin" style="font-size:10px;">原生</span></td><td>完全清空對話</td><td>換新任務時</td></tr>
+        <tr><td class="qcmd">/permissions</td><td><span class="type-badge builtin" style="font-size:10px;">原生</span></td><td>管理工具允許清單</td><td>減少每次確認</td></tr>
+        <tr><td class="qcmd">/help</td><td><span class="type-badge builtin" style="font-size:10px;">原生</span></td><td>列出所有指令</td><td>隨時</td></tr>
+        <tr><td class="qcmd">/review</td><td><span class="type-badge builtin" style="font-size:10px;">原生</span></td><td>Code review 當前改動</td><td>提 PR 前</td></tr>
+        <tr><td class="qcmd">/mcp</td><td><span class="type-badge builtin" style="font-size:10px;">原生</span></td><td>管理 MCP server</td><td>接外部工具</td></tr>
+        <tr><td class="qcmd">/hooks</td><td><span class="type-badge builtin" style="font-size:10px;">原生</span></td><td>查看 hook 設定</td><td>確認自動化流程</td></tr>
+        <tr><td class="qcmd">/skills</td><td><span class="type-badge builtin" style="font-size:10px;">原生</span></td><td>列出所有可用 skills</td><td>確認 skill 已載入</td></tr>
+        <tr><td class="qcmd">/simplify</td><td><span class="type-badge bundled" style="font-size:10px;">內建 Skill</span></td><td>平行 3 個 agent 清理程式碼</td><td>實作完後</td></tr>
+        <tr><td class="qcmd">/code-review</td><td><span class="type-badge ecc" style="font-size:10px;">ECC</span></td><td>完整 PR review + CI 驗證</td><td>嚴格 PR 審查</td></tr>
+        <tr><td class="qcmd">/checkpoint</td><td><span class="type-badge ecc" style="font-size:10px;">ECC</span></td><td>儲存工作狀態快照</td><td>里程碑節點</td></tr>
+        <tr><td class="qcmd">/evolve</td><td><span class="type-badge ecc" style="font-size:10px;">ECC</span></td><td>從對話學習新 instinct</td><td>發現好 pattern 後</td></tr>
+        <tr><td class="qcmd">/learn</td><td><span class="type-badge ecc" style="font-size:10px;">ECC</span></td><td>主動教 Claude 規則</td><td>設定技術規範</td></tr>
+        <tr><td class="qcmd">/sessions</td><td><span class="type-badge ecc" style="font-size:10px;">ECC</span></td><td>查看/搜尋 session 記錄</td><td>找回過去工作</td></tr>
+        <tr><td class="qcmd">/harness-audit</td><td><span class="type-badge ecc" style="font-size:10px;">ECC</span></td><td>審計 ECC 配置</td><td>安裝後確認</td></tr>
+        <tr><td class="qcmd">/loop-start</td><td><span class="type-badge ecc" style="font-size:10px;">ECC</span></td><td>啟動自動迭代迴圈</td><td>跑到條件達成</td></tr>
+        <tr><td class="qcmd">/quality-gate</td><td><span class="type-badge ecc" style="font-size:10px;">ECC</span></td><td>設定品質關卡</td><td>確保品質標準</td></tr>
+        <tr><td class="qcmd">/update-docs</td><td><span class="type-badge ecc" style="font-size:10px;">ECC</span></td><td>自動同步更新文件</td><td>改完 API 後</td></tr>
+        <tr><td class="qcmd">/model-route</td><td><span class="type-badge ecc" style="font-size:10px;">ECC</span></td><td>智慧自動選模型</td><td>省成本</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div>Claude Code 指令完全手冊 · 資料來源：claude.ai docs + everything-claude-code (github.com/affaan-m/everything-claude-code)</div>
+  <div style="margin-top:6px; opacity:0.5;">點擊任何指令卡片可展開詳細說明</div>
+</footer>
+
+<script>
+function showScenario(id, btn) {
+  try {
+    document.querySelectorAll('.sc-panel').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('.scenario-tab').forEach(b => b.classList.remove('active'));
+    const panel = document.getElementById(id);
+    if (panel) panel.style.display = 'block';
+    if (btn) btn.classList.add('active');
+  } catch(e) {
+    console.error('showScenario 發生錯誤:', e);
+  }
+}
+
+function toggleCard(headerRow) {
+  try {
+    const card = headerRow.closest('.cmd-card');
+    const toggle = headerRow.querySelector('.expand-toggle');
+    if (card) card.classList.toggle('expanded');
+    if (toggle) toggle.classList.toggle('open');
+  } catch(e) {
+    console.error('toggleCard 發生錯誤:', e);
+  }
+}
+
+// 確保 DOM 完全載入後再綁定與執行邏輯
+document.addEventListener('DOMContentLoaded', () => {
+  // Nav active state on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav-link');
+
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          navLinks.forEach(l => l.classList.remove('active'));
+          const active = document.querySelector(`.nav-link[href="#${entry.target.id}"]`);
+          if (active) active.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+
+    sections.forEach(s => observer.observe(s));
+  }
+
+  // Auto-expand first card in each section on load
+  document.querySelectorAll('.section').forEach(section => {
+    const firstCard = section.querySelector('.cmd-card');
+    if (firstCard) {
+      firstCard.classList.add('expanded');
+      const toggle = firstCard.querySelector('.expand-toggle');
+      if (toggle) toggle.classList.add('open');
+    }
+  });
+});
+</script>
+</body>
+</html>
