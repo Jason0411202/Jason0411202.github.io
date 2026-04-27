@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 01｜gRPC 是什麼:HTTP/2 上的 RPC — gRPC 課程</title>
+<meta name="description" content="從 RPC 心智模型出發,理解 gRPC 為什麼建立在 HTTP/2 之上、和 REST 的根本差異、四種呼叫模式概覽,以及什麼時候不該用 gRPC。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 01 · gRPC 概念篇</div>
+    <h1 class="hero-title">gRPC 是什麼:<span>HTTP/2 上的 RPC</span></h1>
+    <p class="hero-desc">先建立詞彙與心智模型,理解「遠端呼叫」是個漏抽象,以及 gRPC 為什麼挑 HTTP/2 + Protobuf 這個組合。<strong>這堂課完全不寫 code,目標是讓後面 9 堂讀起來都很順。</strong></p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 1 / 10 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>初階 · 純概念</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#what-is-rpc">RPC 心智模型</a></li>
+      <li><a class="toc-link" href="#vs-rest">vs REST</a></li>
+      <li><a class="toc-link" href="#http2">為何用 HTTP/2</a></li>
+      <li><a class="toc-link" href="#protobuf">為何用 Protobuf</a></li>
+      <li><a class="toc-link" href="#four-types">四種 RPC 模式</a></li>
+      <li><a class="toc-link" href="#when-not">何時不該用</a></li>
+      <li><a class="toc-link" href="#ecosystem">生態與版本</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="what-is-rpc">
+      <span class="section-eyebrow">01 — RPC 心智模型</span>
+      <h2>RPC 是什麼:讓「呼叫遠端函式」像呼叫本地函式</h2>
+      <p>RPC = <strong>Remote Procedure Call</strong>(遠端程序呼叫)。gRPC 官方文件第一段話直接點題:</p>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">"</div>
+        <div class="callout-body">
+          <strong>gRPC 的核心理念</strong>
+          「<em>a client application can directly call a method on a server application on a different machine as if it were a local object</em>」 — 在不同機器上的方法,寫起來像呼叫本地物件。
+        </div>
+      </div>
+
+      <p>聽起來很美,但這是個<strong>漏抽象</strong>(leaky abstraction)。本地函式呼叫不會失敗、不會超時、不會中途斷線、不會序列化錯誤;遠端呼叫每一項都會。所以實務上 RPC 框架要解決的不是「讓你忘記它在遠端」,而是<strong>把那些「遠端會發生的麻煩事」變成可控的工具</strong>。gRPC 之所以值得學,是因為它把這些麻煩事都處理得不錯:序列化、傳輸、錯誤、超時、取消、重試、認證、串流 — 都有官方的標準做法。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" aria-label="RPC 呼叫流程圖">
+          <defs>
+            <marker id="arr13" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+            <marker id="arrR13" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#ff3d1f"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="13">
+            <text x="360" y="32" text-anchor="middle" font-family="Syne, sans-serif" font-size="18" font-weight="700" fill="#0a0a0f">一次 gRPC 呼叫做了多少事</text>
+
+            <rect x="30"  y="80" width="160" height="120" rx="10" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="110" y="108" text-anchor="middle" font-weight="700" fill="#0a0a0f">Client</text>
+            <text x="110" y="132" text-anchor="middle" fill="#6b6b7e" font-size="11">res = stub.Get(req)</text>
+            <text x="110" y="155" text-anchor="middle" fill="#6b6b7e" font-size="11">看起來像本地呼叫</text>
+
+            <rect x="240" y="80" width="240" height="120" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="360" y="105" text-anchor="middle" font-weight="700" fill="#4c1d95">gRPC Runtime</text>
+            <text x="360" y="125" text-anchor="middle" fill="#4c1d95" font-size="11">序列化 / HTTP/2 framing</text>
+            <text x="360" y="142" text-anchor="middle" fill="#4c1d95" font-size="11">deadline / metadata</text>
+            <text x="360" y="159" text-anchor="middle" fill="#4c1d95" font-size="11">retry / load balance</text>
+            <text x="360" y="176" text-anchor="middle" fill="#4c1d95" font-size="11">tls / auth</text>
+
+            <rect x="530" y="80" width="160" height="120" rx="10" fill="#0a0a0f" stroke="#0a0a0f"/>
+            <text x="610" y="108" text-anchor="middle" font-weight="700" fill="#fafaf8">Server</text>
+            <text x="610" y="132" text-anchor="middle" fill="#a8a8b8" font-size="11">handler(req) → res</text>
+            <text x="610" y="155" text-anchor="middle" fill="#a8a8b8" font-size="11">看起來也像本地</text>
+
+            <line x1="190" y1="120" x2="240" y2="120" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arr13)"/>
+            <line x1="480" y1="120" x2="530" y2="120" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arr13)"/>
+            <line x1="530" y1="160" x2="190" y2="160" stroke="#ff3d1f" stroke-width="1.8" marker-end="url(#arrR13)"/>
+
+            <text x="360" y="232" text-anchor="middle" fill="#6b6b7e" font-size="11">中間那一大塊就是 gRPC 幫你處理掉的東西</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 13.1 — gRPC runtime 把序列化、傳輸、錯誤處理一次包好</div>
+      </div>
+    </section>
+
+    <section id="vs-rest">
+      <span class="section-eyebrow">02 — vs REST</span>
+      <h2>和 REST 的真正差別,不是「快」</h2>
+      <p>很多介紹會說「gRPC 比 REST 快」。這只說對一半。<strong>真正的差別是抽象層次</strong>:</p>
+
+      <table>
+        <thead>
+          <tr><th>面向</th><th>REST</th><th>gRPC</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>抽象單位</td>
+            <td>資源(URL) + HTTP 動詞</td>
+            <td>方法(method) + 訊息(message)</td>
+          </tr>
+          <tr>
+            <td>API 契約</td>
+            <td>OpenAPI / 口頭約定 / Markdown</td>
+            <td><code>.proto</code> 檔(編譯期就有型別)</td>
+          </tr>
+          <tr>
+            <td>序列化</td>
+            <td>JSON(文字)</td>
+            <td>Protobuf(二進位)</td>
+          </tr>
+          <tr>
+            <td>傳輸</td>
+            <td>HTTP/1.1 為主</td>
+            <td>HTTP/2(必要)</td>
+          </tr>
+          <tr>
+            <td>串流</td>
+            <td>需另外用 SSE / WebSocket</td>
+            <td>四種模式天生內建</td>
+          </tr>
+          <tr>
+            <td>瀏覽器直接呼叫</td>
+            <td>原生支援</td>
+            <td>需 gRPC-Web 代理</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>用一句話分:REST 思考「資源」,gRPC 思考「動作」</strong>
+          REST 寫 <code>GET /users/42</code>(對 user 資源做讀取);gRPC 寫 <code>UserService.GetUser(id=42)</code>(呼叫 GetUser 方法)。前者適合對外 public API、CRUD;後者適合服務之間互相呼叫(microservice-to-microservice)、有複雜串流需求。
+        </div>
+      </div>
+
+      <h3>「快」是怎麼來的</h3>
+      <p>真要比性能,gRPC 比 REST + JSON 快通常來自三件事:</p>
+      <ul>
+        <li><strong>Protobuf 序列化</strong>比 JSON 小且快(二進位、無 key 字串重複)</li>
+        <li><strong>HTTP/2 多工</strong>避免 HTTP/1.1 的隊頭阻塞(head-of-line blocking)</li>
+        <li><strong>長連線重用</strong>省下反覆 TCP/TLS 建立成本</li>
+      </ul>
+      <p>但「快多少」高度取決於 payload 大小、網路、語言實作。對短連線、小 payload,REST 不見得慢多少。<strong>選 gRPC 不該只為了快,應為了型別契約與串流模型</strong>。</p>
+    </section>
+
+    <section id="http2">
+      <span class="section-eyebrow">03 — 為何 HTTP/2</span>
+      <h2>HTTP/2 提供的三件 gRPC 必要的東西</h2>
+      <p>gRPC 規格<strong>強制使用 HTTP/2</strong>,不是選擇題。原因是 HTTP/1.1 有三個能力做不到:</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" aria-label="HTTP/1.1 vs HTTP/2 多工示意">
+          <g font-family="JetBrains Mono, monospace" font-size="12">
+            <text x="180" y="28" text-anchor="middle" font-family="Syne, sans-serif" font-size="15" font-weight="700" fill="#0a0a0f">HTTP/1.1 — 一條連線一次一個</text>
+            <rect x="40" y="50" width="280" height="36" fill="#fee2e2" stroke="#b91c1c" stroke-width="1"/>
+            <text x="180" y="73" text-anchor="middle" fill="#7f1d1d" font-size="11">req A ────► resp A</text>
+            <rect x="40" y="92" width="280" height="36" fill="#fee2e2" stroke="#b91c1c" stroke-width="1"/>
+            <text x="180" y="115" text-anchor="middle" fill="#7f1d1d" font-size="11">(A 沒回完前 B 卡住) req B ──►</text>
+            <text x="180" y="148" text-anchor="middle" fill="#6b6b7e" font-size="10">Head-of-line blocking — 隊頭阻塞</text>
+
+            <text x="540" y="28" text-anchor="middle" font-family="Syne, sans-serif" font-size="15" font-weight="700" fill="#0a0a0f">HTTP/2 — 一條連線多串流並行</text>
+            <rect x="400" y="50" width="280" height="22" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+            <text x="540" y="65" text-anchor="middle" fill="#14532d" font-size="11">stream 1 — req A ──► resp A</text>
+            <rect x="400" y="76" width="280" height="22" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+            <text x="540" y="91" text-anchor="middle" fill="#14532d" font-size="11">stream 3 — req B ──► resp B (同時)</text>
+            <rect x="400" y="102" width="280" height="22" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+            <text x="540" y="117" text-anchor="middle" fill="#14532d" font-size="11">stream 5 — req C ──► resp C (同時)</text>
+            <text x="540" y="148" text-anchor="middle" fill="#6b6b7e" font-size="10">同一條 TCP 上多 stream 交錯傳輸</text>
+
+            <text x="360" y="200" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">+ 二進位 framing + 雙向流 + Header 壓縮(HPACK)</text>
+            <text x="360" y="222" text-anchor="middle" fill="#6b6b7e" font-size="11">這三件事讓 gRPC 的 streaming RPC 與低延遲微服務通訊成為可能</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 13.2 — 隊頭阻塞 vs 多工 stream</div>
+      </div>
+
+      <h3>三個 HTTP/2 必要特性</h3>
+      <ol>
+        <li><strong>二進位 framing</strong> — HTTP/2 把訊息拆成 frame,不再是純文字。一個 frame 屬於一個 stream,多個 stream 可以在同一條 TCP 上交錯傳輸,這就是「多工」(multiplexing)。</li>
+        <li><strong>全雙工 stream</strong> — 同一個 stream 上 client 和 server 可以同時收送訊息。這直接對應 gRPC 的 bidirectional streaming(第 5 課會看到)。</li>
+        <li><strong>HPACK header 壓縮</strong> — Header 經常重複(例如 <code>:authority</code>、<code>content-type</code>),HPACK 用索引表壓縮,大量小請求時頻寬節省明顯。</li>
+      </ol>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>HTTP/2 ≠ 自動快</strong>
+          HTTP/2 在「同一條連線多請求」時最有效。如果你的 client 每次呼叫都建一條新 connection、用完就關,HTTP/2 的好處幾乎全失效。這也是為什麼 gRPC 推薦<strong>長連線重用</strong>(第 10 課的 channel/keepalive)。
+        </div>
+      </div>
+    </section>
+
+    <section id="protobuf">
+      <span class="section-eyebrow">04 — 為何 Protobuf</span>
+      <h2>Protobuf:契約即程式碼</h2>
+      <p>Protocol Buffers(簡稱 protobuf)是 Google 2008 開源的<strong>序列化格式 + IDL</strong>(Interface Definition Language)。gRPC 預設用 protobuf,但兩者是分開的東西 — gRPC 也可以用 JSON,protobuf 也可以脫離 gRPC 單獨用。</p>
+
+      <h3>protobuf 給你的三個東西</h3>
+      <ol>
+        <li><strong>跨語言型別契約</strong> — 寫一份 <code>.proto</code>,用 <code>protoc</code> 編譯出 Go / Java / Python / TypeScript 的型別定義。前後端、跨服務不會再為「這個欄位是 int 還是 string」吵架。</li>
+        <li><strong>緊湊二進位</strong> — 一個 <code>int32</code> 多數情況用 1–5 byte(varint 編碼),JSON 至少要 1 byte 的引號 + N byte 的數字字串 + key 字串。同樣訊息 protobuf 通常比 JSON 小 30–50%。</li>
+        <li><strong>可演進的 schema</strong> — 透過<strong>欄位編號</strong>(field number)實現「新加欄位、舊版客戶端忽略」、「移除欄位、舊資料還能讀」。這是 protobuf 設計上最重要的取捨,第 3 課會詳講。</li>
+      </ol>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">JSON</span>寫起來</div>
+          <div class="compare-body">
+            <code>{"user_id": 42, "name": "Jason", "active": true}</code>
+            <p style="font-size:13px;margin-top:0.5rem;color:var(--muted);">63 bytes,key 重複佔位</p>
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">PB</span>傳輸時</div>
+          <div class="compare-body">
+            <code>08 2A 12 05 4A 61 73 6F 6E 18 01</code>
+            <p style="font-size:13px;margin-top:0.5rem;color:var(--muted);">11 bytes(欄位編號 + tag + 值),小約 80%</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="four-types">
+      <span class="section-eyebrow">05 — 四種 RPC 模式</span>
+      <h2>gRPC 支援的四種呼叫模式</h2>
+      <p>本堂只做概念介紹,實作分別在第 16(Unary)、17(三種 streaming)講。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" aria-label="四種 RPC 模式示意">
+          <defs>
+            <marker id="arrU" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+            <marker id="arrUr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#ff3d1f"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <!-- Unary -->
+            <text x="120" y="30" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">Unary</text>
+            <text x="40" y="55" fill="#6b6b7e">Client</text>
+            <text x="200" y="55" fill="#6b6b7e">Server</text>
+            <line x1="50" y1="65" x2="50" y2="135" stroke="#d4d3cc" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="200" y1="65" x2="200" y2="135" stroke="#d4d3cc" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="50" y1="80" x2="195" y2="80" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arrU)"/>
+            <text x="125" y="76" text-anchor="middle" fill="#7c3aed" font-size="10">1 req</text>
+            <line x1="200" y1="120" x2="55" y2="120" stroke="#ff3d1f" stroke-width="1.6" marker-end="url(#arrUr)"/>
+            <text x="125" y="116" text-anchor="middle" fill="#ff3d1f" font-size="10">1 resp</text>
+            <text x="120" y="160" text-anchor="middle" fill="#0a0a0f" font-size="11">最常見,等同 HTTP request</text>
+
+            <!-- Server streaming -->
+            <text x="360" y="30" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">Server streaming</text>
+            <text x="280" y="55" fill="#6b6b7e">Client</text>
+            <text x="440" y="55" fill="#6b6b7e">Server</text>
+            <line x1="290" y1="65" x2="290" y2="155" stroke="#d4d3cc" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="440" y1="65" x2="440" y2="155" stroke="#d4d3cc" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="290" y1="80" x2="435" y2="80" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arrU)"/>
+            <text x="365" y="76" text-anchor="middle" fill="#7c3aed" font-size="10">1 req</text>
+            <line x1="440" y1="100" x2="295" y2="100" stroke="#ff3d1f" stroke-width="1.6" marker-end="url(#arrUr)"/>
+            <line x1="440" y1="118" x2="295" y2="118" stroke="#ff3d1f" stroke-width="1.6" marker-end="url(#arrUr)"/>
+            <line x1="440" y1="136" x2="295" y2="136" stroke="#ff3d1f" stroke-width="1.6" marker-end="url(#arrUr)"/>
+            <text x="365" y="156" text-anchor="middle" fill="#ff3d1f" font-size="10">N resp</text>
+            <text x="360" y="180" text-anchor="middle" fill="#0a0a0f" font-size="11">log 推送、結果分頁、訂閱</text>
+
+            <!-- Client streaming -->
+            <text x="600" y="30" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">Client streaming</text>
+            <text x="520" y="55" fill="#6b6b7e">Client</text>
+            <text x="680" y="55" fill="#6b6b7e">Server</text>
+            <line x1="530" y1="65" x2="530" y2="155" stroke="#d4d3cc" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="680" y1="65" x2="680" y2="155" stroke="#d4d3cc" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="530" y1="80" x2="675" y2="80" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arrU)"/>
+            <line x1="530" y1="98" x2="675" y2="98" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arrU)"/>
+            <line x1="530" y1="116" x2="675" y2="116" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arrU)"/>
+            <text x="605" y="76" text-anchor="middle" fill="#7c3aed" font-size="10">N req</text>
+            <line x1="680" y1="140" x2="535" y2="140" stroke="#ff3d1f" stroke-width="1.6" marker-end="url(#arrUr)"/>
+            <text x="605" y="156" text-anchor="middle" fill="#ff3d1f" font-size="10">1 resp</text>
+            <text x="600" y="180" text-anchor="middle" fill="#0a0a0f" font-size="11">檔案上傳、批次寫入</text>
+
+            <!-- Bidirectional streaming -->
+            <text x="360" y="220" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">Bidirectional streaming</text>
+            <text x="200" y="245" fill="#6b6b7e">Client</text>
+            <text x="520" y="245" fill="#6b6b7e">Server</text>
+            <line x1="210" y1="255" x2="210" y2="325" stroke="#d4d3cc" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="520" y1="255" x2="520" y2="325" stroke="#d4d3cc" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="210" y1="270" x2="515" y2="270" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arrU)"/>
+            <line x1="520" y1="285" x2="215" y2="285" stroke="#ff3d1f" stroke-width="1.6" marker-end="url(#arrUr)"/>
+            <line x1="210" y1="300" x2="515" y2="300" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arrU)"/>
+            <line x1="520" y1="315" x2="215" y2="315" stroke="#ff3d1f" stroke-width="1.6" marker-end="url(#arrUr)"/>
+            <text x="360" y="345" text-anchor="middle" fill="#0a0a0f" font-size="11">即時聊天、雙向同步、雙向協商</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 13.3 — 四種 RPC 呼叫模式</div>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>模式</th><th>Client → Server</th><th>Server → Client</th><th>典型場景</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Unary</strong></td><td>1 條訊息</td><td>1 條訊息</td><td>取單筆資料、寫入單筆</td></tr>
+          <tr><td><strong>Server streaming</strong></td><td>1 條訊息</td><td>N 條訊息</td><td>訂閱、log tail、大查詢結果分批送</td></tr>
+          <tr><td><strong>Client streaming</strong></td><td>N 條訊息</td><td>1 條訊息</td><td>大檔案分塊上傳、批次寫入</td></tr>
+          <tr><td><strong>Bidirectional</strong></td><td>N 條訊息</td><td>N 條訊息(可交錯)</td><td>即時聊天、雙向同步、雙向協商</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>「Stream」≠「TCP 一直連著」</strong>
+          gRPC 的 stream 是 HTTP/2 stream 的概念,在邏輯上是一條訊息序列。底層連線(channel)是長存的,但 stream 本身有開始與結束。
+        </div>
+      </div>
+    </section>
+
+    <section id="when-not">
+      <span class="section-eyebrow">06 — 何時不該用</span>
+      <h2>不適合 gRPC 的三種情境</h2>
+      <p>用對地方比學會它更重要。下列情況通常 REST 或其他方案更合適:</p>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>不要用 gRPC</div>
+          <div class="compare-body">
+            <ul style="margin:0 0 0 1rem;font-size:13px;">
+              <li><strong>瀏覽器直連 backend</strong> — 瀏覽器無法直接發 HTTP/2 trailer,需 gRPC-Web 代理(Envoy / nginx),架構變複雜。直接 REST 或 GraphQL 通常較好。</li>
+              <li><strong>對外公開 API</strong> — 第三方開發者熟悉 REST + JSON,要他們 <code>protoc</code> 編譯 stub 阻力大。除非客戶是企業技術團隊。</li>
+              <li><strong>單純的 CRUD + 表單</strong> — REST 對應 HTTP 動詞天然契合,gRPC 反而要為 GET/POST 各定一個 method。</li>
+              <li><strong>強烈依賴 HTTP 中介設施</strong> — 某些舊 LB / WAF / debug proxy 只懂 HTTP/1.1,gRPC 流量會卡住或被誤判。</li>
+            </ul>
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>適合 gRPC</div>
+          <div class="compare-body">
+            <ul style="margin:0 0 0 1rem;font-size:13px;">
+              <li><strong>內部微服務之間呼叫</strong> — 高頻、低延遲、契約緊、不需要被瀏覽器直接看到。</li>
+              <li><strong>多語言團隊</strong> — Go server、Python data pipeline、Java client 共用同一份 <code>.proto</code>。</li>
+              <li><strong>串流場景</strong> — 即時報價、log tail、雙向同步,server streaming / bidi 比 SSE/WebSocket 更結構化。</li>
+              <li><strong>頻寬與序列化敏感</strong> — 行動裝置、大量小訊息、IoT。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="ecosystem">
+      <span class="section-eyebrow">07 — 生態與版本</span>
+      <h2>2026 年 gRPC 生態現況</h2>
+
+      <h3>官方語言實作</h3>
+      <p>gRPC 是 Google 2015 年開源、目前由 CNCF(Cloud Native Computing Foundation)畢業專案。官方支援的語言實作放在三個獨立 GitHub 倉庫:</p>
+      <table>
+        <thead>
+          <tr><th>實作</th><th>倉庫</th><th>本課使用</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>grpc-go</code></td><td><code>grpc/grpc-go</code></td><td>✓ 主軸</td></tr>
+          <tr><td><code>grpc-java</code></td><td><code>grpc/grpc-java</code></td><td>—</td></tr>
+          <tr><td>C 系(Python / Ruby / PHP / Objective-C / C# / C++)</td><td><code>grpc/grpc</code>(共用 C-core)</td><td>—</td></tr>
+          <tr><td><code>grpc-web</code></td><td><code>grpc/grpc-web</code></td><td>—(本課不教)</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:13px;color:var(--muted);">發布頻率:<strong>每六週一次</strong>,版本號形如 <code>v1.78</code>、<code>v1.80</code>。</p>
+
+      <h3>序列化:Protobuf 版本</h3>
+      <ul>
+        <li><strong>proto3</strong> — 目前 gRPC 官方推薦的語法,本課全部範例用這個</li>
+        <li><strong>Protobuf Editions</strong> — 2024 年 GA(Edition 2024 隨 Protobuf v32.0 釋出),長期會取代 proto2/proto3,但 gRPC 官方目前文件仍以 proto3 為主。本課提一句即可,實務上先學會 proto3</li>
+      </ul>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>Source of Truth</strong>
+          後續 9 堂課所有 API 與用法,以 <a class="inline-link" href="https://grpc.io/docs/" target="_blank" rel="noopener">grpc.io/docs</a> 與 <a class="inline-link" href="https://pkg.go.dev/google.golang.org/grpc" target="_blank" rel="noopener">pkg.go.dev/google.golang.org/grpc</a> 為準。網路上很多教學示範的 <code>grpc.Dial(...)</code> 已被 deprecated,本課全部使用<strong>新的 <code>grpc.NewClient(...)</code></strong>。
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "下列哪一項<strong>不是</strong> gRPC 強制用 HTTP/2 的原因?",
+    "options": [
+      "HTTP/2 支援單一連線多 stream 並行(multiplexing)",
+      "HTTP/2 支援全雙工 stream,讓 bidirectional streaming 可行",
+      "HTTP/2 強制使用 TLS 加密所有流量",
+      "HTTP/2 用 HPACK 壓縮 header,小訊息更省頻寬"
+    ],
+    "answer": 2,
+    "explain": "HTTP/2 規格本身<strong>沒有</strong>強制 TLS,只是大多數瀏覽器要求 HTTPS。gRPC 自己有 TLS 設定(第 9 課會講),但這不是 HTTP/2 的特性。其他三項都是 HTTP/2 帶給 gRPC 的關鍵能力。"
+  },
+  {
+    "question": "下列哪些情境比較<strong>不</strong>適合用 gRPC?(多選)",
+    "options": [
+      "兩個內部 Go microservice 之間互相呼叫",
+      "對外公開、要讓第三方開發者用的 REST-like API",
+      "需要 server 持續推訊息給 client(訂閱、log tail)",
+      "瀏覽器 SPA 直接呼叫 backend,沒有額外 proxy 基礎設施"
+    ],
+    "answer": [1, 3],
+    "explain": "<strong>對外公開 API</strong>:第三方開發者熟悉 REST+JSON,要他們 protoc 編譯 stub 阻力大。<strong>瀏覽器直連</strong>:瀏覽器無法直接發 HTTP/2 trailer,需 gRPC-Web + Envoy 代理,架構變複雜。內部 microservice 與 streaming 訂閱反而是 gRPC 的甜蜜點。"
+  },
+  {
+    "question": "Protocol Buffers(protobuf)和 gRPC 的關係是?",
+    "options": [
+      "protobuf 是 gRPC 的子模組,只能在 gRPC 裡用",
+      "兩者必須一起用,缺一不可",
+      "兩者是分開的東西。gRPC 預設用 protobuf,但也能用 JSON;protobuf 也可單獨當序列化格式用",
+      "gRPC 是 protobuf 的舊名"
+    ],
+    "answer": 2,
+    "explain": "protobuf 是 Google 2008 開源的<strong>序列化格式 + IDL</strong>,跟 gRPC 是兩個獨立專案。gRPC 用 protobuf 定義 service/message,但設計上允許其他格式;protobuf 也能脫離 gRPC,只用來儲存或傳輸資料。"
+  },
+  {
+    "question": "下列關於 gRPC 四種 RPC 模式的描述,哪一個<strong>正確</strong>?",
+    "options": [
+      "Unary RPC 是 client 一條訊息、server 一條訊息",
+      "Server streaming 是 client 多條訊息、server 一條訊息",
+      "Client streaming 是雙向都多條訊息,可以交錯",
+      "Bidirectional streaming 等同 HTTP request,client 和 server 各送一條"
+    ],
+    "answer": 0,
+    "explain": "Unary 是最常見的 1 req → 1 resp 模式。Server streaming 應為 1 req → N resp(B 是反過來);Client streaming 應為 N req → 1 resp(C 描述錯了);Bidirectional 才是雙向都 N 條(D 描述錯了)。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://grpc.io/docs/what-is-grpc/introduction/" target="_blank" rel="noopener">grpc.io — Introduction to gRPC</a><span class="ref-meta">官方核心理念</span></li>
+        <li><a href="https://grpc.io/docs/what-is-grpc/core-concepts/" target="_blank" rel="noopener">grpc.io — Core concepts, architecture and lifecycle</a><span class="ref-meta">四種 RPC + lifecycle</span></li>
+        <li><a href="https://grpc.io/docs/what-is-grpc/faq/" target="_blank" rel="noopener">grpc.io — FAQ</a><span class="ref-meta">常見問題、語言支援</span></li>
+        <li><a href="https://datatracker.ietf.org/doc/html/rfc9113" target="_blank" rel="noopener">RFC 9113 — HTTP/2</a><span class="ref-meta">HTTP/2 規格</span></li>
+        <li><a href="https://protobuf.dev/" target="_blank" rel="noopener">protobuf.dev</a><span class="ref-meta">Protobuf 官方文件</span></li>
+        <li><a href="https://github.com/grpc/grpc-go" target="_blank" rel="noopener">grpc/grpc-go</a><span class="ref-meta">本課使用的 Go 實作</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev disabled" aria-disabled="true">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">這是 gRPC 系列第一堂</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="grpc_02_setup.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 02 · 環境安裝與工具鏈</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">10 堂 gRPC 系列 <span class="progress-pill">1 / 10</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item current" href="grpc_01_intro.html"><span class="course-nav-num">01</span><span>gRPC 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="grpc_02_setup.html"><span class="course-nav-num">02</span><span>環境安裝與工具鏈</span></a></li>
+        <li><a class="course-nav-item" href="grpc_03_protobuf_syntax.html"><span class="course-nav-num">03</span><span>Protobuf 語法</span></a></li>
+        <li><a class="course-nav-item" href="grpc_04_unary_rpc.html"><span class="course-nav-num">04</span><span>Unary RPC 實戰</span></a></li>
+        <li><a class="course-nav-item" href="grpc_05_streaming_rpc.html"><span class="course-nav-num">05</span><span>三種 Streaming</span></a></li>
+        <li><a class="course-nav-item" href="grpc_06_context_metadata.html"><span class="course-nav-num">06</span><span>Context / Metadata</span></a></li>
+        <li><a class="course-nav-item" href="grpc_07_error_handling.html"><span class="course-nav-num">07</span><span>錯誤處理</span></a></li>
+        <li><a class="course-nav-item" href="grpc_08_interceptors.html"><span class="course-nav-num">08</span><span>Interceptors</span></a></li>
+        <li><a class="course-nav-item" href="grpc_09_tls_auth.html"><span class="course-nav-num">09</span><span>TLS / Auth</span></a></li>
+        <li><a class="course-nav-item" href="grpc_10_connection_lifecycle.html"><span class="course-nav-num">10</span><span>連線生命週期</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 gRPC 課程系列 · Lesson 01
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redis 05｜Redis 8.x 新特性 — Redis 課程</title>
+<meta name="description" content="Redis 8 把 Stack 併回 OSS：Search / JSON / TimeSeries / Bloom 內建。Vector Sets 在 8.6 達 GA 級效能。8.6 帶來 30+ 性能改進、Streams 增強、新 eviction policies。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Redis 05 · 8.x 新特性</div>
+    <h1 class="hero-title">Redis 8 把<span>Stack 併回 OSS</span></h1>
+    <p class="hero-desc">Search / JSON / TimeSeries / Bloom 不再需要單裝模組,Vector Sets 8.6 達 GA 級效能。對 RAG / 向量搜尋 / 文件查詢場景影響極大。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 5 / 6 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 13 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>進階</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#merge">Stack 併回 OSS</a></li>
+      <li><a class="toc-link" href="#vector-sets">Vector Sets</a></li>
+      <li><a class="toc-link" href="#search">Search</a></li>
+      <li><a class="toc-link" href="#json">JSON</a></li>
+      <li><a class="toc-link" href="#86">8.6 亮點</a></li>
+      <li><a class="toc-link" href="#vs-others">vs ES/Pinecone</a></li>
+      <li><a class="toc-link" href="#hands-on">動手玩</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="merge">
+      <span class="section-eyebrow">01 — Stack 併回</span>
+      <h2>Redis Stack 是什麼，為什麼又消失了</h2>
+      <p>2022 年 Redis 公司推出 <strong>Redis Stack</strong>：把 RediSearch、RedisJSON、RedisTimeSeries、RedisBloom 四個模組打包成一個發行版，方便一鍵安裝。但這帶來雙頭管理：OSS 與 Stack 兩條版本線、模組要單獨更新。</p>
+
+      <p><strong>Redis 8（2025 年 GA）把 Stack 全部併回 Open Source</strong>：</p>
+      <ul>
+        <li><strong>Redis Search</strong>：全文 / 向量 / 數值範圍 / 標籤索引</li>
+        <li><strong>Redis JSON</strong>：JSON 文件儲存 + JSONPath 查詢</li>
+        <li><strong>Redis TimeSeries</strong>：時序資料 + downsampling + 聚合</li>
+        <li><strong>Redis Bloom</strong>：Bloom / Cuckoo / Top-K / Count-Min sketch / t-Digest</li>
+      </ul>
+
+      <p>意思是：<strong>裝 Redis 8 即內建這些功能，不用再 <code>FT.MODULE LOAD ...</code></strong>。Redis Stack 6.2 / 7.2 / 7.4 已於 2025-09-15 停止支援。</p>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>對你影響</strong>
+          以前要用 RediSearch / RedisJSON 的人，常被困在「我的 Redis 是 Stack 還是 OSS、能不能用 X」的版本焦慮。Redis 8.0+ 統一一條線：<em>裝 Redis 8 就有全部</em>。docker image <code>redis:8.6</code> 已含。
+        </div>
+      </div>
+    </section>
+
+    <section id="vector-sets">
+      <span class="section-eyebrow">02 — Vector Sets</span>
+      <h2>Vector Sets：原生向量資料結構</h2>
+      <p>8.0 beta 引入 <strong>Vector Set</strong>（簡寫 <code>VSET</code>），是一個專為向量相似度設計的<em>新資料結構</em>（不是模組指令）。8.6 達到 GA 級效能：</p>
+      <ul>
+        <li>vs 8.4，向量寫入快 <strong>43%</strong>、查詢快 <strong>58%</strong>（同硬體）</li>
+        <li>支援多種 quantization（int8、binary）省記憶體</li>
+        <li>HNSW 演算法（跟 Cassandra Vector Search 同家族）</li>
+      </ul>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis-cli</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 加入向量到 vector set</span>
+<span class="tk-fn">VADD</span> docs <span class="tk-op">VALUES</span> <span class="tk-num">3</span> <span class="tk-num">0.9</span> <span class="tk-num">0.1</span> <span class="tk-num">0.0</span> <span class="tk-st">"doc:1"</span>
+<span class="tk-fn">VADD</span> docs <span class="tk-op">VALUES</span> <span class="tk-num">3</span> <span class="tk-num">0.85</span> <span class="tk-num">0.05</span> <span class="tk-num">0.1</span> <span class="tk-st">"doc:2"</span>
+<span class="tk-fn">VADD</span> docs <span class="tk-op">VALUES</span> <span class="tk-num">3</span> <span class="tk-num">0.1</span> <span class="tk-num">0.9</span> <span class="tk-num">0.0</span> <span class="tk-st">"doc:3"</span>
+
+<span class="tk-cm"># 查詢:取最相似的前 2 筆</span>
+<span class="tk-fn">VSIM</span> docs <span class="tk-op">VALUES</span> <span class="tk-num">3</span> <span class="tk-num">0.88</span> <span class="tk-num">0.08</span> <span class="tk-num">0.05</span> <span class="tk-op">COUNT</span> <span class="tk-num">2</span>
+1) <span class="tk-st">"doc:1"</span>     <span class="tk-cm"># 距離最近</span>
+2) <span class="tk-st">"doc:2"</span>
+
+<span class="tk-cm"># 看 set 大小</span>
+<span class="tk-fn">VCARD</span> docs
+<span class="tk-num">(integer) 3</span></code></pre>
+      </div>
+
+      <h3>Vector Sets vs RediSearch 的 vector index</h3>
+      <p>Redis 提供<strong>兩個</strong>向量介面：</p>
+      <ul>
+        <li><strong>Vector Sets (VSET / VADD / VSIM ...)</strong>：原生資料結構，輕量、純向量、API 簡潔。適合不需要 metadata filter 的場景。</li>
+        <li><strong>RediSearch FT.SEARCH 的 VECTOR field</strong>：包在 search index 內，可結合 metadata（標籤、數值範圍）做混合搜尋。複雜場景用這個。</li>
+      </ul>
+    </section>
+
+    <section id="search">
+      <span class="section-eyebrow">03 — Search</span>
+      <h2>Redis Search：全文 + 向量 + 結構化</h2>
+      <p>Redis Search 用 <code>FT.CREATE</code> 建索引，可以一次涵蓋多種欄位型態：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis-cli</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 1. 建一個 hash 索引,涵蓋全文 + 標籤 + 數值 + 向量</span>
+<span class="tk-fn">FT.CREATE</span> idx:news <span class="tk-op">ON</span> HASH PREFIX <span class="tk-num">1</span> <span class="tk-st">"news:"</span> SCHEMA \
+  title <span class="tk-op">TEXT</span> WEIGHT <span class="tk-num">5.0</span> \
+  category <span class="tk-op">TAG</span> \
+  views <span class="tk-op">NUMERIC</span> SORTABLE \
+  emb <span class="tk-op">VECTOR</span> HNSW <span class="tk-num">6</span> TYPE FLOAT32 DIM <span class="tk-num">3</span> DISTANCE_METRIC COSINE
+
+<span class="tk-cm"># 2. 灌資料</span>
+<span class="tk-fn">HSET</span> news:1 title <span class="tk-st">"TSLA up"</span>     category <span class="tk-st">"stock"</span> views <span class="tk-num">1200</span> emb <span class="tk-st">"\x66\x66..."</span>
+<span class="tk-fn">HSET</span> news:2 title <span class="tk-st">"AAPL earnings"</span> category <span class="tk-st">"stock"</span> views <span class="tk-num">800</span>  emb <span class="tk-st">"\x..."</span>
+<span class="tk-fn">HSET</span> news:3 title <span class="tk-st">"Inflation"</span>    category <span class="tk-st">"macro"</span> views <span class="tk-num">3000</span> emb <span class="tk-st">"\x..."</span>
+
+<span class="tk-cm"># 3. 全文搜</span>
+<span class="tk-fn">FT.SEARCH</span> idx:news <span class="tk-st">"TSLA"</span>
+
+<span class="tk-cm"># 4. 標籤 + 數值範圍</span>
+<span class="tk-fn">FT.SEARCH</span> idx:news <span class="tk-st">"@category:{stock} @views:[500 +inf]"</span>
+
+<span class="tk-cm"># 5. 向量 KNN</span>
+<span class="tk-fn">FT.SEARCH</span> idx:news <span class="tk-st">"*=&gt;[KNN 2 @emb $q]"</span> PARAMS <span class="tk-num">2</span> q <span class="tk-st">"\x..."</span>
+
+<span class="tk-cm"># 6. 混合:在 stock 類別內做 KNN</span>
+<span class="tk-fn">FT.SEARCH</span> idx:news <span class="tk-st">"@category:{stock} =&gt;[KNN 2 @emb $q]"</span> PARAMS <span class="tk-num">2</span> q <span class="tk-st">"\x..."</span></code></pre>
+      </div>
+
+      <p>RediSearch 的甜蜜點是「<strong>不大不小</strong>」的搜尋場景：資料量幾百萬筆、混合過濾、要求低延遲、團隊已經有 Redis。比起拉一個 Elasticsearch 集群輕量很多。</p>
+    </section>
+
+    <section id="json">
+      <span class="section-eyebrow">04 — JSON</span>
+      <h2>Redis JSON：第二類 native 結構</h2>
+      <p>Redis JSON 提供 JSON 文件的原生儲存與 JSONPath 查詢：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis-cli</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-fn">JSON.SET</span> user:1 $ <span class="tk-st">'{"name":"Jason","age":28,"orders":[{"id":1,"amt":100}]}'</span>
+OK
+
+<span class="tk-fn">JSON.GET</span> user:1 $.name
+<span class="tk-st">"[\"Jason\"]"</span>
+
+<span class="tk-fn">JSON.GET</span> user:1 <span class="tk-st">'$.orders[*].amt'</span>
+<span class="tk-st">"[100]"</span>
+
+<span class="tk-cm"># 修改其中一個欄位 (不用整份重寫)</span>
+<span class="tk-fn">JSON.SET</span> user:1 $.age <span class="tk-num">29</span>
+
+<span class="tk-cm"># 在陣列尾加東西</span>
+<span class="tk-fn">JSON.ARRAPPEND</span> user:1 $.orders <span class="tk-st">'{"id":2,"amt":50}'</span></code></pre>
+      </div>
+
+      <p>RediSearch 也支援 ON JSON：可以直接對 JSON 內的 JSONPath 路徑做索引。寫起來像 MongoDB 但延遲是 Redis 等級。</p>
+    </section>
+
+    <section id="86">
+      <span class="section-eyebrow">05 — 8.6 亮點</span>
+      <h2>8.6 帶來的具體改進</h2>
+      <p>2026/03 公告。Redis 8 系列維持「每隔幾個月一個 minor 版本」的快節奏。8.6 重點：</p>
+      <ul>
+        <li><strong>Vector Sets 大幅加速</strong>：vs 8.4，VADD +43%、VSIM +58%；針對 Intel / AMD / ARM 用 SIMD 與 popcount 內建函式優化二進位向量距離計算。</li>
+        <li><strong>30+ 整體效能改進</strong>：跨指令的小優化累積。</li>
+        <li><strong>Streams 增強</strong>：consumer group 操作更高效；新增更細的 entry 過濾。</li>
+        <li><strong>新 Eviction Policies</strong>：除了傳統 LRU/LFU/random，新增更聰明的策略（例如針對 hash field 級別的 TTL 與 eviction）。</li>
+        <li><strong>Hash Field TTL</strong>（8.0 引入）：個別 hash 欄位可有自己的過期時間，<code>HEXPIRE / HEXPIREAT / HPERSIST</code>。</li>
+      </ul>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis-cli</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># Hash Field TTL (8.0+)</span>
+<span class="tk-fn">HSET</span> session:abc user_id <span class="tk-num">100</span> last_seen <span class="tk-num">1745912345</span>
+<span class="tk-fn">HEXPIRE</span> session:abc <span class="tk-num">1800</span> FIELDS <span class="tk-num">1</span> last_seen
+<span class="tk-cm"># last_seen 欄位 30 分鐘後過期,user_id 不過期</span></code></pre>
+      </div>
+    </section>
+
+    <section id="vs-others">
+      <span class="section-eyebrow">06 — 取捨</span>
+      <h2>什麼時候用 Redis 8 取代 ES / Pinecone / pgvector？</h2>
+
+      <table>
+        <thead>
+          <tr><th>場景</th><th>建議</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>RAG / 向量搜尋 (&lt; 1000 萬筆)，team 已經有 Redis</td>
+            <td><strong>Redis Vector Sets / RediSearch</strong></td>
+          </tr>
+          <tr>
+            <td>向量規模 &gt; 1 億筆，需要進階調參</td>
+            <td><strong>Pinecone / Milvus / Weaviate</strong></td>
+          </tr>
+          <tr>
+            <td>全文搜尋為主、要 BM25 / 同義詞 / 多語言分析器</td>
+            <td><strong>Elasticsearch</strong></td>
+          </tr>
+          <tr>
+            <td>已用 PostgreSQL，向量 + 結構化資料同庫</td>
+            <td><strong>pgvector</strong></td>
+          </tr>
+          <tr>
+            <td>輕量 JSON 文件儲存 + 低延遲查</td>
+            <td><strong>Redis JSON</strong>（取代 MongoDB 的小場景）</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Redis 的賣點永遠是「<strong>低延遲 + 極簡部署 + 已經在你架構裡</strong>」。當你的場景不需要 search engine 等級的全文功能、向量規模中等，Redis 8 是<em>多開一個元件 vs 用現有 Redis</em> 的取捨。</p>
+    </section>
+
+    <section id="hands-on">
+      <span class="section-eyebrow">07 — 動手玩</span>
+      <h2>跑 Vector Set + RediSearch</h2>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 確認用的是 Redis 8.6 (8.0+ 含模組)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> run --rm -p 6379:6379 redis:8.6
+
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it $(docker ps -q --filter ancestor=redis:8.6) redis-cli
+&gt; <span class="tk-fn">INFO</span> server | grep redis_version
+redis_version:8.6.x
+
+<span class="tk-cm"># 1. Vector Set 玩法</span>
+&gt; <span class="tk-fn">VADD</span> mySet <span class="tk-op">VALUES</span> <span class="tk-num">3</span> <span class="tk-num">0.9</span> <span class="tk-num">0.1</span> <span class="tk-num">0.0</span> <span class="tk-st">"doc:tsla"</span>
+&gt; <span class="tk-fn">VADD</span> mySet <span class="tk-op">VALUES</span> <span class="tk-num">3</span> <span class="tk-num">0.85</span> <span class="tk-num">0.1</span> <span class="tk-num">0.05</span> <span class="tk-st">"doc:aapl"</span>
+&gt; <span class="tk-fn">VADD</span> mySet <span class="tk-op">VALUES</span> <span class="tk-num">3</span> <span class="tk-num">0.1</span> <span class="tk-num">0.9</span> <span class="tk-num">0.0</span> <span class="tk-st">"doc:macro"</span>
+&gt; <span class="tk-fn">VSIM</span> mySet <span class="tk-op">VALUES</span> <span class="tk-num">3</span> <span class="tk-num">0.88</span> <span class="tk-num">0.08</span> <span class="tk-num">0.05</span> <span class="tk-op">COUNT</span> <span class="tk-num">2</span>
+1) <span class="tk-st">"doc:tsla"</span>
+2) <span class="tk-st">"doc:aapl"</span>
+
+<span class="tk-cm"># 2. RediSearch + JSON</span>
+&gt; <span class="tk-fn">JSON.SET</span> user:1 $ <span class="tk-st">'{"name":"Jason","city":"Taipei","age":28}'</span>
+&gt; <span class="tk-fn">JSON.SET</span> user:2 $ <span class="tk-st">'{"name":"Alex","city":"Tokyo","age":35}'</span>
+
+&gt; <span class="tk-fn">FT.CREATE</span> idx:user <span class="tk-op">ON</span> JSON PREFIX <span class="tk-num">1</span> <span class="tk-st">"user:"</span> SCHEMA \
+    $.name <span class="tk-op">AS</span> name <span class="tk-op">TEXT</span> \
+    $.city <span class="tk-op">AS</span> city <span class="tk-op">TAG</span> \
+    $.age  <span class="tk-op">AS</span> age <span class="tk-op">NUMERIC</span> SORTABLE
+
+&gt; <span class="tk-fn">FT.SEARCH</span> idx:user <span class="tk-st">"@city:{Taipei}"</span>
+&gt; <span class="tk-fn">FT.SEARCH</span> idx:user <span class="tk-st">"@age:[30 +inf]"</span></code></pre>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "Redis 8 「把 Stack 併回 OSS」對你影響最大的是？",
+    "options": [
+      "原本用 RediSearch / RedisJSON 的應用要重寫",
+      "Redis 8 內建 Search/JSON/TimeSeries/Bloom,不用再單裝模組或選 Stack 版",
+      "OSS Redis 不再開源",
+      "向量功能被移除"
+    ],
+    "answer": 1,
+    "explain": "Redis 8 把原本要分開維護的 Stack 模組全部合進主線。裝 redis:8.x 自動有所有功能,Redis Stack 6.2/7.2/7.4 已於 2025-09-15 停止支援。對使用者來說就是「一條版本線、一個指令集」,大幅簡化版本與部署。"
+  },
+  {
+    "question": "下列哪些<strong>正確</strong>描述 Redis Vector Sets？(多選)",
+    "options": [
+      "是 Redis 8 引入的新原生資料結構,API 為 VADD/VSIM/VCARD 等",
+      "Vector Sets 跟 RediSearch 的 VECTOR field 功能完全等同",
+      "8.6 vs 8.4 的 VADD 寫入快約 43%、VSIM 查詢快約 58%",
+      "底層使用 HNSW 演算法"
+    ],
+    "answer": [0, 2, 3],
+    "explain": "(0)(2)(3) 正確。(1) 錯：兩者目的不同 — Vector Sets 是輕量、純向量的<em>資料結構</em>;RediSearch 的 VECTOR field 包在 search index 內，可與 TAG / NUMERIC / TEXT 欄位做混合搜尋。複雜場景仍要用 RediSearch。"
+  },
+  {
+    "question": "你的場景是「商品搜尋系統,要全文 + 標籤 + 數值範圍 + 向量(用語意找相似商品)」,規模 200 萬筆。在 Redis 8 下最適合？",
+    "options": [
+      "用一個 Vector Set + 多個 Set 做 metadata 過濾",
+      "用 RediSearch FT.CREATE,單一 index 涵蓋 TEXT / TAG / NUMERIC / VECTOR",
+      "把資料丟去 Elasticsearch,Redis 只當 cache",
+      "用 Redis Streams 做搜尋"
+    ],
+    "answer": 1,
+    "explain": "需要 <strong>混合搜尋</strong>(全文 + 結構化 + 向量) → RediSearch 是 Redis 內最合適的選擇。一個 FT.CREATE 就涵蓋四種欄位型態，且可寫複合 query 如 <code>@category:{phones} @price:[100 500] =&gt;[KNN 10 @emb $q]</code>。200 萬筆對 RediSearch 是輕量規模。Vector Set 只支援純向量，做 metadata filter 不易。"
+  },
+  {
+    "question": "下列關於 Hash Field TTL（8.0 引入的 <code>HEXPIRE</code>）的敘述，哪一項<strong>正確</strong>？",
+    "options": [
+      "整個 hash 一起過期",
+      "可以對 hash 內個別欄位設 TTL,其他欄位不受影響",
+      "只有 String 型態能設 TTL,Hash 不能",
+      "需要額外載入模組才能用"
+    ],
+    "answer": 1,
+    "explain": "Redis 8.0 引入 Hash Field TTL：<code>HEXPIRE / HEXPIREAT / HPERSIST</code> 等指令能對<strong>個別 field</strong>設過期。例如 session 中 <code>last_seen</code> 過期但 <code>user_id</code> 永久。原本要做這個只能多用幾個 key 模擬,現在直接用 hash 即可。是 8.x 系列務實的小升級。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://redis.io/blog/redis-8-ga/" target="_blank" rel="noopener">Redis 8 GA Blog</a><span class="ref-meta">官方公告</span></li>
+        <li><a href="https://redis.io/docs/latest/develop/whats-new/8-6/" target="_blank" rel="noopener">Redis 8.6 What's New</a><span class="ref-meta">2026/03</span></li>
+        <li><a href="https://redis.io/blog/announcing-redis-86-performance-improvements-streams/" target="_blank" rel="noopener">Announcing Redis 8.6</a><span class="ref-meta">效能數字</span></li>
+        <li><a href="https://redis.io/docs/latest/develop/data-types/vector-sets/" target="_blank" rel="noopener">Vector Sets</a><span class="ref-meta">官方文件</span></li>
+        <li><a href="https://redis.io/docs/latest/develop/interact/search-and-query/" target="_blank" rel="noopener">Search and query</a><span class="ref-meta">RediSearch</span></li>
+        <li><a href="https://redis.io/docs/latest/develop/data-types/json/" target="_blank" rel="noopener">JSON</a><span class="ref-meta">RedisJSON</span></li>
+        <li><a href="https://redis.io/commands/hexpire/" target="_blank" rel="noopener">HEXPIRE</a><span class="ref-meta">Hash Field TTL</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="redis_04_ha_cluster.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Redis 04 · Sentinel vs Cluster</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="redis_06_patterns_antipatterns.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Redis 06 · 實戰模式與反模式</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">6 堂 Redis 系列 <span class="progress-pill">5 / 6</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="redis_01_intro.html"><span class="course-nav-num">01</span><span>Redis 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="redis_02_advanced_ds.html"><span class="course-nav-num">02</span><span>進階資料結構</span></a></li>
+        <li><a class="course-nav-item" href="redis_03_persistence_replication.html"><span class="course-nav-num">03</span><span>持久化與複製</span></a></li>
+        <li><a class="course-nav-item" href="redis_04_ha_cluster.html"><span class="course-nav-num">04</span><span>Sentinel vs Cluster</span></a></li>
+        <li><a class="course-nav-item current" href="redis_05_v8_modules.html"><span class="course-nav-num">05</span><span>Redis 8 新特性</span></a></li>
+        <li><a class="course-nav-item" href="redis_06_patterns_antipatterns.html"><span class="course-nav-num">06</span><span>實戰模式與反模式</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 Redis 課程系列 · Lesson 05
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

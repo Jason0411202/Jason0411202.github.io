@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cassandra 03｜CQL 與 Query-First 資料建模 — Cassandra 課程</title>
+<meta name="description" content="CQL 看似 SQL 但不能 join。Primary Key = Partition Key + Clustering Key 是核心心智模型。Query-First 設計、反正規化是常態、最後比較 SAI / 2i / Materialized View。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Cassandra 03 · 資料建模</div>
+    <h1 class="hero-title">CQL 與<span>Query-First 建模</span></h1>
+    <p class="hero-desc">Cassandra 最容易踩坑的地方就是「以為 CQL 是 SQL」。本堂把 partition key / clustering key、wide row、反正規化、為什麼不能 join 一次說清楚。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 3 / 6 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 16 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>核心</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#cql-vs-sql">CQL vs SQL</a></li>
+      <li><a class="toc-link" href="#pk">Primary Key 結構</a></li>
+      <li><a class="toc-link" href="#wide-row">Wide Row</a></li>
+      <li><a class="toc-link" href="#query-first">Query-First</a></li>
+      <li><a class="toc-link" href="#denorm">反正規化</a></li>
+      <li><a class="toc-link" href="#index-options">索引選擇</a></li>
+      <li><a class="toc-link" href="#anti">反模式</a></li>
+      <li><a class="toc-link" href="#hands-on">動手玩</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="cql-vs-sql">
+      <span class="section-eyebrow">01 — CQL vs SQL</span>
+      <h2>看起來像 SQL，骨子裡是 KV</h2>
+      <p>CQL（Cassandra Query Language）的語法是刻意設計成像 SQL 的，目的是降低學習門檻。<strong>但骨子裡 Cassandra 是個分散式 KV 系統</strong>，CQL 把它包裝成 row/column 介面。最常見的誤會：</p>
+
+      <table>
+        <thead>
+          <tr><th>SQL 能做但 CQL <strong>不能</strong>做</th><th>原因</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>JOIN</code> 兩張表</td>
+            <td>跨 partition 跨節點 join 會變分散式 query，違反 Cassandra 設計</td>
+          </tr>
+          <tr>
+            <td>沒指定 partition key 的 <code>WHERE</code></td>
+            <td>等於要掃整個叢集；強行用會被 <code>ALLOW FILTERING</code> 警告</td>
+          </tr>
+          <tr>
+            <td><code>GROUP BY</code> + 聚合（除非同 partition）</td>
+            <td>aggregation 跨 partition 不可行；要做請用 Spark</td>
+          </tr>
+          <tr>
+            <td><code>ORDER BY</code> 任意欄位</td>
+            <td>只能依 clustering key 排序；其他欄位不行</td>
+          </tr>
+          <tr>
+            <td>外鍵 (FK) / 真正的 transaction</td>
+            <td>有 LWT 但代價高，不是設計目標</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>看到 <code>ALLOW FILTERING</code> 就要警覺</strong>
+          這是 Cassandra 給你「我知道你要做掃全表的危險查詢」的明示開關。<em>除了管理工具，幾乎不該出現在生產 query 裡</em>。
+        </div>
+      </div>
+    </section>
+
+    <section id="pk">
+      <span class="section-eyebrow">02 — Primary Key</span>
+      <h2>核心心智模型：PK = Partition Key + Clustering Key</h2>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">cql</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-kw">CREATE TABLE</span> price_by_symbol (
+  symbol     <span class="tk-kw">text</span>,
+  ts         <span class="tk-kw">timestamp</span>,
+  price      <span class="tk-kw">decimal</span>,
+  volume     <span class="tk-kw">bigint</span>,
+  <span class="tk-kw">PRIMARY KEY</span> ((symbol), ts)
+  <span class="tk-cm">--           ↑          ↑</span>
+  <span class="tk-cm">--    partition key   clustering key</span>
+);</code></pre>
+      </div>
+
+      <ul>
+        <li><strong>Partition key</strong>：決定這筆資料<em>放在哪台機器</em>（用上一堂提的 Murmur3 hash）。同一個 partition key 的所有資料一定在同一台節點。</li>
+        <li><strong>Clustering key</strong>：partition 內部的排序依據。<em>同一 partition 內的資料按 clustering key 連續儲存</em>。</li>
+      </ul>
+
+      <h3>複合 partition key</h3>
+      <p>有時單欄當 partition key 容易產生 hot partition（例如全部資料 partition key 都是 <code>"prod"</code>）。可以用 <strong>複合 partition key</strong> 把流量分散：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">cql</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-kw">CREATE TABLE</span> events_by_day (
+  day        <span class="tk-kw">date</span>,
+  bucket     <span class="tk-kw">int</span>,        <span class="tk-cm">-- 0~9 隨機分桶</span>
+  ts         <span class="tk-kw">timestamp</span>,
+  payload    <span class="tk-kw">text</span>,
+  <span class="tk-kw">PRIMARY KEY</span> ((day, bucket), ts)
+  <span class="tk-cm">--           ↑               ↑</span>
+  <span class="tk-cm">--   複合 partition key   clustering key</span>
+);</code></pre>
+      </div>
+
+      <p>同一天的資料原本只會在一個 partition、可能塞爆。加上 <code>bucket</code> 後，同一天的資料分到 10 個 partition、平均到不同節點。<em>但 query 時要記得「day + bucket」一起給</em>。</p>
+    </section>
+
+    <section id="wide-row">
+      <span class="section-eyebrow">03 — Wide Row</span>
+      <h2>同一 partition 內的資料是怎麼排列的</h2>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" aria-label="wide row 結構">
+          <g font-family="JetBrains Mono, monospace" font-size="12">
+            <text x="360" y="28" text-anchor="middle" font-family="Syne, sans-serif" font-size="16" font-weight="700" fill="#0a0a0f">price_by_symbol — partition by symbol</text>
+
+            <!-- TSLA partition -->
+            <rect x="40" y="60" width="640" height="90" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="80" y="80" font-weight="700" fill="#4c1d95" font-size="13">"TSLA"</text>
+            <text x="80" y="100" fill="#6b6b7e" font-size="10">(partition key, hash → 某 token)</text>
+
+            <g font-size="11">
+              <rect x="180" y="100" width="100" height="40" rx="4" fill="#fff" stroke="#c4b5fd"/>
+              <text x="230" y="115" text-anchor="middle" fill="#0a0a0f">09:30:00</text>
+              <text x="230" y="130" text-anchor="middle" fill="#7c3aed">285.40 / 12500</text>
+
+              <rect x="290" y="100" width="100" height="40" rx="4" fill="#fff" stroke="#c4b5fd"/>
+              <text x="340" y="115" text-anchor="middle" fill="#0a0a0f">09:31:00</text>
+              <text x="340" y="130" text-anchor="middle" fill="#7c3aed">285.62 / 9800</text>
+
+              <rect x="400" y="100" width="100" height="40" rx="4" fill="#fff" stroke="#c4b5fd"/>
+              <text x="450" y="115" text-anchor="middle" fill="#0a0a0f">09:32:00</text>
+              <text x="450" y="130" text-anchor="middle" fill="#7c3aed">286.10 / 14000</text>
+
+              <rect x="510" y="100" width="100" height="40" rx="4" fill="#fff" stroke="#c4b5fd"/>
+              <text x="560" y="115" text-anchor="middle" fill="#0a0a0f">09:33:00 ...</text>
+              <text x="560" y="130" text-anchor="middle" fill="#7c3aed">數十萬筆</text>
+            </g>
+
+            <text x="100" y="170" fill="#6b6b7e" font-size="11">↑ 同一個 partition</text>
+            <text x="100" y="186" fill="#6b6b7e" font-size="11">  以 ts 為 clustering key 連續儲存</text>
+
+            <!-- AAPL partition -->
+            <rect x="40" y="200" width="640" height="60" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+            <text x="80" y="220" font-weight="700" fill="#92400e" font-size="13">"AAPL"</text>
+            <text x="80" y="240" fill="#6b6b7e" font-size="10">在另一個節點 (依 hash 結果)</text>
+            <g font-size="11">
+              <rect x="240" y="225" width="100" height="25" rx="4" fill="#fff" stroke="#fcd34d"/>
+              <text x="290" y="241" text-anchor="middle" fill="#0a0a0f">09:30:00 / 175.50</text>
+              <rect x="350" y="225" width="100" height="25" rx="4" fill="#fff" stroke="#fcd34d"/>
+              <text x="400" y="241" text-anchor="middle" fill="#0a0a0f">09:31:00 / 175.62</text>
+            </g>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 C3.1 — 「TSLA」的所有報價在同一個 partition 內依 ts 連續儲存</div>
+      </div>
+
+      <p>因為 partition 內<strong>連續儲存</strong>，<em>範圍查詢非常便宜</em>：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">cql</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm">-- 只到 1 台節點，partition 內 sequential scan,飛快</span>
+<span class="tk-kw">SELECT</span> * <span class="tk-kw">FROM</span> price_by_symbol
+  <span class="tk-kw">WHERE</span> symbol = <span class="tk-st">'TSLA'</span>
+    <span class="tk-kw">AND</span> ts &gt;= <span class="tk-st">'2026-04-27 09:30'</span>
+    <span class="tk-kw">AND</span> ts &lt;  <span class="tk-st">'2026-04-27 16:00'</span>;
+
+<span class="tk-cm">-- 但這個爆炸 — 沒指定 partition key</span>
+<span class="tk-kw">SELECT</span> * <span class="tk-kw">FROM</span> price_by_symbol
+  <span class="tk-kw">WHERE</span> ts &gt;= <span class="tk-st">'2026-04-27 09:30'</span>;
+<span class="tk-cm">-- ↑ 沒給 symbol → Cassandra 要掃所有 partition,拒絕</span></code></pre>
+      </div>
+    </section>
+
+    <section id="query-first">
+      <span class="section-eyebrow">04 — Query-First</span>
+      <h2>不是先設計 schema，是先列查詢</h2>
+      <p>關聯式資料庫的工作流：先 normalize 出 schema → 之後查不到再加 index。<strong>Cassandra 反過來</strong>：</p>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">列出所有 query</div>
+            <div class="timeline-desc">「給我這支股票最近 100 筆報價」「給我某用戶的所有訂單」「給我這個 device 今天的事件」 — 把所有讀取需求清單列出。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">為每個 query 設計一張表</div>
+            <div class="timeline-desc">每張表的 partition key 對應 query 裡固定的那一欄，clustering key 對應「要排序或範圍取的那一欄」。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">同一份資料寫多份表</div>
+            <div class="timeline-desc">一筆訂單同時寫進 <code>orders_by_user</code>、<code>orders_by_status</code>、<code>orders_by_day</code> ...，這叫「反正規化」，不是壞味道。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">驗證 partition size 不會炸</div>
+            <div class="timeline-desc">每個 partition 估算大小，目標 &lt; 100 MB、&lt; 100 萬個 cell。超過就要切 bucket。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="denorm">
+      <span class="section-eyebrow">05 — 反正規化</span>
+      <h2>同一筆資料寫多份是常態</h2>
+      <p>場景：訂單系統，常見三個查詢需求：</p>
+      <ol>
+        <li>給一個用戶看他的所有訂單（最新優先）。</li>
+        <li>給後台看「待出貨」狀態的所有訂單。</li>
+        <li>給財務看某一天的所有訂單。</li>
+      </ol>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">cql</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm">-- 1. 用戶視角</span>
+<span class="tk-kw">CREATE TABLE</span> orders_by_user (
+  user_id    <span class="tk-kw">uuid</span>,
+  created_at <span class="tk-kw">timestamp</span>,
+  order_id   <span class="tk-kw">uuid</span>,
+  status     <span class="tk-kw">text</span>,
+  amount     <span class="tk-kw">decimal</span>,
+  <span class="tk-kw">PRIMARY KEY</span> ((user_id), created_at, order_id)
+) <span class="tk-kw">WITH CLUSTERING ORDER BY</span> (created_at <span class="tk-kw">DESC</span>, order_id <span class="tk-kw">ASC</span>);
+
+<span class="tk-cm">-- 2. 後台 status 視角 (用 day + status 當複合 partition key 避免 hot)</span>
+<span class="tk-kw">CREATE TABLE</span> orders_by_status (
+  day        <span class="tk-kw">date</span>,
+  status     <span class="tk-kw">text</span>,
+  order_id   <span class="tk-kw">uuid</span>,
+  user_id    <span class="tk-kw">uuid</span>,
+  amount     <span class="tk-kw">decimal</span>,
+  <span class="tk-kw">PRIMARY KEY</span> ((day, status), order_id)
+);
+
+<span class="tk-cm">-- 3. 財務日視角</span>
+<span class="tk-kw">CREATE TABLE</span> orders_by_day (
+  day        <span class="tk-kw">date</span>,
+  bucket     <span class="tk-kw">int</span>,    <span class="tk-cm">-- 0~9 分桶</span>
+  created_at <span class="tk-kw">timestamp</span>,
+  order_id   <span class="tk-kw">uuid</span>,
+  user_id    <span class="tk-kw">uuid</span>,
+  amount     <span class="tk-kw">decimal</span>,
+  <span class="tk-kw">PRIMARY KEY</span> ((day, bucket), created_at, order_id)
+);</code></pre>
+      </div>
+
+      <p>建立訂單時，<strong>應用層</strong>（或一個輕量的 batch / event handler）負責把<em>同一筆資料</em>寫到三張表。<em>是的，這會增加寫入量</em>，但 Cassandra 寫入便宜（C-04 會說明），而且這樣每個 query 都能 O(1) 直達 partition。</p>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>用 BATCH 把多張表寫入綁在一起</strong>
+          Cassandra 提供 <code>BEGIN BATCH ... APPLY BATCH;</code>（logged batch）保證「全部成功或全部失敗」。但 batch 跨多個 partition 時有效能成本，<em>只在「不能容忍部分寫入」時用</em>。
+        </div>
+      </div>
+    </section>
+
+    <section id="index-options">
+      <span class="section-eyebrow">06 — 索引選擇</span>
+      <h2>除了 PK 還能怎麼查：2i / SAI / Materialized View</h2>
+
+      <table>
+        <thead>
+          <tr><th>機制</th><th>機制說明</th><th>建議</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Secondary Index (2i)</td>
+            <td>每個節點各自維護自己 partition 的 local index，查詢時要 scatter-gather</td>
+            <td><strong>不建議在大叢集用</strong>，低基數欄位才勉強</td>
+          </tr>
+          <tr>
+            <td>SASI</td>
+            <td>SSTable-Attached Secondary Index</td>
+            <td>4.x 已 deprecated，不要新用</td>
+          </tr>
+          <tr>
+            <td><strong>SAI（5.0 預設選項）</strong></td>
+            <td>Storage-Attached Index，與儲存引擎深度整合，效能與彈性接近 ES</td>
+            <td><strong>5.0 起的首選</strong>（C-05 詳細）</td>
+          </tr>
+          <tr>
+            <td>Materialized View</td>
+            <td>Cassandra 自動為你維護「同樣資料但 PK 不同」的另一張表</td>
+            <td>3.0 就有但<em>實驗性</em>且有 race condition；社群多建議「應用層自己反正規化」</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>實務上 5.0 的建議路徑：<strong>應用層反正規化（一筆寫多表）為主，SAI 為輔</strong>。Materialized View 除非你能接受其限制，否則別用。</p>
+    </section>
+
+    <section id="anti">
+      <span class="section-eyebrow">07 — 反模式</span>
+      <h2>四個保證踩坑的反模式</h2>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>Hot Partition</div>
+          <div class="compare-body">
+            所有資料用同一 partition key（例如 <code>"global"</code>）。<br>
+            → 一台節點扛全部流量，其他節點閒著。<br>
+            <strong>解法：</strong>加 bucket、用更分散的 key。
+          </div>
+        </div>
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>Unbounded Partition</div>
+          <div class="compare-body">
+            partition 持續長大不切（例如「所有事件用同一個 device 當 PK」幾年累積千萬筆）。<br>
+            → 單 partition &gt; 100 MB 後讀取明顯變慢。<br>
+            <strong>解法：</strong>把時間切進 PK（年/月/週）。
+          </div>
+        </div>
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>無界 IN</div>
+          <div class="compare-body">
+            <code>WHERE symbol IN (?, ?, ..., 1000 個)</code>。<br>
+            → coordinator 要對 1000 個 partition fan-out，多半超時。<br>
+            <strong>解法：</strong>應用層拆成 N 條 query 並行。
+          </div>
+        </div>
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>ALLOW FILTERING</div>
+          <div class="compare-body">
+            <code>SELECT ... WHERE non_pk_col = ? ALLOW FILTERING</code>。<br>
+            → 等於告訴 Cassandra「我知道要全表掃」。<br>
+            <strong>解法：</strong>新增一張對應 query 的表（反正規化）。
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="hands-on">
+      <span class="section-eyebrow">08 — 動手玩</span>
+      <h2>建一個 stockbot 風格的 schema</h2>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">cql</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm">-- 接續 C-01 的 stockbot keyspace</span>
+<span class="tk-kw">USE</span> stockbot;
+
+<span class="tk-cm">-- 1. 主表：依股票代碼查歷史報價(已存在)</span>
+
+<span class="tk-cm">-- 2. 每天每支股票的最新一筆 (給 dashboard 用)</span>
+<span class="tk-kw">CREATE TABLE</span> latest_price_by_day (
+  day      <span class="tk-kw">date</span>,
+  symbol   <span class="tk-kw">text</span>,
+  ts       <span class="tk-kw">timestamp</span>,
+  price    <span class="tk-kw">decimal</span>,
+  <span class="tk-kw">PRIMARY KEY</span> ((day), symbol)
+);
+
+<span class="tk-cm">-- 3. 「告警」事件流：依 user 查近期告警</span>
+<span class="tk-kw">CREATE TABLE</span> alerts_by_user (
+  user_id    <span class="tk-kw">uuid</span>,
+  created_at <span class="tk-kw">timestamp</span>,
+  alert_id   <span class="tk-kw">uuid</span>,
+  symbol     <span class="tk-kw">text</span>,
+  rule       <span class="tk-kw">text</span>,
+  <span class="tk-kw">PRIMARY KEY</span> ((user_id), created_at, alert_id)
+) <span class="tk-kw">WITH CLUSTERING ORDER BY</span> (created_at <span class="tk-kw">DESC</span>, alert_id <span class="tk-kw">ASC</span>);
+
+<span class="tk-cm">-- 試查</span>
+<span class="tk-kw">INSERT INTO</span> latest_price_by_day (day, symbol, ts, price)
+  <span class="tk-kw">VALUES</span> (<span class="tk-st">'2026-04-27'</span>, <span class="tk-st">'TSLA'</span>, <span class="tk-st">'2026-04-27 15:59'</span>, <span class="tk-num">288.20</span>);
+<span class="tk-kw">INSERT INTO</span> latest_price_by_day (day, symbol, ts, price)
+  <span class="tk-kw">VALUES</span> (<span class="tk-st">'2026-04-27'</span>, <span class="tk-st">'AAPL'</span>, <span class="tk-st">'2026-04-27 15:59'</span>, <span class="tk-num">175.80</span>);
+
+<span class="tk-kw">SELECT</span> * <span class="tk-kw">FROM</span> latest_price_by_day <span class="tk-kw">WHERE</span> day=<span class="tk-st">'2026-04-27'</span>;</code></pre>
+      </div>
+
+      <p><strong>練習</strong>：嘗試這些 query，預測哪個會成功、哪個會被拒：</p>
+      <ul>
+        <li><code>SELECT * FROM price_by_symbol WHERE symbol='TSLA';</code> ← 主鍵命中</li>
+        <li><code>SELECT * FROM price_by_symbol WHERE ts &gt; '2026-04-27';</code> ← 沒 partition key，Cassandra 拒絕</li>
+        <li><code>SELECT * FROM price_by_symbol WHERE ts &gt; '2026-04-27' ALLOW FILTERING;</code> ← 加上才允許，但是反模式</li>
+        <li><code>SELECT * FROM price_by_symbol WHERE symbol='TSLA' AND price &gt; 280;</code> ← 沒 SAI 不行（5.0 可加 SAI 索引讓它變可行，C-05 講）</li>
+      </ul>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "你要設計一張表存「每個用戶的所有訂單」，最常見查詢是「給我 user_id=X 最近 50 筆訂單」。下列哪一個 PK 設計<strong>最適合</strong>？",
+    "options": [
+      "PRIMARY KEY ((order_id))，再加 secondary index 在 user_id",
+      "PRIMARY KEY ((user_id), created_at, order_id) 並 ORDER BY created_at DESC",
+      "PRIMARY KEY ((user_id, order_id), created_at)",
+      "PRIMARY KEY ((created_at), user_id, order_id)"
+    ],
+    "answer": 1,
+    "explain": "最常見的查詢是「按 user_id 取最近 N 筆」 → user_id 當 partition key（同一 user 在同一節點）、created_at DESC 當 clustering key（最新優先、範圍取便宜）。(0) 用 secondary index 對熱點查詢效能差。(2) 把 user_id+order_id 都當 partition key 表示「指定一筆」才能 query，無法列表。(3) 按 created_at 分 partition 會跨多個 partition fan-out。"
+  },
+  {
+    "question": "下列哪些是 Cassandra 經典的<strong>反模式</strong>？(多選)",
+    "options": [
+      "把同一筆資料寫到 3 張不同設計的表（反正規化）",
+      "用 ALLOW FILTERING 做生產 query",
+      "讓單一 partition 累積數年資料，size 突破 1 GB",
+      "用 IN 子句一次帶 1000 個 partition key"
+    ],
+    "answer": [1, 2, 3],
+    "explain": "(0) 反正規化是 Cassandra 的<em>正確做法</em>，不是反模式。(1)(2)(3) 都是經典地雷：ALLOW FILTERING 等於宣告全表掃；unbounded partition 讀取暴慢；無界 IN 讓 coordinator 對上千 partition fan-out 容易超時。"
+  },
+  {
+    "question": "為什麼 Cassandra 5.0+ 推薦用 <strong>SAI</strong> 而不是傳統 secondary index (2i) 或 Materialized View？",
+    "options": [
+      "SAI 是與儲存引擎深度整合的索引，效能與彈性遠高於 2i；MV 有 race condition 與運維坑",
+      "2i 已經完全廢棄不能用",
+      "Materialized View 不支援多欄位",
+      "SAI 是付費功能，所以較強"
+    ],
+    "answer": 0,
+    "explain": "SAI（Storage-Attached Index）是 5.0 引入的新索引機制，與 SSTable / memtable 整合，可在大叢集穩定運作。2i 仍可用但跨大叢集 scatter-gather 效能差。MV 自 3.x 引入但<em>歷來有 race / 一致性問題</em>，社群多建議走應用層反正規化。SAI 是 OSS 功能，不需付費。"
+  },
+  {
+    "question": "看到下面這個 query，最大的問題是什麼？<br><code>SELECT * FROM events WHERE symbol IN ('AAPL', 'TSLA', ..., 共 800 個);</code>",
+    "options": [
+      "IN 子句語法錯誤",
+      "Cassandra 不支援 IN",
+      "coordinator 要對 800 個 partition fan-out 並聚合，極可能超時並拖慢叢集",
+      "IN 只能放數字"
+    ],
+    "answer": 2,
+    "explain": "IN 子句語法可用，但<strong>數量太大</strong>是 Cassandra 經典反模式。coordinator 要對每個 partition key 都發 read（800 個 partition、可能跨多台），收齊全部才能回 client。實務做法是<em>應用層自己拆成 N 條並行 query</em>（client driver 也可幫忙）。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/developing/cql/index.html" target="_blank" rel="noopener">CQL 文件</a><span class="ref-meta">官方語法</span></li>
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/data-modeling/index.html" target="_blank" rel="noopener">Data modeling</a><span class="ref-meta">官方</span></li>
+        <li><a href="https://www.datastax.com/learn/data-modeling-by-example" target="_blank" rel="noopener">Data modeling by example — DataStax</a><span class="ref-meta">經典範例</span></li>
+        <li><a href="https://www.instaclustr.com/blog/cassandra-data-partitioning/" target="_blank" rel="noopener">Cassandra Data Partitioning — Instaclustr</a><span class="ref-meta">PK 設計實務</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="cassandra_02_architecture.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Cassandra 02 · 環狀架構</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="cassandra_04_read_write_path.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Cassandra 04 · 讀寫路徑與 Compaction</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">6 堂 Cassandra 系列 <span class="progress-pill">3 / 6</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="cassandra_01_intro.html"><span class="course-nav-num">01</span><span>Cassandra 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_02_architecture.html"><span class="course-nav-num">02</span><span>環狀架構與一致性</span></a></li>
+        <li><a class="course-nav-item current" href="cassandra_03_cql_modeling.html"><span class="course-nav-num">03</span><span>CQL 與資料建模</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_04_read_write_path.html"><span class="course-nav-num">04</span><span>讀寫路徑 / Compaction</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_05_v5_features.html"><span class="course-nav-num">05</span><span>5.0 新特性</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_06_ops_practice.html"><span class="course-nav-num">06</span><span>運維實務</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 Cassandra 課程系列 · Lesson 03
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

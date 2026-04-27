@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 05｜Code Review 文化與技巧 — 開源貢獻課程</title>
+<meta name="description" content="Google Engineering Practices、Conventional Comments、CODEOWNERS — 從 Reviewer 與 Author 雙視角學會業界 code review 的標準做法。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 05 · 協作工作流篇</div>
+    <h1 class="hero-title">Code Review<span> 文化與技巧</span></h1>
+    <p class="hero-desc">Code review 不是「揪錯」，是<strong>知識傳遞 + 風險控管</strong>。這堂教你怎麼當好 reviewer 與好 author，以及業界共通的留言規範。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 5 / 12 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 12 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>中階</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#why">為什麼要 review</a></li>
+      <li><a class="toc-link" href="#reviewer">Reviewer 心法</a></li>
+      <li><a class="toc-link" href="#author">Author 禮儀</a></li>
+      <li><a class="toc-link" href="#conventional">留言規範</a></li>
+      <li><a class="toc-link" href="#actions">三種 review 結論</a></li>
+      <li><a class="toc-link" href="#suggested">Suggested changes</a></li>
+      <li><a class="toc-link" href="#codeowners">CODEOWNERS</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="why">
+      <span class="section-eyebrow">01 — 為什麼要 review</span>
+      <h2>Code review 的真正目的</h2>
+
+      <p>很多人以為 review 是來「找 bug」的。其實找 bug 只是<strong>副產物</strong>。Google Engineering Practices 對 review 目的的官方說法：</p>
+
+      <ol>
+        <li><strong>維護程式碼品質</strong> — 不只正確，還要可讀、可維護</li>
+        <li><strong>知識共享</strong> — 至少有 2 個人懂這段程式碼</li>
+        <li><strong>建立團隊規範</strong> — 透過討論累積一致風格</li>
+        <li><strong>傳承</strong> — 新人看 review 學資深者的思考</li>
+      </ol>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>Reviewer 不是把關者，是合作者</strong>
+          Reviewer 跟 author 是同一隊的，目標都是讓程式碼變好。如果用「審判 vs 被審判」心態做 review，整個團隊文化就崩了。
+        </div>
+      </div>
+    </section>
+
+    <section id="reviewer">
+      <span class="section-eyebrow">02 — Reviewer 心法</span>
+      <h2>當 Reviewer 該注意什麼</h2>
+
+      <h3>Reviewer 的優先順序 (Google Style Guide)</h3>
+      <ol>
+        <li><strong>設計</strong> — 整體架構與這次改動的取捨對嗎？</li>
+        <li><strong>功能性</strong> — 行為符合需求嗎？邊界情況處理了嗎？</li>
+        <li><strong>複雜度</strong> — 有沒有 over-engineer？讀的人能理解嗎？</li>
+        <li><strong>測試</strong> — 有測試嗎？測試本身寫得好嗎？</li>
+        <li><strong>命名</strong> — 變數 / 函式 / 檔案命名清楚嗎？</li>
+        <li><strong>註解</strong> — 註解解釋「為什麼」(WHY) 而非「做什麼」(WHAT)？</li>
+        <li><strong>風格</strong> — 符合 style guide？(這個應該是 linter 自動處理)</li>
+      </ol>
+
+      <h3>Reviewer 速度</h3>
+      <p>Google 的內部標準：<strong>收到 review 請求後 1 個工作天內要給回應</strong>。即使做不完整 review，也要先 ack「收到，X 點前回覆」。</p>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>不要拖延 review</strong>
+          PR 卡在 review 越久，author 越痛苦：① 衝突越來越多 ② 上下文記憶流失 ③ 後面工作被擋住。<strong>review 不是「我有空再做」的事，是團隊輸出速度的關鍵環節。</strong>
+        </div>
+      </div>
+
+      <h3>找不到問題該怎麼做？</h3>
+      <p>Reviewer 不需要「至少挑一個毛病」。如果整份 PR 看起來都好，<strong>直接 approve 並寫一句肯定的話</strong>就好。Google 內部規定：「如果一個 reviewer 覺得整份 CL (change list) 至少跟現有 codebase 一樣好，就應該 LGTM (Looks Good To Me)」。</p>
+    </section>
+
+    <section id="author">
+      <span class="section-eyebrow">03 — Author 禮儀</span>
+      <h2>當 Author 怎麼讓自己 PR 順利通過</h2>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">PR 越小越好</div>
+            <div class="timeline-desc">理想 PR：&lt; 400 行 diff。超過 1000 行的 PR review 品質會急速下降，建議拆成多個。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">寫好 PR 描述</div>
+            <div class="timeline-desc">背景 / 改動 / 怎麼測 / 是否 breaking — Lesson 04 的範本。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">先自己 review 一遍</div>
+            <div class="timeline-desc">送出前自己看一次 GitHub diff 介面，常會發現 debug print、TODO、命名問題。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">回覆每一個 comment</div>
+            <div class="timeline-desc">不要靜默改完就 push。每條 comment 至少回 <em>Done</em> / <em>Won't fix because...</em> / <em>Discussed with X offline</em>。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">5</div>
+          <div class="timeline-content">
+            <div class="timeline-title">不同意時 push back，但禮貌</div>
+            <div class="timeline-desc">Reviewer 也會錯。有理由就提出來討論，不是無條件接受所有建議。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">6</div>
+          <div class="timeline-content">
+            <div class="timeline-title">避免被 review 後再大改</div>
+            <div class="timeline-desc">review 通過後再大改範圍，整個流程要重來，等於浪費 reviewer 的時間。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>不要把 review 當成個人攻擊</strong>
+          Reviewer 是針對「程式碼」不是「你」。即使留言用詞犀利，把焦點拉回 — 這段程式碼有什麼可以更好的？大多數時候你會發現意見很合理。
+        </div>
+      </div>
+    </section>
+
+    <section id="conventional">
+      <span class="section-eyebrow">04 — 留言規範</span>
+      <h2>Conventional Comments — 用 prefix 表達意圖</h2>
+
+      <p>同樣是 review 留言，下面這兩個的訊號完全不同：</p>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>含糊</div>
+          <div class="compare-body">
+            <code>這裡名字不太好</code>
+            <p style="font-size:13px;margin-top:0.4rem;">Author 不知道這是 must-fix 還是建議？要改成什麼？必要嗎？</p>
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>明確</div>
+          <div class="compare-body">
+            <code>nit: <code>handle</code> → <code>handleSubmit</code> 會更明確，可選</code>
+            <p style="font-size:13px;margin-top:0.4rem;"><code>nit:</code> = 雞蛋裡挑骨頭、可選；author 知道不必修也能合併。</p>
+          </div>
+        </div>
+      </div>
+
+      <h3>業界共通的 prefix</h3>
+
+      <table>
+        <thead>
+          <tr><th>Prefix</th><th>意思</th><th>範例</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>blocking:</code></td>
+            <td>必須改，否則不能合併</td>
+            <td><em>blocking: 這會讓 production 上的 user 看到 stack trace</em></td>
+          </tr>
+          <tr>
+            <td><code>suggestion:</code></td>
+            <td>建議改，author 可以選擇接受</td>
+            <td><em>suggestion: 用 Map 取代 if-else 鏈會更好維護</em></td>
+          </tr>
+          <tr>
+            <td><code>nit:</code></td>
+            <td>(nitpick) 雞蛋裡挑骨頭、純風格</td>
+            <td><em>nit: 這個變數可以早一行宣告</em></td>
+          </tr>
+          <tr>
+            <td><code>question:</code></td>
+            <td>提問，不是要你改</td>
+            <td><em>question: 這個 timeout 設 5 秒的理由是？</em></td>
+          </tr>
+          <tr>
+            <td><code>thought:</code></td>
+            <td>想到的點，純分享</td>
+            <td><em>thought: 之後可能可以抽成 hook</em></td>
+          </tr>
+          <tr>
+            <td><code>praise:</code></td>
+            <td>稱讚 (鼓勵 reviewer 也寫這種!)</td>
+            <td><em>praise: 這段抽象做得很乾淨 👍</em></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>praise 留言其實很重要</strong>
+          Code review 文化不是只批評。看到好的設計記得說出來 — author 知道自己做對了什麼，整個團隊 morale 也會好。研究顯示「正面 review 留言」跟「員工留任率」高度相關。
+        </div>
+      </div>
+    </section>
+
+    <section id="actions">
+      <span class="section-eyebrow">05 — 三種 review 結論</span>
+      <h2>Approve / Request changes / Comment 怎麼選</h2>
+
+      <p>GitHub PR review 有三個按鈕，各自意義：</p>
+
+      <table>
+        <thead>
+          <tr><th>選項</th><th>效果</th><th>什麼時候用</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Approve</strong></td>
+            <td>+1 通過票，CI / 設定到位後可合併</td>
+            <td>看完了沒問題；或只剩 nit 不影響合併</td>
+          </tr>
+          <tr>
+            <td><strong>Request changes</strong></td>
+            <td>擋住 merge 直到 author 解決並再次 review</td>
+            <td>有 blocking 問題，沒改不能合</td>
+          </tr>
+          <tr>
+            <td><strong>Comment</strong></td>
+            <td>留下意見但不投票</td>
+            <td>路過想說兩句、無法完整 review、提問</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>Request changes 要慎用</strong>
+          有些團隊文化把 request changes 當成「強烈反對」。如果只是 nit 級別的問題，用 <strong>Approve</strong> + <strong>內含 nit comment</strong> 比較好 — 表示「這些是建議，可以採納可以不採納，但不擋你合」。Request changes 留給真正會破壞東西的問題。
+        </div>
+      </div>
+    </section>
+
+    <section id="suggested">
+      <span class="section-eyebrow">06 — Suggested changes</span>
+      <h2>GitHub Suggested Changes — 一鍵接受改動</h2>
+
+      <p>GitHub 留言時用一個特殊 code block 寫建議的修改，author 就能在網頁上直接 commit：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">markdown</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm">```suggestion</span>
+const handleSubmit = async (event) =&gt; {
+  event.preventDefault();
+  await onSubmit(formData);
+};
+<span class="tk-cm">```</span></code></pre>
+      </div>
+
+      <p>Author 看到後會出現一個按鈕「Add suggestion to batch」或「Commit suggestion」，按下去就直接 push 一個 commit，不用本地操作。</p>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>什麼時候用 suggestion 最好</strong>
+          Typo、命名建議、簡單重構 — 反正比文字描述更精準。複雜邏輯不適合用 suggestion，因為 author 應該理解後自己寫，不是無腦接受。
+        </div>
+      </div>
+    </section>
+
+    <section id="codeowners">
+      <span class="section-eyebrow">07 — CODEOWNERS</span>
+      <h2><code>CODEOWNERS</code>：自動指派 reviewer</h2>
+
+      <p>大型專案會在 repo 根目錄或 <code>.github/</code> 放一個 <code>CODEOWNERS</code> 檔，定義「哪個目錄改動時自動找誰 review」：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">codeowners</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 預設所有改動都要這個團隊 review</span>
+*       @your-org/core-team
+
+<span class="tk-cm"># 前端目錄找前端團隊</span>
+/web/   @your-org/frontend
+/mobile/ @your-org/mobile
+
+<span class="tk-cm"># 安全相關必須找安全團隊</span>
+/auth/  @your-org/security
+*.pem   @your-org/security
+
+<span class="tk-cm"># 文件可以任何 docs 團隊成員</span>
+/docs/  @your-org/docs</code></pre>
+      </div>
+
+      <p>當 PR 改到對應目錄，GitHub 會自動加那些人 / 團隊到 reviewer。配合 branch protection 的 <strong>Require review from Code Owners</strong>，可以強制必須由相關專家 review 才能合併。</p>
+
+      <details class="collapse">
+        <summary>進階：CODEOWNERS 語法陷阱 <span class="collapse-tag">深入</span></summary>
+        <div class="collapse-body">
+          <ul style="margin-left:1rem;font-size:13px;">
+            <li><strong>後寫的優先</strong> — 跟 .gitignore 一樣，下面的規則覆蓋上面的</li>
+            <li><strong>路徑開頭的 <code>/</code> 表示 repo 根目錄</strong> — <code>/auth/</code> 只匹配根的 auth/，不匹配 <code>src/auth/</code></li>
+            <li><strong>沒有開頭 <code>/</code> 表示任何位置</strong> — <code>auth/</code> 會匹配 <code>src/auth/</code> 也會匹配 <code>tests/auth/</code></li>
+            <li><strong>個人 owner 必須有寫權限</strong> — 沒寫權限的人不能成為 code owner</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="collapse">
+        <summary>Async vs Sync review、Pair review、Review fatigue <span class="collapse-tag">深入</span></summary>
+        <div class="collapse-body">
+          <p style="margin-bottom:0.5rem;"><strong>Async review (大多數)</strong>：reviewer 自己有空時看，留 comment，author 改完再請 reviewer 看。適合分散團隊。</p>
+          <p style="margin-bottom:0.5rem;"><strong>Sync review</strong>：兩人坐一起 (或視訊) 一行一行討論。適合複雜 / 高風險改動，一次解掉所有疑問。</p>
+          <p style="margin-bottom:0.5rem;"><strong>Pair review</strong>：兩人一起寫程式 + review，適合新人 onboarding。</p>
+          <p><strong>Review fatigue 對策</strong>：① 一次 review 上限 60 分鐘 / 400 行 ② 大 PR 拆小 ③ reviewer rotation 不要永遠同幾個人 ④ 自動化 (linter / CI) 處理機械性檢查，讓人類 review 集中在真正重要的東西。</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "下列哪個<strong>不是</strong> code review 的主要目的？",
+    "options": [
+      "維護程式碼品質與可讀性",
+      "知識共享 (至少 2 個人懂這段程式碼)",
+      "把關 / 審判 author 的能力",
+      "建立團隊一致的程式碼風格與規範"
+    ],
+    "answer": 2,
+    "explain": "Reviewer 是 author 的合作者，不是審判者。「把關 / 審判」心態會破壞團隊文化、降低 PR 流速。Google Eng Practices 把 review 定義成知識共享 + 品質維護，不是審查。"
+  },
+  {
+    "question": "Reviewer 看完 PR 覺得只有風格上小問題，沒有實質錯誤。最佳做法是？",
+    "options": [
+      "Request changes，要求 author 全部修完",
+      "Approve，並用 nit: prefix 留下建議",
+      "故意不回應，讓 PR 卡著",
+      "Comment 一堆問題但不 approve 也不 request"
+    ],
+    "answer": 1,
+    "explain": "Request changes 留給真正 blocking 的問題。純風格 / nit 級別的建議用 Approve + nit: comment 比較好 — author 可以選擇採納，也不會擋住合併。"
+  },
+  {
+    "question": "Conventional Comments 的 <code>nit:</code> prefix 代表什麼？",
+    "options": [
+      "Must-fix，必須改",
+      "Nitpick，雞蛋裡挑骨頭，可選",
+      "Bug，發現的錯誤",
+      "New idea，新想法"
+    ],
+    "answer": 1,
+    "explain": "<code>nit:</code> 來自 nitpick (吹毛求疵)，明確標記「這個建議很小、可以不修也能合併」。對 author 是清楚的訊號 = 不要為這個重新跑一輪 review。"
+  },
+  {
+    "question": "下列哪些是 <code>CODEOWNERS</code> 檔案的好處？(多選)",
+    "options": [
+      "PR 改到特定目錄時自動指派 reviewer",
+      "搭配 branch protection 強制相關專家必須 review",
+      "完全取代 code review 流程",
+      "讓 maintainer 不用記哪些人懂哪些區域的程式碼"
+    ],
+    "answer": [0, 1, 3],
+    "explain": "CODEOWNERS 是把「哪個區域該找誰 review」自動化，但 review 流程本身還是要靠人。它<strong>強化</strong> review 流程，不是<strong>取代</strong>。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://google.github.io/eng-practices/review/" target="_blank" rel="noopener">Google Engineering Practices: Code Review</a><span class="ref-meta">業界最被引用的指南</span></li>
+        <li><a href="https://google.github.io/eng-practices/review/reviewer/standard.html" target="_blank" rel="noopener">Google: The Standard of Code Review</a><span class="ref-meta">什麼是「夠好」</span></li>
+        <li><a href="https://conventionalcomments.org" target="_blank" rel="noopener">conventionalcomments.org</a><span class="ref-meta">留言 prefix 規範</span></li>
+        <li><a href="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners" target="_blank" rel="noopener">GitHub Docs: About Code Owners</a><span class="ref-meta">CODEOWNERS 完整語法</span></li>
+        <li><a href="https://smartbear.com/learn/code-review/best-practices-for-peer-code-review/" target="_blank" rel="noopener">SmartBear: Best Practices for Peer Code Review</a><span class="ref-meta">Cisco 等公司大規模研究數據</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="04_fork_pr_workflow.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 04 · Fork、PR 完整流程</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="06_commits_versioning.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 06 · Commit、SemVer、Changelog</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">12 堂課程系列 <span class="progress-pill">5 / 12</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
+        <li><a class="course-nav-item" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
+        <li><a class="course-nav-item" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇</span></a></li>
+        <li><a class="course-nav-item" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
+        <li><a class="course-nav-item current" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
+        <li><a class="course-nav-item" href="06_commits_versioning.html"><span class="course-nav-num">06</span><span>Commit、SemVer、Changelog</span></a></li>
+        <li><a class="course-nav-item" href="07_issues_project_mgmt.html"><span class="course-nav-num">07</span><span>Issue 與專案管理</span></a></li>
+        <li><a class="course-nav-item" href="08_testing_tdd.html"><span class="course-nav-num">08</span><span>測試金字塔與 TDD</span></a></li>
+        <li><a class="course-nav-item" href="09_ci_cd_hooks.html"><span class="course-nav-num">09</span><span>CI/CD、Hooks、Lint</span></a></li>
+        <li><a class="course-nav-item" href="10_rfc_adr_release.html"><span class="course-nav-num">10</span><span>RFC、ADR、Release</span></a></li>
+        <li><a class="course-nav-item" href="11_dependencies_supply_chain.html"><span class="course-nav-num">11</span><span>依賴管理與供應鏈安全</span></a></li>
+        <li><a class="course-nav-item" href="12_first_contribution.html"><span class="course-nav-num">12</span><span>第一次貢獻實戰</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的開源協作課程系列 · Lesson 05
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

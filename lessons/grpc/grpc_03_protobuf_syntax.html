@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 03｜Protocol Buffers 語法完整版 — gRPC 課程</title>
+<meta name="description" content="一次掌握 proto3 全部語法:message、欄位編號、scalar 型別、repeated、enum、oneof、map、reserved、巢狀與 import。學完能讀懂任何業界 .proto。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 03 · Protobuf 語法</div>
+    <h1 class="hero-title">Protocol Buffers<span>語法完整版</span></h1>
+    <p class="hero-desc">message、欄位編號、scalar、repeated、enum、oneof、map、reserved 一次學完。<strong>欄位編號的重要性是本堂的靈魂 — 它決定了你的 API 能不能演進。</strong></p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 3 / 10 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 16 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>初階 → 中階</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#message">message 基本</a></li>
+      <li><a class="toc-link" href="#field-number">欄位編號</a></li>
+      <li><a class="toc-link" href="#scalar">scalar 型別</a></li>
+      <li><a class="toc-link" href="#repeated">repeated / optional</a></li>
+      <li><a class="toc-link" href="#enum">enum</a></li>
+      <li><a class="toc-link" href="#oneof">oneof</a></li>
+      <li><a class="toc-link" href="#map">map</a></li>
+      <li><a class="toc-link" href="#reserved">reserved 與演進</a></li>
+      <li><a class="toc-link" href="#nesting">巢狀與 import</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="message">
+      <span class="section-eyebrow">01 — message 基本</span>
+      <h2><code>message</code> 是 protobuf 的最小單位</h2>
+      <p>每個 <code>.proto</code> 檔的頭三行幾乎都長這樣:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">user.proto</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">syntax</span> = <span class="tk-st">"proto3"</span>;          <span class="tk-cm">// 聲明使用 proto3 語法</span>
+
+<span class="tk-kw">package</span> myapp.v1;             <span class="tk-cm">// 命名空間,避免跨檔衝突</span>
+
+<span class="tk-kw">option</span> go_package = <span class="tk-st">"example.com/myapp/v1;myappv1"</span>;
+
+<span class="tk-kw">message</span> User {
+  <span class="tk-kw">string</span> id    = <span class="tk-num">1</span>;
+  <span class="tk-kw">string</span> name  = <span class="tk-num">2</span>;
+  <span class="tk-kw">int32</span>  age   = <span class="tk-num">3</span>;
+  <span class="tk-kw">bool</span>   active = <span class="tk-num">4</span>;
+}</code></pre>
+      </div>
+
+      <ul>
+        <li><code>syntax</code> — 必填,目前都用 <code>"proto3"</code></li>
+        <li><code>package</code> — 邏輯命名空間。不同檔案可在同一 package,跨 package 引用要用 fully qualified name(如 <code>auth.v1.Token</code>)</li>
+        <li><code>option go_package</code> — 告訴 <code>protoc-gen-go</code> 生成檔的 Go import path 與 package 名</li>
+        <li><code>message</code> — 一個資料結構,由「欄位」組成,每個欄位有<strong>型別、名稱、編號</strong>三件事</li>
+      </ul>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>命名慣例</strong>
+          <code>message</code> 與 <code>service</code> 用 <code>UpperCamelCase</code>,欄位用 <code>snake_case</code>(生成 Go 時會自動轉成 <code>UpperCamelCase</code>),<code>enum</code> 值用 <code>UPPER_SNAKE_CASE</code>。Google 官方 style guide 與所有主流公司都遵守。
+        </div>
+      </div>
+    </section>
+
+    <section id="field-number">
+      <span class="section-eyebrow">02 — 欄位編號</span>
+      <h2>欄位編號:protobuf 的命脈</h2>
+      <p>每個欄位後面那個數字(<code>= 1</code>、<code>= 2</code>)叫<strong>欄位編號</strong>(field number)。它不是給人看的,是寫進二進位 wire format、用來識別欄位的關鍵。</p>
+
+      <div class="callout callout-danger">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>欄位編號一旦在 production 用過,絕對不能改</strong>
+          改編號等同<strong>把舊欄位刪掉、加一個新欄位</strong>。所有舊版客戶端傳上來的資料會被當成「未知欄位」,你的 server 讀到的所有舊資料會變成預設值。這是 protobuf 工程師最常踩的雷。<strong>正確做法是:用 <code>reserved</code> 標記退役的編號,絕不重用。</strong>
+        </div>
+      </div>
+
+      <h3>編號範圍與成本</h3>
+      <table>
+        <thead>
+          <tr><th>範圍</th><th>說明</th><th>實務建議</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>1 – 15</code></td><td>wire format 上 tag 只佔 <strong>1 byte</strong></td><td>留給<strong>最常出現</strong>的欄位</td></tr>
+          <tr><td><code>16 – 2047</code></td><td>tag 佔 2 bytes</td><td>一般欄位</td></tr>
+          <tr><td><code>19000 – 19999</code></td><td><strong>protobuf 內部保留</strong>,不能用</td><td>避開,protoc 會直接報錯</td></tr>
+          <tr><td><code>2048 – 536,870,911</code></td><td>tag 佔 2+ bytes</td><td>幾乎用不到</td></tr>
+        </tbody>
+      </table>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>反模式</div>
+          <div class="compare-body">
+            <pre style="background:var(--paper);padding:0.6rem;border-radius:6px;font-size:13px;line-height:1.6;"><code><span class="tk-kw">message</span> User {
+  <span class="tk-kw">string</span> avatar_url = <span class="tk-num">1</span>;     <span class="tk-cm">// 用很少</span>
+  <span class="tk-kw">string</span> bio        = <span class="tk-num">2</span>;     <span class="tk-cm">// 用很少</span>
+  <span class="tk-kw">string</span> id         = <span class="tk-num">15</span>;    <span class="tk-cm">// 每筆都有</span>
+  <span class="tk-kw">string</span> name       = <span class="tk-num">16</span>;    <span class="tk-cm">// 每筆都有</span>
+}</code></pre>
+            <p style="font-size:13px;margin-top:0.5rem;color:var(--muted);">熱欄位放 16+,每筆都浪費 1 byte tag。</p>
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>好寫法</div>
+          <div class="compare-body">
+            <pre style="background:var(--paper);padding:0.6rem;border-radius:6px;font-size:13px;line-height:1.6;"><code><span class="tk-kw">message</span> User {
+  <span class="tk-kw">string</span> id         = <span class="tk-num">1</span>;
+  <span class="tk-kw">string</span> name       = <span class="tk-num">2</span>;
+  <span class="tk-kw">string</span> avatar_url = <span class="tk-num">10</span>;
+  <span class="tk-kw">string</span> bio        = <span class="tk-num">11</span>;
+}</code></pre>
+            <p style="font-size:13px;margin-top:0.5rem;color:var(--muted);">高頻欄位佔 1–15。新增欄位往後加。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="scalar">
+      <span class="section-eyebrow">03 — scalar 型別</span>
+      <h2>數字型別有 12 種,該怎麼挑</h2>
+      <p>新手最常問:「<code>int32</code> 跟 <code>sint32</code> 跟 <code>fixed32</code> 差在哪?」答案是<strong>編碼方式</strong>不同,導致對不同數值範圍的效率不同。</p>
+
+      <table>
+        <thead>
+          <tr><th>型別</th><th>編碼</th><th>用在</th><th>對應 Go</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>int32</code> / <code>int64</code></td><td>varint</td><td>大多數時候用這個。負數會編成 10 byte(差),所以僅用於非負或極少負的場景</td><td><code>int32</code> / <code>int64</code></td></tr>
+          <tr><td><code>uint32</code> / <code>uint64</code></td><td>varint</td><td>已知非負(計數、ID)</td><td><code>uint32</code> / <code>uint64</code></td></tr>
+          <tr><td><code>sint32</code> / <code>sint64</code></td><td>zigzag varint</td><td>常出現負數時(差值、座標)</td><td><code>int32</code> / <code>int64</code></td></tr>
+          <tr><td><code>fixed32</code> / <code>fixed64</code></td><td>固定 4/8 byte</td><td>數值通常很大(雜湊、時戳),varint 編碼反而更長</td><td><code>uint32</code> / <code>uint64</code></td></tr>
+          <tr><td><code>sfixed32</code> / <code>sfixed64</code></td><td>固定 4/8 byte</td><td>同上但帶符號</td><td><code>int32</code> / <code>int64</code></td></tr>
+          <tr><td><code>float</code> / <code>double</code></td><td>IEEE 754</td><td>浮點數</td><td><code>float32</code> / <code>float64</code></td></tr>
+          <tr><td><code>bool</code></td><td>1 byte</td><td>布林</td><td><code>bool</code></td></tr>
+          <tr><td><code>string</code></td><td>UTF-8</td><td>必須是 UTF-8 文字</td><td><code>string</code></td></tr>
+          <tr><td><code>bytes</code></td><td>原始 byte</td><td>非文字資料(圖片、檔案、加密過的內容)</td><td><code>[]byte</code></td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>新手選擇指南</strong>
+          90% 場景用 <code>int32</code> / <code>int64</code> / <code>string</code> / <code>bool</code> 就夠。<code>sint*</code> 只在「常常是負數」時值得;<code>fixed*</code> 只在「總是大數值」(例如 64-bit hash、Unix nanosec timestamp)時值得。
+        </div>
+      </div>
+    </section>
+
+    <section id="repeated">
+      <span class="section-eyebrow">04 — repeated / optional</span>
+      <h2>陣列與「該欄位有沒有設」</h2>
+
+      <h3>repeated — 0 個或多個</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">proto3</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">message</span> Order {
+  <span class="tk-kw">string</span> id = <span class="tk-num">1</span>;
+  <span class="tk-kw">repeated string</span> item_ids = <span class="tk-num">2</span>;       <span class="tk-cm">// 對應 Go []string</span>
+  <span class="tk-kw">repeated</span> Item items = <span class="tk-num">3</span>;             <span class="tk-cm">// 對應 Go []*Item</span>
+}</code></pre>
+      </div>
+      <p>順序保留。scalar repeated 預設用 <strong>packed encoding</strong>(全部值連在一起共用一個 tag),省空間。</p>
+
+      <h3>optional — 顯式表達「有沒有設」</h3>
+      <p>proto3 有個歷史包袱:<strong>scalar 欄位沒辦法區分「沒設」和「設成預設值 0」</strong>。如果你需要區分(例如「年齡欄位是 0 歲嬰兒」 vs 「沒填」),就要加 <code>optional</code>:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">proto3</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">message</span> User {
+  <span class="tk-kw">string</span> id = <span class="tk-num">1</span>;
+  <span class="tk-kw">int32</span> age = <span class="tk-num">2</span>;             <span class="tk-cm">// 沒設 vs 0 無法區分</span>
+  <span class="tk-kw">optional int32</span> height_cm = <span class="tk-num">3</span>;  <span class="tk-cm">// 可以區分(Go 生成 *int32)</span>
+}</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>scalar 預設值無法傳遞語意</strong>
+          proto3 中 <code>int32</code> 沒設等同於 <code>0</code>、<code>string</code> 沒設等同於 <code>""</code>、<code>bool</code> 沒設等同於 <code>false</code>。<strong>需要區分「沒填」與「填預設值」時請加 <code>optional</code></strong>。message 欄位天生就有「null/nil」概念,不需要 optional。
+        </div>
+      </div>
+    </section>
+
+    <section id="enum">
+      <span class="section-eyebrow">05 — enum</span>
+      <h2>enum:零值必須是 UNSPECIFIED</h2>
+      <p>protobuf enum 是有限的整數常數集。<strong>第一個值必須是 0</strong>(這是 proto3 的硬性規定),且按 Google 官方 style guide,<strong>慣例命名為 <code>{ENUM}_UNSPECIFIED</code></strong>:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">proto3</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">enum</span> OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = <span class="tk-num">0</span>;   <span class="tk-cm">// 必填,代表「沒設」</span>
+  ORDER_STATUS_PENDING     = <span class="tk-num">1</span>;
+  ORDER_STATUS_PAID        = <span class="tk-num">2</span>;
+  ORDER_STATUS_SHIPPED     = <span class="tk-num">3</span>;
+  ORDER_STATUS_DELIVERED   = <span class="tk-num">4</span>;
+  ORDER_STATUS_CANCELLED   = <span class="tk-num">5</span>;
+}
+
+<span class="tk-kw">message</span> Order {
+  <span class="tk-kw">string</span> id = <span class="tk-num">1</span>;
+  OrderStatus status = <span class="tk-num">2</span>;
+}</code></pre>
+      </div>
+
+      <h3>為什麼 0 要當 UNSPECIFIED?</h3>
+      <p>因為 scalar 沒設等同預設值,而 enum 的預設值就是 0。如果你把 <code>PENDING = 0</code>,那「沒設 status」會被當成「PENDING」 — 這是隱含的錯誤,看 server 端永遠不會發現「客戶端忘了設 status」。把 0 留給 UNSPECIFIED,server 端就能 explicit 處理「客戶端沒設」這個情況。</p>
+
+      <h3>未知值會保留</h3>
+      <p>如果新版 server 加了 <code>ORDER_STATUS_RETURNED = 6</code>,舊版 client 收到時:</p>
+      <ul>
+        <li>不會 crash</li>
+        <li>該欄位以「未知」形式保留(具體呈現方式依語言)</li>
+        <li>client 把訊息再轉送出去時,未知值會原封不動帶過去</li>
+      </ul>
+      <p>這個「forward compatibility」是 protobuf 設計上的重要特性。</p>
+    </section>
+
+    <section id="oneof">
+      <span class="section-eyebrow">06 — oneof</span>
+      <h2><code>oneof</code>:多選一</h2>
+      <p>當一組欄位<strong>最多只有一個會被設</strong>,用 <code>oneof</code> 表達語意比一堆 nullable 欄位清楚得多。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">proto3</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">message</span> NotificationTarget {
+  <span class="tk-kw">oneof</span> target {
+    <span class="tk-kw">string</span> email   = <span class="tk-num">1</span>;
+    <span class="tk-kw">string</span> phone   = <span class="tk-num">2</span>;
+    <span class="tk-kw">string</span> webhook = <span class="tk-num">3</span>;
+  }
+  <span class="tk-kw">string</span> message = <span class="tk-num">10</span>;
+}</code></pre>
+      </div>
+
+      <p>規則:</p>
+      <ul>
+        <li>同時設 <code>email</code> 與 <code>phone</code> → 後設的會清掉前面的</li>
+        <li>不能用 <code>repeated</code>、不能用 <code>map</code> 在 oneof 裡</li>
+        <li>欄位編號要在<strong>整個 message 範圍內</strong>唯一(不只 oneof 內)</li>
+      </ul>
+
+      <p>生成的 Go code 提供 type-switch:</p>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">switch</span> t := target.GetTarget().(<span class="tk-kw">type</span>) {
+<span class="tk-kw">case</span> *pb.NotificationTarget_Email:
+    sendEmail(t.Email, msg)
+<span class="tk-kw">case</span> *pb.NotificationTarget_Phone:
+    sendSMS(t.Phone, msg)
+<span class="tk-kw">case</span> *pb.NotificationTarget_Webhook:
+    callHook(t.Webhook, msg)
+<span class="tk-kw">case</span> <span class="tk-kw">nil</span>:
+    <span class="tk-cm">// 沒設,error 處理</span>
+}</code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>oneof 是 API 設計利器</strong>
+          很多 API 端點接受多種輸入(查詢可用 ID 或 Email 任一),用 oneof 表達遠比定義一堆 <code>SearchByEmail</code> / <code>SearchByID</code> 端點優雅。
+        </div>
+      </div>
+    </section>
+
+    <section id="map">
+      <span class="section-eyebrow">07 — map</span>
+      <h2><code>map</code>:鍵值對</h2>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">proto3</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">message</span> Resource {
+  <span class="tk-kw">string</span> id = <span class="tk-num">1</span>;
+  <span class="tk-kw">map</span>&lt;<span class="tk-kw">string</span>, <span class="tk-kw">string</span>&gt; labels = <span class="tk-num">2</span>;        <span class="tk-cm">// k8s style labels</span>
+  <span class="tk-kw">map</span>&lt;<span class="tk-kw">string</span>, Tag&gt; tags_by_key = <span class="tk-num">3</span>;
+}</code></pre>
+      </div>
+
+      <p>限制:</p>
+      <ul>
+        <li>key 只能是<strong>整數型</strong>或 <code>string</code>(不能是 <code>float</code>、<code>bytes</code>、<code>enum</code>、<code>message</code>)</li>
+        <li>value 任意,但<strong>不能是另一個 map</strong></li>
+        <li>不能加 <code>repeated</code></li>
+        <li>序列化順序、迭代順序<strong>未定義</strong> — 不要依賴順序!</li>
+      </ul>
+    </section>
+
+    <section id="reserved">
+      <span class="section-eyebrow">08 — reserved 與演進</span>
+      <h2>schema 演進的安全網:<code>reserved</code></h2>
+      <p>當你刪掉一個欄位、或改名,正確做法是把它的<strong>編號和名稱都放進 <code>reserved</code></strong>:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">proto3</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">message</span> User {
+  <span class="tk-kw">reserved</span> <span class="tk-num">3</span>, <span class="tk-num">5</span>, <span class="tk-num">9</span> <span class="tk-kw">to</span> <span class="tk-num">12</span>;          <span class="tk-cm">// 這些編號絕不再用</span>
+  <span class="tk-kw">reserved</span> <span class="tk-st">"old_email"</span>, <span class="tk-st">"legacy_id"</span>;    <span class="tk-cm">// 名稱也保留</span>
+
+  <span class="tk-kw">string</span> id   = <span class="tk-num">1</span>;
+  <span class="tk-kw">string</span> name = <span class="tk-num">2</span>;
+  <span class="tk-cm">// 編號 3 (legacy_id) 已退役,改放在 reserved 上方</span>
+  <span class="tk-kw">string</span> email = <span class="tk-num">4</span>;
+}</code></pre>
+      </div>
+
+      <p>這樣做的好處:</p>
+      <ul>
+        <li>有人手殘把新欄位編號設成 <code>3</code>,<code>protoc</code> 會直接報錯</li>
+        <li>把 <code>old_email</code> 拿來重用當其他欄位名,<code>protoc</code> 也會報錯</li>
+        <li>line-of-sight 文件:讀 .proto 就知道哪些編號是退役的、不要碰</li>
+      </ul>
+
+      <h3>schema 演進的三條鐵律</h3>
+      <ol>
+        <li><strong>不改編號</strong> — 改編號等於刪舊增新,所有舊資料失效</li>
+        <li><strong>不改型別</strong>(除非是 wire-format 相容的轉換,如 <code>int32</code> ↔ <code>int64</code> ↔ <code>uint32</code>;細節見官方 update guide)</li>
+        <li><strong>退役欄位放 <code>reserved</code></strong>,絕不重用編號或名稱</li>
+      </ol>
+
+      <div class="callout callout-danger">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>真實事故案例</strong>
+          某團隊把 <code>int32 user_id = 5;</code> 退役但沒寫 <code>reserved</code>。半年後新人用 <code>5</code> 編號加了 <code>string user_email = 5;</code>。Server 收到舊客戶端傳上來的整數 user_id,把那串 binary 解讀成 string,寫進 DB 的 email 欄位變成亂碼。<code>reserved</code> 就是用來防這種事。
+        </div>
+      </div>
+    </section>
+
+    <section id="nesting">
+      <span class="section-eyebrow">09 — 巢狀與 import</span>
+      <h2>跨檔引用與巢狀</h2>
+
+      <h3>巢狀 message</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">proto3</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">message</span> SearchResponse {
+  <span class="tk-kw">message</span> Result {           <span class="tk-cm">// 巢狀,僅在 SearchResponse 內可見</span>
+    <span class="tk-kw">string</span> url = <span class="tk-num">1</span>;
+    <span class="tk-kw">string</span> title = <span class="tk-num">2</span>;
+  }
+  <span class="tk-kw">repeated</span> Result results = <span class="tk-num">1</span>;
+}</code></pre>
+      </div>
+      <p>外部要引用用 <code>SearchResponse.Result</code>。</p>
+
+      <h3>跨檔 import</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">proto3</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">syntax</span> = <span class="tk-st">"proto3"</span>;
+<span class="tk-kw">package</span> myapp.v1;
+
+<span class="tk-kw">import</span> <span class="tk-st">"google/protobuf/timestamp.proto"</span>;   <span class="tk-cm">// well-known type</span>
+<span class="tk-kw">import</span> <span class="tk-st">"common/money.proto"</span>;                 <span class="tk-cm">// 自家共用</span>
+
+<span class="tk-kw">message</span> Payment {
+  <span class="tk-kw">string</span> id = <span class="tk-num">1</span>;
+  google.protobuf.Timestamp paid_at = <span class="tk-num">2</span>;
+  common.Money amount = <span class="tk-num">3</span>;
+}</code></pre>
+      </div>
+
+      <p>import 路徑由 <code>protoc --proto_path=DIR</code>(可重複)決定搜尋根目錄。Google 提供常用的 well-known types(Timestamp、Duration、Empty、Any、Struct…)在 <code>google/protobuf/*.proto</code>。</p>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>Protobuf Editions(2024 GA)</strong>
+          長期 protobuf 會用「Editions」取代 <code>syntax = "proto3"</code>(改成 <code>edition = "2024"</code>),把每個行為變成可調整的 feature。但 gRPC 官方目前文件仍以 proto3 為主流,本課程也用 proto3。等 Editions 在 gRPC 生態普及再學即可,現在學 proto3 不是白學 — 兩者 wire format 完全相容。
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 5</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "下列關於欄位編號(field number)的描述,哪一項<strong>錯誤</strong>?",
+    "options": [
+      "1–15 的編號 tag 只佔 1 byte,該留給最高頻欄位",
+      "19000–19999 是 protobuf 內部保留範圍,不能使用",
+      "在 production 用過的編號可以拿來給新欄位用,只要型別一樣就好",
+      "改編號等同刪舊增新,所有舊資料會失效"
+    ],
+    "answer": 2,
+    "explain": "<strong>絕不可重用</strong>編號。即使型別一樣,舊版客戶端傳的舊欄位資料會被當成新欄位寫進來,語意完全錯亂。退役編號必須用 <code>reserved</code> 永久封存。"
+  },
+  {
+    "question": "為什麼 enum 的零值要慣例命名為 <code>{ENUM}_UNSPECIFIED</code>?",
+    "options": [
+      "讓編譯器跑得比較快",
+      "proto3 規定第一個 enum 值必須是 0;若把有意義的值(如 PENDING)放 0,server 無法區分客戶端「沒設」與「明確設成 PENDING」",
+      "因為 0 是保留給未來的 protobuf 內部用",
+      "為了和 proto2 不相容"
+    ],
+    "answer": 1,
+    "explain": "proto3 的 scalar 欄位沒設等同預設值,enum 預設值是 0。把 0 留給 UNSPECIFIED,server 就能 explicit 處理「客戶端沒設」 — 否則「沒設」會被當成 PENDING,bug 永遠隱藏。"
+  },
+  {
+    "question": "下列哪些情境<strong>適合</strong>用 <code>oneof</code>?(多選)",
+    "options": [
+      "通知目標只可能是 email、phone、webhook 三選一",
+      "API 回傳結果可能是 success(含 data) 或 error(含 message) 兩選一",
+      "一個訂單包含多個商品(item list)",
+      "支付方式可能是信用卡、銀行轉帳、現金"
+    ],
+    "answer": [0, 1, 3],
+    "explain": "<code>oneof</code> 表達「最多選一個」。多商品 list 是<strong>多選</strong>(用 repeated),不適合 oneof — 而且 oneof 本來就不能放 repeated 欄位。"
+  },
+  {
+    "question": "<code>optional int32 height_cm = 3;</code> 在 proto3 中的作用是?",
+    "options": [
+      "讓欄位變成可選的(其他欄位都是必填)",
+      "讓 client 可以區分「沒設」與「設成預設值 0」 — 生成的 Go 為 <code>*int32</code> 而非 <code>int32</code>",
+      "讓欄位的編號可以重複",
+      "防止欄位被序列化"
+    ],
+    "answer": 1,
+    "explain": "proto3 中所有欄位本來就是「可選」(沒有 required)。<code>optional</code> 的真正作用是<strong>顯式表達 presence</strong> — 沒有它,scalar 欄位「沒設」與「設成 0」無法區分。message 型別欄位天生有 nil 概念,不需要 optional。"
+  },
+  {
+    "question": "下列哪一項是 <code>map&lt;K, V&gt;</code> 的<strong>限制</strong>?",
+    "options": [
+      "key 不能是 float、bytes、enum、message;value 不能是另一個 map;序列化順序未定義",
+      "key 必須是 string;value 必須是 message",
+      "整個 message 內最多只能用一個 map 欄位",
+      "map 不能搭配 repeated,只能單獨使用"
+    ],
+    "answer": 0,
+    "explain": "選項 A 完全正確。map 內部其實是「repeated 的 key-value entry message」,所以無法 repeat 它(=不能 repeated)、value 不能是 map(會無限遞迴)、序列化沒順序保證。一個 message 內可以有多個 map 欄位。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://protobuf.dev/programming-guides/proto3/" target="_blank" rel="noopener">protobuf.dev — Language Guide (proto3)</a><span class="ref-meta">本課事實來源</span></li>
+        <li><a href="https://protobuf.dev/programming-guides/proto3/#updating" target="_blank" rel="noopener">protobuf.dev — Updating A Message Type</a><span class="ref-meta">schema 演進的相容規則</span></li>
+        <li><a href="https://protobuf.dev/programming-guides/style/" target="_blank" rel="noopener">protobuf.dev — Style Guide</a><span class="ref-meta">命名慣例</span></li>
+        <li><a href="https://protobuf.dev/programming-guides/encoding/" target="_blank" rel="noopener">protobuf.dev — Encoding</a><span class="ref-meta">varint / zigzag / packed 編碼細節</span></li>
+        <li><a href="https://protobuf.dev/reference/protobuf/google.protobuf/" target="_blank" rel="noopener">protobuf.dev — Well-Known Types</a><span class="ref-meta">Timestamp / Duration / Any 等</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="grpc_02_setup.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 02 · 環境安裝與工具鏈</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="grpc_04_unary_rpc.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 04 · 第一支 gRPC 服務 (Unary)</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">10 堂 gRPC 系列 <span class="progress-pill">3 / 10</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="grpc_01_intro.html"><span class="course-nav-num">01</span><span>gRPC 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="grpc_02_setup.html"><span class="course-nav-num">02</span><span>環境安裝與工具鏈</span></a></li>
+        <li><a class="course-nav-item current" href="grpc_03_protobuf_syntax.html"><span class="course-nav-num">03</span><span>Protobuf 語法</span></a></li>
+        <li><a class="course-nav-item" href="grpc_04_unary_rpc.html"><span class="course-nav-num">04</span><span>Unary RPC 實戰</span></a></li>
+        <li><a class="course-nav-item" href="grpc_05_streaming_rpc.html"><span class="course-nav-num">05</span><span>三種 Streaming</span></a></li>
+        <li><a class="course-nav-item" href="grpc_06_context_metadata.html"><span class="course-nav-num">06</span><span>Context / Metadata</span></a></li>
+        <li><a class="course-nav-item" href="grpc_07_error_handling.html"><span class="course-nav-num">07</span><span>錯誤處理</span></a></li>
+        <li><a class="course-nav-item" href="grpc_08_interceptors.html"><span class="course-nav-num">08</span><span>Interceptors</span></a></li>
+        <li><a class="course-nav-item" href="grpc_09_tls_auth.html"><span class="course-nav-num">09</span><span>TLS / Auth</span></a></li>
+        <li><a class="course-nav-item" href="grpc_10_connection_lifecycle.html"><span class="course-nav-num">10</span><span>連線生命週期</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 gRPC 課程系列 · Lesson 03
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

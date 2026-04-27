@@ -241,6 +241,44 @@ a { color: inherit; text-decoration: none; }
   color: var(--ecc);
   border: 1px solid rgba(124,58,237,0.25);
 }
+.post-series {
+  font-size: 10px;
+  font-family: var(--mono);
+  letter-spacing: 0.12em;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255,61,31,0.1);
+  color: var(--accent);
+  border: 1px solid rgba(255,61,31,0.22);
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 1.4rem;
+}
+.filter-chip {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--paper2);
+  border: 1px solid var(--border);
+  color: var(--ink3);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.filter-chip:hover { background: var(--paper3); }
+.filter-chip.active {
+  background: var(--ink);
+  color: var(--white);
+  border-color: var(--ink);
+}
+.filter-chip .count {
+  margin-left: 6px;
+  opacity: 0.6;
+}
 .post-title {
   font-size: 1.15rem;
   font-weight: 700;
@@ -276,6 +314,76 @@ a { color: inherit; text-decoration: none; }
   color: var(--muted);
 }
 .empty.show { display: block; }
+
+.series-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 2rem;
+}
+.series-card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.1rem 1.2rem 1rem;
+  background: var(--white);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.series-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--series-accent, var(--accent));
+  opacity: 0.85;
+}
+.series-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border2);
+  box-shadow: var(--shadow-lg);
+}
+.series-card.active {
+  background: var(--ink);
+  color: var(--white);
+  border-color: var(--ink);
+}
+.series-card.active::before { opacity: 1; }
+.series-card.active .series-meta { color: rgba(250,250,248,0.6); }
+.series-card.active .series-count { color: var(--white); }
+.series-name {
+  font-family: var(--display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 4px;
+}
+.series-meta {
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.series-count {
+  font-size: 1.6rem;
+  font-family: var(--display);
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.series-unit {
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--muted);
+}
 
 .sidebar {
   display: grid;
@@ -339,6 +447,7 @@ a { color: inherit; text-decoration: none; }
       <p class="hero-desc">用一個乾淨、有層次的入口整理所有文章。每篇文章都是一個小小里程碑，這裡會持續更新。</p>
       <div class="hero-badges">
         <div class="hero-badge"><span class="dot"></span>AI 工具</div>
+        <div class="hero-badge"><span class="dot"></span>開源協作</div>
         <div class="hero-badge"><span class="dot"></span>工作流程</div>
         <div class="hero-badge"><span class="dot"></span>筆記整理</div>
       </div>
@@ -357,6 +466,8 @@ a { color: inherit; text-decoration: none; }
           <input id="search" type="text" placeholder="輸入標題或標籤" autocomplete="off">
         </div>
       </div>
+      <div id="series-picker" class="series-picker"></div>
+      <div id="filter-bar" class="filter-bar"></div>
       <div id="posts" class="post-grid"></div>
       <div id="empty" class="empty">目前沒有符合的文章，請調整搜尋條件。</div>
     </section>
@@ -369,6 +480,84 @@ a { color: inherit; text-decoration: none; }
           <div class="side-stat"><span id="latest-date">--</span><span>最近更新</span></div>
           <div class="side-stat"><span id="total-posts">0</span><span>總文章數</span></div>
           <div class="side-stat"><span>手動新增</span><span>維護方式</span></div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="side-title">課程系列：AI 工具</div>
+        <div class="side-text">Claude Code 指令完全手冊。原生指令、內建 Skill、everything-claude-code (ECC) 擴充一次說清楚，含使用場景與快速查閱表。</div>
+        <div class="side-list">
+          <div>· 原生 Built-in 指令 + 必學四件組</div>
+          <div>· Context 管理 / 工作流程</div>
+          <div>· ECC 深度教學 + 使用場景</div>
+          <div>· 快捷鍵 + 快速查閱表</div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="side-title">課程系列：開源協作</div>
+        <div class="side-text">12 堂實務導向課程，從 Git 進階、PR/Code Review、測試 CI、到第一次貢獻全流程，目標是上工立刻能用。</div>
+        <div class="side-list">
+          <div>· Git 日常 + 進階 (rebase/bisect 等)</div>
+          <div>· 分支策略 / Fork / PR / Code Review</div>
+          <div>· Conventional Commits + SemVer</div>
+          <div>· 測試金字塔 + TDD</div>
+          <div>· CI/CD + Hooks + Lint</div>
+          <div>· RFC / ADR / 供應鏈安全</div>
+          <div>· 第一次貢獻實戰 checklist</div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="side-title">課程系列：gRPC (Go)</div>
+        <div class="side-text">10 堂由淺到深，從概念、環境安裝、Protobuf 語法、四種 RPC、Context/Metadata、錯誤處理、Interceptors、TLS/Auth、連線生命週期。所有 API 使用 grpc-go v1.80 (2026/04) 的最新版本。</div>
+        <div class="side-list">
+          <div>· gRPC 概念 + HTTP/2 + 工具鏈安裝</div>
+          <div>· Protobuf 語法完整版 (含欄位編號)</div>
+          <div>· Unary + 三種 Streaming RPC</div>
+          <div>· Context / Metadata / Deadline / Cancellation</div>
+          <div>· Status Codes + 結構化錯誤處理</div>
+          <div>· Interceptors (logging/recovery/auth/timing)</div>
+          <div>· TLS / mTLS / PerRPC token</div>
+          <div>· Channel / Keepalive / LB / Health / Retry</div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="side-title">課程系列：DevOps 實務</div>
+        <div class="side-text">5 堂大堂課，假設工具環境已架好、聚焦「如何用」。涵蓋 CI/CD pipeline、K8s 日常操作、GitOps 部署、指標 + log 觀測，從入職第一週到能獨當一面。所有 UI / 指令對齊 2026 最新官方文件。</div>
+        <div class="side-list">
+          <div>· Azure DevOps (Boards / Repos / Pipelines)</div>
+          <div>· Kubernetes 日常操作 + Helm</div>
+          <div>· Argo CD GitOps 持續部署</div>
+          <div>· Prometheus + Grafana 指標監控</div>
+          <div>· ELK 日誌蒐集與分析</div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="side-title">課程系列：Cassandra</div>
+        <div class="side-text">6 堂由淺到深的分散式寬欄式資料庫課程。版本基準 Cassandra 5.0.8 (2026/04)，含 SAI、Vector Search、UCS、Dynamic Data Masking 等 5.0 新特性。</div>
+        <div class="side-list">
+          <div>· 是什麼 / 何時用 (CAP / 寬欄式)</div>
+          <div>· Token Ring / RF / Consistency Level / PACELC</div>
+          <div>· CQL 與 Query-First 資料建模</div>
+          <div>· LSM 引擎：寫入 / 讀取路徑 / Compaction</div>
+          <div>· 5.0 新：SAI / Vector ANN / Trie / DDM / UCS</div>
+          <div>· nodetool 上工 Checklist</div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="side-title">課程系列：Redis</div>
+        <div class="side-text">6 堂由淺到深的記憶體資料結構服務課程。版本基準 Redis 8.6 (2026/03)，含 Vector Sets、內建 Search/JSON、新 eviction policies 等 8.x 新特性。</div>
+        <div class="side-list">
+          <div>· 是什麼 / 五大資料結構 / 為何單緒卻快</div>
+          <div>· Streams / HLL / Geo / Pipeline / Lua</div>
+          <div>· RDB / AOF / Hybrid / 主從複製</div>
+          <div>· Sentinel vs Cluster / Hash Tag</div>
+          <div>· Redis 8: Vector Sets / Search / JSON</div>
+          <div>· Cache patterns / 三大災難 / Lock / Rate limit</div>
         </div>
       </div>
 
@@ -387,16 +576,132 @@ a { color: inherit; text-decoration: none; }
   <footer class="footer">Jason 的筆記入口 · 建議以桌機閱讀效果最佳</footer>
 
 <script>
+const COURSE_DATE = '2026-04-27';
+const COURSE_DATE_GRPC = '2026-04-27';
+const COURSE_DATE_DEVOPS = '2026-04-28';
+const COURSE_DATE_CASSANDRA = '2026-04-28';
+const COURSE_DATE_REDIS = '2026-04-28';
+const COURSE_DATE_AI_TOOLS = '2026-04-05';
+
+const aiToolsLessons = [
+  { n: '01', file: 'lessons/claude_code/01_claude_code_intro.html', title: 'Claude Code 使用指南', desc: '完整整理 Claude Code 的指令、配置與自訂指令的使用方式。涵蓋原生指令、內建 Skill、ECC 擴充。', minutes: 12, tags: ['Claude', 'Workflow', 'AI 工具'] }
+];
+
+const gitLessons = [
+  { n: '01', file: 'lessons/opensource/01_git_daily.html',                title: 'Git 日常實務速成',           desc: '從四區心智模型出發，掌握每天會用到的 status / add / commit / log / diff / stash / restore。', minutes: 12, tags: ['Git', '基礎'] },
+  { n: '02', file: 'lessons/opensource/02_git_advanced.html',             title: 'Git 進階操作',                desc: 'rebase / cherry-pick / reflog / bisect / worktree / reset vs revert / --force-with-lease。',     minutes: 15, tags: ['Git', '進階'] },
+  { n: '03', file: 'lessons/opensource/03_branching_strategies.html',     title: '分支策略選擇',                desc: 'Git Flow / GitHub Flow / GitLab Flow / Trunk-Based — 怎麼選最適合自己的團隊。',                  minutes: 10, tags: ['協作', '分支'] },
+  { n: '04', file: 'lessons/opensource/04_fork_pr_workflow.html',         title: 'Fork、Upstream、PR 完整流程',  desc: '從 fork 開始一直到 PR 被合併的全流程，包含 sync upstream、衝突解決、PR 描述。',                 minutes: 14, tags: ['協作', 'PR'] },
+  { n: '05', file: 'lessons/opensource/05_code_review.html',              title: 'Code Review 文化與技巧',       desc: 'Google eng-practices、Conventional Comments、CODEOWNERS — Reviewer 與 Author 雙視角。',          minutes: 12, tags: ['協作', 'Review'] },
+  { n: '06', file: 'lessons/opensource/06_commits_versioning.html',       title: 'Commit Message、SemVer、Changelog', desc: 'Conventional Commits 1.0、Semantic Versioning 2.0、Keep a Changelog 1.1 — 業界規範一次學完。',  minutes: 13, tags: ['規範', '版本'] },
+  { n: '07', file: 'lessons/opensource/07_issues_project_mgmt.html',      title: 'Issue 撰寫與專案管理',         desc: 'Bug report / Feature request 模板、標籤系統、Milestone、GitHub Projects、Issue triage。',         minutes: 11, tags: ['規範', 'Issue'] },
+  { n: '08', file: 'lessons/opensource/08_testing_tdd.html',              title: '測試金字塔與 TDD',             desc: '測試金字塔/獎盃/蜂巢、TDD 三步驟、F.I.R.S.T、AAA、Coverage 何時 80% 才合理。',                 minutes: 13, tags: ['測試', 'TDD'] },
+  { n: '09', file: 'lessons/opensource/09_ci_cd_hooks.html',              title: 'CI/CD、Git Hooks、Lint/Format', desc: 'GitHub Actions、Branch Protection、husky/lint-staged/pre-commit、commitlint。',                  minutes: 14, tags: ['CI', '自動化'] },
+  { n: '10', file: 'lessons/opensource/10_rfc_adr_release.html',          title: 'RFC、ADR、Release Management', desc: 'Rust RFCs / Python PEP 模式、Michael Nygard ADR 範本、feature freeze → RC → GA 流程。',          minutes: 13, tags: ['大型專案', '文件'] },
+  { n: '11', file: 'lessons/opensource/11_dependencies_supply_chain.html', title: '依賴管理與供應鏈安全',         desc: 'Dependabot vs Renovate、CVE/GHSA、SECURITY.md、SBOM、xz utils 等真實案例。',                     minutes: 12, tags: ['安全', '依賴'] },
+  { n: '12', file: 'lessons/opensource/12_first_contribution.html',       title: '第一次貢獻實戰 Checklist',      desc: '從找專案、判斷適合度、認領 issue 到 PR 被合併全流程 — 把前 11 堂收尾成一份可執行清單。',           minutes: 14, tags: ['實戰', 'Checklist'] }
+];
+
+const grpcLessons = [
+  { n: '01', file: 'lessons/grpc/grpc_01_intro.html',                title: 'gRPC 是什麼:HTTP/2 上的 RPC',         desc: 'RPC 心智模型、HTTP/2 多工、Protobuf 序列化、四種 RPC 模式、何時不該用 gRPC — 純概念建立詞彙。',           minutes: 14, tags: ['gRPC', '概念'] },
+  { n: '02', file: 'lessons/grpc/grpc_02_setup.html',                title: '環境安裝與工具鏈',                     desc: 'Go + protoc + protoc-gen-go + protoc-gen-go-grpc 一次裝齊,跑通第一個 .proto → .pb.go。順帶介紹 buf。', minutes: 12, tags: ['gRPC', '安裝'] },
+  { n: '03', file: 'lessons/grpc/grpc_03_protobuf_syntax.html',      title: 'Protobuf 語法完整版',                  desc: 'message / 欄位編號 / scalar / repeated / optional / enum / oneof / map / reserved / 巢狀 / import。',     minutes: 16, tags: ['gRPC', 'Protobuf'] },
+  { n: '04', file: 'lessons/grpc/grpc_04_unary_rpc.html',            title: '第一支 gRPC 服務:Unary RPC',           desc: '從 proto 寫到完整可跑的 server / client。使用新 API grpc.NewClient(取代 deprecated 的 grpc.Dial)。',  minutes: 15, tags: ['gRPC', 'Unary'] },
+  { n: '05', file: 'lessons/grpc/grpc_05_streaming_rpc.html',        title: '三種 Streaming RPC',                   desc: 'Server streaming / Client streaming / Bidirectional 三種模式各一範例,搭配 io.EOF 收尾的慣用模式。',      minutes: 17, tags: ['gRPC', 'Streaming'] },
+  { n: '06', file: 'lessons/grpc/grpc_06_context_metadata.html',     title: 'Context、Metadata、Deadline、Cancellation', desc: 'context.Context 在 gRPC 的角色、metadata 收送、deadline propagation、client 取消怎麼傳到 server。', minutes: 14, tags: ['gRPC', 'Context'] },
+  { n: '07', file: 'lessons/grpc/grpc_07_error_handling.html',       title: '錯誤處理與 Status Codes',              desc: 'gRPC 16 種 status codes、status.Errorf、結構化 error details、client 端 status.FromError 解碼。',        minutes: 13, tags: ['gRPC', '錯誤處理'] },
+  { n: '08', file: 'lessons/grpc/grpc_08_interceptors.html',         title: 'Interceptors 中介層',                  desc: 'Unary / Stream interceptor 簽名、ChainUnaryInterceptor 順序、實作 logging/recovery/auth/timing 四件組。', minutes: 16, tags: ['gRPC', 'Middleware'] },
+  { n: '09', file: 'lessons/grpc/grpc_09_tls_auth.html',             title: 'TLS、mTLS、Token-based Auth',          desc: '單向 TLS、mTLS 雙向驗證、PerRPCCredentials 帶 OAuth/JWT token。Transport vs PerRPC 兩層分工。',         minutes: 16, tags: ['gRPC', '安全'] },
+  { n: '10', file: 'lessons/grpc/grpc_10_connection_lifecycle.html', title: '連線生命週期:Channel、Keepalive、LB、Health', desc: 'ClientConn 狀態機、keepalive、name resolver、round_robin LB、grpc.health.v1、retry policy via service config。', minutes: 18, tags: ['gRPC', '上線'] }
+];
+
+const devopsLessons = [
+  { n: '01', file: 'lessons/devops/01_azure_devops.html',         title: 'Azure DevOps 實務:CI/CD 與專案管理',         desc: 'Org/Project 階層、Boards (Epic→Task)、Repos branch policies、Pipelines YAML、Service Connection、Variable Groups + Key Vault、Environments + Approvals。', minutes: 90, tags: ['DevOps', 'Azure', 'CI/CD'] },
+  { n: '02', file: 'lessons/devops/02_kubernetes_practical.html', title: 'Kubernetes 日常操作實務',                     desc: 'kubectl 心智模型、五動詞速查、Pod 排錯 (CrashLoop/ImagePullBackOff/OOMKilled)、Workload + HPA、Service/Ingress、ConfigMap/Secret、Helm chart、k9s/krew。',   minutes: 75, tags: ['DevOps', 'Kubernetes'] },
+  { n: '03', file: 'lessons/devops/03_argocd_gitops.html',        title: 'Argo CD:GitOps 持續部署',                     desc: 'GitOps 心智模型、UI 全景、Sync 對話框 (Prune/Force/Dry Run)、Application CRD、Sync waves + Hooks、ignoreDifferences 與 HPA、Webhook、Rollback、CLI、ApplicationSet。', minutes: 70, tags: ['DevOps', 'Argo CD', 'GitOps'] },
+  { n: '04', file: 'lessons/devops/04_prometheus_grafana.html',   title: 'Prometheus + Grafana:指標監控與儀表板',       desc: '四種 metric type、PromQL 五式 (rate / histogram_quantile)、Grafana Explore、自製 dashboard、Dashboard as Code (ConfigMap)、Unified Alerting、Go 自訂業務指標、cardinality 紀律。', minutes: 75, tags: ['DevOps', 'Prometheus', 'Grafana'] },
+  { n: '05', file: 'lessons/devops/05_elk_log_analysis.html',     title: 'ELK:日誌蒐集與分析',                          desc: 'log pipeline (stdout → Fluent Bit → ES → Kibana)、JSON 結構化好處、Data View、KQL 五式、Lens 視覺化、Dashboard + Controls、Alerting Rules、ILM 與 Dev Tools 排錯。',                       minutes: 65, tags: ['DevOps', 'ELK', 'Logging'] }
+];
+
+const cassandraLessons = [
+  { n: '01', file: 'lessons/cassandra/cassandra_01_intro.html',             title: 'Cassandra 是什麼、何時用',         desc: '從關聯式 DB 水平擴展痛點出發,認識 Cassandra「寬欄式 + AP + 無 master」三身分,比較 MySQL/MongoDB/Redis,Docker 動手起單節點 + cqlsh 玩 keyspace。版本基準 Cassandra 5.0.8。', minutes: 13, tags: ['Cassandra', '入門'] },
+  { n: '02', file: 'lessons/cassandra/cassandra_02_architecture.html',      title: '環狀架構與可調一致性',              desc: 'Token Ring + Murmur3 partitioner + vnode、NetworkTopologyStrategy + snitch、gossip、coordinator + hinted handoff、Consistency Level (R+W>RF)、PACELC。',                                          minutes: 14, tags: ['Cassandra', '架構'] },
+  { n: '03', file: 'lessons/cassandra/cassandra_03_cql_modeling.html',      title: 'CQL 與 Query-First 資料建模',       desc: 'CQL 看似 SQL 但不能 join、Primary Key = Partition Key + Clustering Key、wide row、Query-First、反正規化是常態、Materialized View vs SAI 比較、四個經典反模式。',                                       minutes: 16, tags: ['Cassandra', 'CQL'] },
+  { n: '04', file: 'lessons/cassandra/cassandra_04_read_write_path.html',   title: '寫入/讀取路徑與 Compaction',         desc: 'LSM-tree 引擎:Commit Log → Memtable → SSTable;讀取路徑要查多 SSTable 合併;tombstone + gc_grace_seconds;5 種 compaction 策略 (5.0 預設 UCS);repair 為什麼必要。',                                  minutes: 14, tags: ['Cassandra', '進階'] },
+  { n: '05', file: 'lessons/cassandra/cassandra_05_v5_features.html',       title: 'Cassandra 5.0 六大新特性',          desc: 'Storage-Attached Indexes (SAI)、Vector Search (HNSW + ANN OF)、Trie Memtable/SSTable、Dynamic Data Masking (MASKED WITH)、Unified Compaction Strategy、單節點 4TB → 10TB+。',                       minutes: 14, tags: ['Cassandra', '5.0', '向量'] },
+  { n: '06', file: 'lessons/cassandra/cassandra_06_ops_practice.html',      title: '運維實務與上工 Checklist',           desc: 'nodetool 必背 12 個指令、JMX 關鍵 metrics、snapshot + sstableloader 備份、rolling upgrade SOP、容量規劃 4 法則、5 個生產地雷、k8ssandra-operator/Reaper/Medusa/Astra 帶過。',                          minutes: 13, tags: ['Cassandra', '運維'] }
+];
+
+const redisLessons = [
+  { n: '01', file: 'lessons/redis/redis_01_intro.html',                       title: 'Redis 是資料結構服務',              desc: 'Redis 不是「只是 cache」、五大基礎資料結構、single-threaded event loop 為何簡單卻快、對比 Memcached/Valkey/DragonflyDB/KeyDB、Docker 動手玩 redis-cli。版本基準 Redis 8.6。',           minutes: 13, tags: ['Redis', '入門'] },
+  { n: '02', file: 'lessons/redis/redis_02_advanced_ds.html',                 title: '進階資料結構與真實場景',             desc: 'Streams (consumer group/XACK 取代 Pub/Sub 做可靠佇列)、Bitmap、HyperLogLog (12 KB 算 UV)、Geo、Pipelining、MULTI/EXEC + WATCH、Lua scripting / Functions。',                              minutes: 15, tags: ['Redis', '結構'] },
+  { n: '03', file: 'lessons/redis/redis_03_persistence_replication.html',     title: '持久化與複製',                       desc: 'RDB snapshot + fork()、AOF + fsync 三檔、Hybrid (8.x 預設)、主從複製 + repl_backlog、為什麼非同步複製 failover 可能掉資料、WAIT 指令的妥協。',                                                 minutes: 13, tags: ['Redis', '持久化'] },
+  { n: '04', file: 'lessons/redis/redis_04_ha_cluster.html',                  title: 'Sentinel vs Cluster 怎麼選',         desc: 'Sentinel 解 HA、Cluster 解水平擴展;16384 hash slot + CRC16、hash tag {} 為什麼存在、MOVED vs ASK redirect、resharding。docker-compose 起 3-master+3-replica cluster。',                       minutes: 14, tags: ['Redis', '叢集'] },
+  { n: '05', file: 'lessons/redis/redis_05_v8_modules.html',                  title: 'Redis 8.x 新特性',                   desc: 'Stack 併回 OSS (Search/JSON/TimeSeries/Bloom 內建)、Vector Sets (8.6 vs 8.4 寫入 +43% 查詢 +58%)、RediSearch 混合查詢、Hash Field TTL、8.6 新 eviction policies。',                            minutes: 13, tags: ['Redis', '8.x', '向量'] },
+  { n: '06', file: 'lessons/redis/redis_06_patterns_antipatterns.html',       title: '實戰模式與反模式',                   desc: 'Cache-Aside / Read-Through / Write-Through / Write-Behind 取捨、三大快取災難 (penetration/breakdown/avalanche)、SET NX 單機 lock vs Redlock 爭議 (Antirez vs Kleppmann)、Sliding Window Lua 限流、KEYS *・big key・hot key 反模式、9 大關鍵指標。', minutes: 15, tags: ['Redis', '上工'] }
+];
+
 const posts = [
-  {
-    title: 'Claude Code 使用指南',
-    desc: '完整整理 Claude Code 的指令、配置與自訂指令的使用方式。',
-    href: 'claude_code_introduction.html',
-    date: '2026-04-05',
-    minutes: 12,
-    tags: ['Claude', 'Workflow', 'AI 工具'],
-    status: 'NEW'
-  }
+  ...aiToolsLessons.map((l) => ({
+    title: l.title,
+    desc: l.desc,
+    href: l.file,
+    date: COURSE_DATE_AI_TOOLS,
+    minutes: l.minutes,
+    tags: l.tags,
+    category: 'AI 工具',
+    series: `第 ${l.n} / ${aiToolsLessons.length} 堂`
+  })),
+  ...gitLessons.map((l) => ({
+    title: l.title,
+    desc: l.desc,
+    href: l.file,
+    date: COURSE_DATE,
+    minutes: l.minutes,
+    tags: l.tags,
+    category: '開源協作',
+    series: `第 ${l.n} / 12 堂`
+  })),
+  ...grpcLessons.map((l) => ({
+    title: l.title,
+    desc: l.desc,
+    href: l.file,
+    date: COURSE_DATE_GRPC,
+    minutes: l.minutes,
+    tags: l.tags,
+    category: 'gRPC',
+    series: `第 ${l.n} / 10 堂`
+  })),
+  ...devopsLessons.map((l) => ({
+    title: l.title,
+    desc: l.desc,
+    href: l.file,
+    date: COURSE_DATE_DEVOPS,
+    minutes: l.minutes,
+    tags: l.tags,
+    category: 'DevOps 實務',
+    series: `第 ${l.n} / 5 堂`
+  })),
+  ...cassandraLessons.map((l) => ({
+    title: l.title,
+    desc: l.desc,
+    href: l.file,
+    date: COURSE_DATE_CASSANDRA,
+    minutes: l.minutes,
+    tags: l.tags,
+    category: 'Cassandra',
+    series: `第 ${l.n} / 6 堂`
+  })),
+  ...redisLessons.map((l) => ({
+    title: l.title,
+    desc: l.desc,
+    href: l.file,
+    date: COURSE_DATE_REDIS,
+    minutes: l.minutes,
+    tags: l.tags,
+    category: 'Redis',
+    series: `第 ${l.n} / 6 堂`
+  }))
 ];
 
 const postContainer = document.getElementById('posts');
@@ -404,6 +709,18 @@ const postCount = document.getElementById('post-count');
 const totalPosts = document.getElementById('total-posts');
 const latestDate = document.getElementById('latest-date');
 const emptyState = document.getElementById('empty');
+const filterBar = document.getElementById('filter-bar');
+const seriesPicker = document.getElementById('series-picker');
+const searchInput = document.getElementById('search');
+
+const seriesMeta = {
+  '開源協作':   { label: '開源協作',     short: 'Open Source',  accent: '#ff3d1f' },
+  'gRPC':       { label: 'gRPC (Go)',    short: 'gRPC',         accent: '#06b6d4' },
+  'DevOps 實務': { label: 'DevOps 實務', short: 'DevOps',       accent: '#22c55e' },
+  'Cassandra':  { label: 'Cassandra',    short: 'Cassandra',    accent: '#a855f7' },
+  'Redis':      { label: 'Redis',        short: 'Redis',        accent: '#dc2626' },
+  'AI 工具':    { label: 'AI 工具',      short: 'AI Tools',     accent: '#7c3aed' }
+};
 
 const formatDate = (value) => {
   if (!value) return '--';
@@ -411,14 +728,74 @@ const formatDate = (value) => {
   return `${y}.${m}.${d}`;
 };
 
-const sortedPosts = [...posts].sort((a, b) => new Date(b.date) - new Date(a.date));
+const sortedPosts = [...posts].sort((a, b) => {
+  // 主要按日期降冪
+  const byDate = new Date(b.date) - new Date(a.date);
+  if (byDate !== 0) return byDate;
+  // 同日期：先把同系列(同 category)的依序號升冪排在一起
+  if (a.category !== b.category) return a.category.localeCompare(b.category);
+  if (a.series && b.series) return a.series.localeCompare(b.series);
+  return 0;
+});
+
 latestDate.textContent = sortedPosts.length ? formatDate(sortedPosts[0].date) : '--';
-postCount.textContent = sortedPosts.length;
 totalPosts.textContent = sortedPosts.length;
+
+let activeCategory = 'all';
+let activeQuery = '';
+
+const categories = Array.from(new Set(posts.map((p) => p.category)));
+
+const renderFilterBar = () => {
+  const chips = [
+    { key: 'all', label: '全部', count: posts.length },
+    ...categories.map((c) => ({ key: c, label: c, count: posts.filter((p) => p.category === c).length }))
+  ];
+  filterBar.innerHTML = chips.map((c) => `
+    <button class="filter-chip ${c.key === activeCategory ? 'active' : ''}" data-key="${c.key}">
+      ${c.label}<span class="count">${c.count}</span>
+    </button>
+  `).join('');
+  filterBar.querySelectorAll('.filter-chip').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setActiveCategory(btn.dataset.key);
+    });
+  });
+};
+
+const renderSeriesPicker = () => {
+  seriesPicker.innerHTML = categories.map((c) => {
+    const meta = seriesMeta[c] || { label: c, short: c, accent: '#0a0a0f' };
+    const count = posts.filter((p) => p.category === c).length;
+    const isActive = activeCategory === c;
+    return `
+      <button class="series-card ${isActive ? 'active' : ''}" data-key="${c}" style="--series-accent: ${meta.accent};">
+        <div class="series-name">${meta.label}</div>
+        <div class="series-meta"><span class="series-count">${count}</span><span class="series-unit">堂</span></div>
+      </button>
+    `;
+  }).join('');
+  seriesPicker.querySelectorAll('.series-card').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.key;
+      setActiveCategory(activeCategory === key ? 'all' : key);
+    });
+  });
+};
+
+const setActiveCategory = (key) => {
+  activeCategory = key;
+  renderFilterBar();
+  renderSeriesPicker();
+  applyFilters();
+};
 
 const renderPosts = (items) => {
   postContainer.innerHTML = items.map((post) => {
     const tags = post.tags.map((tag) => `<span class="tag">${tag}</span>`).join('');
+    const flag = post.series
+      ? `<span class="post-series">${post.series}</span>`
+      : (post.status ? `<span class="post-flag">${post.status}</span>` : '');
     return `
       <a class="post-card" href="${post.href}">
         <div class="post-top">
@@ -426,8 +803,10 @@ const renderPosts = (items) => {
             <span>${formatDate(post.date)}</span>
             <span class="post-dot"></span>
             <span>${post.minutes} min</span>
+            <span class="post-dot"></span>
+            <span>${post.category}</span>
           </div>
-          ${post.status ? `<span class="post-flag">${post.status}</span>` : ''}
+          ${flag}
         </div>
         <div class="post-title">${post.title}</div>
         <div class="post-desc">${post.desc}</div>
@@ -436,23 +815,31 @@ const renderPosts = (items) => {
     `;
   }).join('');
 
+  postCount.textContent = items.length;
   emptyState.classList.toggle('show', items.length === 0);
 };
 
-renderPosts(sortedPosts);
-
-const searchInput = document.getElementById('search');
-searchInput.addEventListener('input', (event) => {
-  const query = event.target.value.trim().toLowerCase();
-  if (!query) {
-    renderPosts(sortedPosts);
-    return;
+const applyFilters = () => {
+  let filtered = sortedPosts;
+  if (activeCategory !== 'all') {
+    filtered = filtered.filter((p) => p.category === activeCategory);
   }
-  const filtered = sortedPosts.filter((post) => {
-    const haystack = [post.title, post.desc, post.tags.join(' ')].join(' ').toLowerCase();
-    return haystack.includes(query);
-  });
+  if (activeQuery) {
+    filtered = filtered.filter((post) => {
+      const haystack = [post.title, post.desc, post.tags.join(' '), post.category].join(' ').toLowerCase();
+      return haystack.includes(activeQuery);
+    });
+  }
   renderPosts(filtered);
+};
+
+renderSeriesPicker();
+renderFilterBar();
+applyFilters();
+
+searchInput.addEventListener('input', (event) => {
+  activeQuery = event.target.value.trim().toLowerCase();
+  applyFilters();
 });
 </script>
 </body>

@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cassandra 02｜環狀架構與一致性 — Cassandra 課程</title>
+<meta name="description" content="無 master 的 token ring、Murmur3 partitioner、複寫策略、gossip、coordinator、hinted handoff、可調 consistency level、PACELC — Cassandra 怎麼把資料平均散到多台機器又能保持一致性。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Cassandra 02 · 架構與一致性</div>
+    <h1 class="hero-title">環狀架構與<span>可調一致性</span></h1>
+    <p class="hero-desc">把上一堂課提到的「無 master + AP + 可調一致性」具體展開。token ring、partitioner、replication strategy、gossip、coordinator、consistency level、PACELC — 這些字看完不再陌生。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 2 / 6 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>基礎觀念</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#ring">Token Ring</a></li>
+      <li><a class="toc-link" href="#partitioner">Partitioner</a></li>
+      <li><a class="toc-link" href="#replication">Replication</a></li>
+      <li><a class="toc-link" href="#gossip">Gossip</a></li>
+      <li><a class="toc-link" href="#write-flow">Coordinator</a></li>
+      <li><a class="toc-link" href="#consistency">Consistency Level</a></li>
+      <li><a class="toc-link" href="#pacelc">PACELC</a></li>
+      <li><a class="toc-link" href="#nodetool">nodetool 動手玩</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="ring">
+      <span class="section-eyebrow">01 — Token Ring</span>
+      <h2>無 master 的環：Consistent Hashing 在工程上的實踐</h2>
+      <p>Cassandra 沒有 primary 也沒有 leader。它把所有節點排成一個邏輯環，環上每一點都對應一個 64-bit 的 <strong>token</strong>。每筆資料的 partition key 經過 hash 也得到一個 token，然後從那個 token 出發<em>順時針往下找第一個節點</em> — 那個節點就是這筆資料的「主節點（primary replica）」。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" aria-label="Cassandra token ring 示意">
+          <g font-family="JetBrains Mono, monospace" font-size="13">
+            <text x="360" y="28" text-anchor="middle" font-family="Syne, sans-serif" font-size="18" font-weight="700" fill="#0a0a0f">8 個 vnode 的 token ring（簡化）</text>
+
+            <circle cx="360" cy="200" r="120" fill="none" stroke="#d4d3cc" stroke-width="2" stroke-dasharray="3 3"/>
+
+            <!-- 4 nodes evenly distributed -->
+            <g>
+              <circle cx="360" cy="80"  r="22" fill="#fafaf8" stroke="#7c3aed" stroke-width="2"/>
+              <text x="360" y="86" text-anchor="middle" font-weight="700" fill="#4c1d95">N1</text>
+              <text x="360" y="55" text-anchor="middle" fill="#6b6b7e" font-size="11">token 0</text>
+
+              <circle cx="480" cy="200" r="22" fill="#fafaf8" stroke="#7c3aed" stroke-width="2"/>
+              <text x="480" y="206" text-anchor="middle" font-weight="700" fill="#4c1d95">N2</text>
+              <text x="528" y="206" text-anchor="middle" fill="#6b6b7e" font-size="11">2^62</text>
+
+              <circle cx="360" cy="320" r="22" fill="#fafaf8" stroke="#7c3aed" stroke-width="2"/>
+              <text x="360" y="326" text-anchor="middle" font-weight="700" fill="#4c1d95">N3</text>
+              <text x="360" y="356" text-anchor="middle" fill="#6b6b7e" font-size="11">2^63</text>
+
+              <circle cx="240" cy="200" r="22" fill="#fafaf8" stroke="#7c3aed" stroke-width="2"/>
+              <text x="240" y="206" text-anchor="middle" font-weight="700" fill="#4c1d95">N4</text>
+              <text x="190" y="206" text-anchor="middle" fill="#6b6b7e" font-size="11">-2^62</text>
+            </g>
+
+            <!-- key example -->
+            <g>
+              <circle cx="425" cy="125" r="6" fill="#ff3d1f"/>
+              <text x="445" y="120" fill="#ff3d1f" font-size="11">hash("TSLA")</text>
+              <text x="445" y="135" fill="#6b6b7e" font-size="10">→ 落到 N1~N2 之間</text>
+              <text x="445" y="150" fill="#6b6b7e" font-size="10">→ 順時針找到 N2</text>
+              <text x="445" y="165" fill="#ff3d1f" font-size="11" font-weight="700">N2 是主 replica</text>
+            </g>
+
+            <!-- arrow showing clockwise -->
+            <path d="M 350 80 A 120 120 0 0 1 480 200" stroke="#ff3d1f" stroke-width="2" fill="none" stroke-dasharray="4 4" marker-end="url(#arrCW)"/>
+            <defs>
+              <marker id="arrCW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+                <path d="M0,0 L10,5 L0,10 Z" fill="#ff3d1f"/>
+              </marker>
+            </defs>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 C2.1 — partition key 經過 hash 落到環上某點，順時針取到的第一個 node 即主 replica</div>
+      </div>
+
+      <h3>Vnode（virtual node）：為什麼真實環上有幾百個點</h3>
+      <p>實作上每台實體機<strong>不是只占環上一個位置</strong>。預設每台 server 有 16 個 <em>vnode</em>（虛擬節點），每個 vnode 對應一個獨立 token。這帶來兩個好處：</p>
+      <ul>
+        <li><strong>負載更平均</strong>：實體機不再對應「環上一段大區間」，而是被切成 16 段散落各處。即便 4 台機器，環上也有 64 個切點。</li>
+        <li><strong>加減節點時資料搬移更平均</strong>：新節點加入時 16 個 vnode 各從不同既有 vnode 偷一塊資料；不會像舊版（單 token）只跟相鄰兩台搶。</li>
+      </ul>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>num_tokens 別亂改</strong>
+          5.0 預設每台 16 個 vnode（過去 4.x 預設 256）。<em>16 是社群實測對 streaming repair 較友善的值</em>。新建叢集就用預設，不要因為網路文章說「設高一點」就改。
+        </div>
+      </div>
+    </section>
+
+    <section id="partitioner">
+      <span class="section-eyebrow">02 — Partitioner</span>
+      <h2>Murmur3Partitioner：把 partition key 變 token</h2>
+      <p>Cassandra 5.0 預設使用 <code>Murmur3Partitioner</code>。它的工作很單純：</p>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">概念</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code>token = MurmurHash3(<span class="tk-st">partition_key_bytes</span>)   <span class="tk-cm">// 64-bit signed int</span>
+       <span class="tk-cm">// 範圍：-2^63 ~ +2^63 - 1</span></code></pre>
+      </div>
+
+      <p>Murmur3 是一個<strong>非加密 hash</strong>，速度極快、分布均勻。早期版本另有 <code>RandomPartitioner</code>（用 MD5），現在已不推薦，主要因為 Murmur3 速度快很多。</p>
+
+      <p>請注意：<strong>partitioner 是叢集級設定，叢集起來後幾乎無法改</strong>。所有 keyspace 都共用同一個 partitioner。</p>
+    </section>
+
+    <section id="replication">
+      <span class="section-eyebrow">03 — Replication</span>
+      <h2>RF、replica placement、NetworkTopologyStrategy</h2>
+      <p>每個 keyspace 建立時要指定 <strong>Replication Factor（RF）</strong> — 一筆資料要存幾份。RF=3 是業界最常見：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">cql</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm">-- 多 DC、production-grade 設法</span>
+<span class="tk-kw">CREATE KEYSPACE</span> stockbot
+  <span class="tk-kw">WITH replication</span> = {
+    <span class="tk-st">'class'</span>: <span class="tk-st">'NetworkTopologyStrategy'</span>,
+    <span class="tk-st">'dc1'</span>: <span class="tk-num">3</span>,    <span class="tk-cm">-- dc1 放 3 份</span>
+    <span class="tk-st">'dc2'</span>: <span class="tk-num">3</span>     <span class="tk-cm">-- dc2 也放 3 份</span>
+  };</code></pre>
+      </div>
+
+      <p>規則：找到 partition 的主 replica 後，沿著環<strong>繼續順時針取下一個</strong>，<em>但不能在同一個 rack（架）</em>，也不能在同一個 DC 超過該 DC 的 RF 數量。這個放置邏輯由 <code>NetworkTopologyStrategy</code> + <strong>snitch</strong> 共同決定。</p>
+
+      <h3>Snitch：告訴 Cassandra 誰跟誰是同 rack / 同 DC</h3>
+      <ul>
+        <li><strong>GossipingPropertyFileSnitch</strong>（最常用）：每台機器讀 <code>cassandra-rackdc.properties</code> 設定自己的 rack/DC，再透過 gossip 告訴大家。</li>
+        <li><strong>Ec2Snitch / GoogleCloudSnitch</strong>：自動讀 cloud metadata。</li>
+        <li><strong>SimpleSnitch</strong>：所有機器都假裝同一個 rack（demo 用）。</li>
+      </ul>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>SimpleStrategy 別在 production 用</strong>
+          上一堂為了 demo 用 <code>SimpleStrategy + RF=1</code>。它<em>不分 DC、不分 rack</em>，只能單 DC 玩玩。production 一律 <code>NetworkTopologyStrategy</code>，每個 DC 明確指定 RF。
+        </div>
+      </div>
+    </section>
+
+    <section id="gossip">
+      <span class="section-eyebrow">04 — Gossip</span>
+      <h2>Gossip 協定：節點怎麼互相認識</h2>
+      <p>Cassandra 沒有 master，那怎麼知道叢集現在有幾台機器、誰活著、token 範圍在哪？答案是 <strong>gossip 協定</strong>：</p>
+      <ul>
+        <li>每秒，每台節點挑 <strong>1~3 台</strong> 隨機節點交換狀態（包含「我認識的所有其他節點目前在哪、token 是什麼、上次心跳幾秒前」）。</li>
+        <li>狀態用 <em>version vector</em>（version + heartbeat）合併，新訊息覆蓋舊訊息。</li>
+        <li>幾秒內，整個叢集就會收斂。</li>
+      </ul>
+      <p>當你 <code>nodetool status</code> 看到節點狀態（UN / DN / ?），都是 gossip 收上來的。</p>
+
+      <h3>Hinted Handoff：暫時掛掉的節點怎麼補資料</h3>
+      <p>假設要寫到 N1, N2, N3 三個 replica，但 N3 此刻網路斷線：</p>
+      <ol>
+        <li>Coordinator 把寫入給 N1、N2 並回 client「成功」（依 consistency level）。</li>
+        <li>Coordinator 同時為 N3 留一份 <strong>hint</strong>（暫存記錄）。</li>
+        <li>等到 gossip 偵測到 N3 復活，coordinator 自動把 hint 推給 N3 補上。</li>
+      </ol>
+      <p>預設 hint 最多保留 3 小時。超過就放棄、改用 <em>repair</em> 補資料（C-04 會講）。</p>
+    </section>
+
+    <section id="write-flow">
+      <span class="section-eyebrow">05 — Coordinator</span>
+      <h2>沒有 master，那 client 連誰？</h2>
+      <p>Client 可以連叢集中<strong>任何一台</strong>節點。被連到的那台節點就成為這次請求的 <strong>coordinator</strong>。它做的事：</p>
+
+      <ol>
+        <li>用 partitioner 算出資料該到哪些 replica。</li>
+        <li>把寫入 <em>同步</em> 廣播給該寫的 replica（依 RF 與 consistency level）。</li>
+        <li>等到收齊「足夠多」的成功回覆，就回 client。</li>
+      </ol>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" aria-label="coordinator 寫入流程">
+          <defs>
+            <marker id="arrC2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="12">
+            <text x="360" y="28" text-anchor="middle" font-family="Syne, sans-serif" font-size="16" font-weight="700" fill="#0a0a0f">RF=3 + W=QUORUM 的寫入</text>
+
+            <rect x="30" y="80" width="120" height="60" rx="8" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="90" y="115" text-anchor="middle" font-weight="700" fill="#0a0a0f">Client</text>
+
+            <rect x="200" y="80" width="160" height="60" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+            <text x="280" y="105" text-anchor="middle" font-weight="700" fill="#4c1d95">Coordinator</text>
+            <text x="280" y="125" text-anchor="middle" fill="#6b6b7e" font-size="10">(N1, 任何一台)</text>
+
+            <rect x="430" y="40"  width="100" height="40" rx="6" fill="#fafaf8" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="480" y="65" text-anchor="middle" font-weight="700" fill="#15803d">replica N1 ✓</text>
+
+            <rect x="430" y="100" width="100" height="40" rx="6" fill="#fafaf8" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="480" y="125" text-anchor="middle" font-weight="700" fill="#15803d">replica N2 ✓</text>
+
+            <rect x="430" y="160" width="100" height="40" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <text x="480" y="185" text-anchor="middle" font-weight="700" fill="#92400e">replica N3 (慢)</text>
+
+            <line x1="150" y1="110" x2="200" y2="110" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arrC2)"/>
+            <line x1="360" y1="100" x2="430" y2="60"  stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arrC2)"/>
+            <line x1="360" y1="115" x2="430" y2="120" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arrC2)"/>
+            <line x1="360" y1="130" x2="430" y2="180" stroke="#7c3aed" stroke-width="1.8" stroke-dasharray="3 3" marker-end="url(#arrC2)"/>
+
+            <text x="600" y="115" text-anchor="middle" fill="#0a0a0f" font-size="11">收齊 2 個 ACK</text>
+            <text x="600" y="135" text-anchor="middle" fill="#0a0a0f" font-size="11">就回 client 成功</text>
+            <text x="600" y="155" text-anchor="middle" fill="#6b6b7e" font-size="10">(N3 慢沒關係)</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 C2.2 — coordinator 等到「達成 consistency level」就回，剩下慢的 replica 在背後補上</div>
+      </div>
+    </section>
+
+    <section id="consistency">
+      <span class="section-eyebrow">06 — Consistency Level</span>
+      <h2>可調的一致性：CL 是每筆讀寫的旋鈕</h2>
+
+      <table>
+        <thead>
+          <tr><th>CL</th><th>寫入意義</th><th>讀取意義</th><th>常見用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>ONE</code></td><td>1 個 replica 寫成功即回</td><td>1 個 replica 回應即回</td><td>最快、容錯最差</td></tr>
+          <tr><td><code>QUORUM</code></td><td>多數派（&gt; RF/2）寫成功</td><td>多數派回應</td><td><strong>強一致的關鍵</strong></td></tr>
+          <tr><td><code>LOCAL_QUORUM</code></td><td>本 DC 多數派</td><td>本 DC 多數派</td><td><strong>多 DC 標配</strong></td></tr>
+          <tr><td><code>EACH_QUORUM</code></td><td>每個 DC 都要多數派</td><td>(寫入用)</td><td>跨 DC 寫入強一致</td></tr>
+          <tr><td><code>ALL</code></td><td>所有 replica 都成功</td><td>所有 replica 回應</td><td>很少用，太脆弱</td></tr>
+          <tr><td><code>ANY</code></td><td>連 hint 也算（最弱）</td><td>(無)</td><td>幾乎不要用</td></tr>
+        </tbody>
+      </table>
+
+      <h3>強一致的公式</h3>
+      <div class="callout callout-tip">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>R + W &gt; RF 即強一致</strong>
+          假設 RF=3，<code>W=QUORUM=2</code> 並 <code>R=QUORUM=2</code>。最差情況下，寫入的 2 個 replica 跟讀取的 2 個 replica<em>必有交集</em>，所以一定能讀到最新值。<br>
+          → 但代價：寫慢一點、讀慢一點、容忍更少節點掛掉。
+        </div>
+      </div>
+
+      <h3>多 DC：用 LOCAL_QUORUM 而不是 QUORUM</h3>
+      <p>跨 DC 網路 RTT 動輒 50ms 以上。如果用 <code>QUORUM</code>，每次寫入都要等遠端 DC 回應，延遲爆炸。實務上幾乎一律用 <code>LOCAL_QUORUM</code>：本地強一致、跨 DC 用<em>非同步複寫</em>達成最終一致。</p>
+    </section>
+
+    <section id="pacelc">
+      <span class="section-eyebrow">07 — PACELC</span>
+      <h2>CAP 之外：正常時的取捨叫 PACELC</h2>
+      <p>CAP 只描述「分區發生時」要選 C 或 A。但分散式系統大多時間是<strong>正常運作的</strong> — 此時還是有取捨：<strong>Latency 還是 Consistency？</strong>這就是 PACELC（Daniel Abadi 2010 提出）：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">概念</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code>If <span class="tk-kw">Partition</span> happens → choose <span class="tk-kw">A</span>vailability or <span class="tk-kw">C</span>onsistency
+<span class="tk-kw">Else</span>            → choose <span class="tk-kw">L</span>atency or <span class="tk-kw">C</span>onsistency
+
+Cassandra: <span class="tk-fn">PA / EL</span>   <span class="tk-cm">// 分區時 A、平時 L → 預設追求快</span>
+MongoDB:   <span class="tk-fn">PC / EC</span>   <span class="tk-cm">// 分區時 C、平時 C → 追求對</span>
+DynamoDB:  <span class="tk-fn">PA / EL</span>   <span class="tk-cm">// 跟 Cassandra 一樣血統</span>
+HBase:     <span class="tk-fn">PC / EC</span></code></pre>
+      </div>
+
+      <p>這也是為什麼很多人說「Cassandra 預設下不是強一致」 — 不是因為它不能，而是它預設選了延遲。你要強一致，就調 CL。</p>
+    </section>
+
+    <section id="nodetool">
+      <span class="section-eyebrow">08 — 動手玩</span>
+      <h2>用 nodetool 看自己的環</h2>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 1. 看叢集所有節點狀態</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 nodetool status
+
+Datacenter: datacenter1
+=======================
+<span class="tk-cm">Status=Up/Down
+|/ State=Normal/Leaving/Joining/Moving</span>
+--  Address     Load        Tokens  Owns (effective)  Host ID
+<span class="tk-fn">UN</span>  127.0.0.1   183.5 KiB   16      100.0%            7e62...
+
+<span class="tk-cm"># 2. 看 token 範圍（每個 vnode 一行）</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 nodetool ring
+
+<span class="tk-cm"># 3. 看一筆 partition key 對應到哪台機器</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 nodetool getendpoints stockbot price_by_symbol <span class="tk-st">'TSLA'</span>
+127.0.0.1   <span class="tk-cm"># 單節點所以只有自己</span>
+
+<span class="tk-cm"># 4. 在 cqlsh 裡切換 consistency level 觀察</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 cqlsh
+cqlsh&gt; <span class="tk-fn">CONSISTENCY</span> QUORUM;
+Consistency level set to QUORUM.
+
+cqlsh&gt; <span class="tk-fn">USE</span> stockbot;
+cqlsh:stockbot&gt; <span class="tk-fn">SELECT</span> * <span class="tk-kw">FROM</span> price_by_symbol <span class="tk-kw">WHERE</span> symbol=<span class="tk-st">'TSLA'</span>;
+
+<span class="tk-cm"># 5. 看一張表「每個 partition 在哪些 replica 上」</span>
+cqlsh&gt; <span class="tk-fn">DESCRIBE</span> <span class="tk-kw">KEYSPACE</span> stockbot;</code></pre>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>單節點看不到太多東西</strong>
+          要看真實的多節點 ring，最簡單方式是用 <code>ccm</code>（Cassandra Cluster Manager）在本機起 3 節點：<code>ccm create test -v 5.0.8 -n 3 -s</code>。或者用 docker-compose。本系列為了上手簡單只跑單節點，但 nodetool 指令在多節點環境會有趣很多。
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "假設 RF=3，client 用 W=QUORUM、R=QUORUM 進行讀寫。下列哪一項<strong>正確</strong>？",
+    "options": [
+      "這樣是強一致：寫入的 2 個 replica 跟讀取的 2 個必有交集",
+      "因為 Cassandra 是 AP，所以不論 CL 怎麼設都不可能強一致",
+      "只有 R=ALL 才能達到強一致",
+      "QUORUM 表示寫到 3 個 replica，效能最慢"
+    ],
+    "answer": 0,
+    "explain": "公式 <code>R + W &gt; RF</code> 成立即強一致。RF=3 時 QUORUM=2，2+2=4 &gt; 3。最差情況下讀取的 2 個 replica 與寫入的 2 個必有交集，能讀到最新值。<br>(2) QUORUM = ⌊RF/2⌋+1 = 2，不是 3。"
+  },
+  {
+    "question": "下列關於「coordinator」的敘述，哪些<strong>正確</strong>？(多選)",
+    "options": [
+      "Client 可以連任何一台節點，那台就成為這次請求的 coordinator",
+      "Coordinator 是叢集事先選出的固定 master，所有寫入都要透過它",
+      "Coordinator 負責用 partitioner 算出資料該寫到哪些 replica，並等 CL 達標",
+      "若 coordinator 自己不是 replica 之一，它會幫忙轉發但不會儲存資料"
+    ],
+    "answer": [0, 2, 3],
+    "explain": "(0)(2)(3) 都是 coordinator 的真實角色。(1) 錯：Cassandra 沒有 master，coordinator 是<em>每次請求即時指定</em>的 — 你連哪台、哪台就是 coordinator。"
+  },
+  {
+    "question": "為什麼多 DC 部署時實務上幾乎一律用 <code>LOCAL_QUORUM</code> 而不是 <code>QUORUM</code>？",
+    "options": [
+      "QUORUM 不支援多 DC",
+      "QUORUM 會等到跨 DC 多數派回應，動輒幾十 ms 延遲；LOCAL_QUORUM 只等本 DC 多數派",
+      "LOCAL_QUORUM 才能達到強一致",
+      "QUORUM 不允許 hinted handoff"
+    ],
+    "answer": 1,
+    "explain": "跨 DC 網路 RTT 通常 30~100ms，QUORUM 要等遠端 DC 回應、寫入延遲爆炸。LOCAL_QUORUM 達成「本地強一致 + 跨 DC 非同步複寫的最終一致」。"
+  },
+  {
+    "question": "vnode（virtual node）的設計目的<strong>不包含</strong>下列哪一項？",
+    "options": [
+      "讓資料負載在實體節點之間更平均",
+      "加減節點時資料搬移更平均、影響範圍更小",
+      "提升單筆查詢的延遲",
+      "讓 streaming repair 比較順暢"
+    ],
+    "answer": 2,
+    "explain": "vnode 是<em>叢集級的負載與運維特性</em>，跟單筆查詢延遲<strong>幾乎無關</strong>。其他三項都是 vnode 真實帶來的好處（負載平均、加減節點時影響小、repair 較順）。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/architecture/dynamo.html" target="_blank" rel="noopener">Cassandra — Dynamo-style Architecture</a><span class="ref-meta">官方架構文件</span></li>
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/architecture/snitch.html" target="_blank" rel="noopener">Cassandra — Snitch</a><span class="ref-meta">snitch 詳細</span></li>
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/architecture/dynamo.html#tunable-consistency" target="_blank" rel="noopener">Tunable consistency</a><span class="ref-meta">CL 列表</span></li>
+        <li><a href="https://en.wikipedia.org/wiki/PACELC_design_principle" target="_blank" rel="noopener">PACELC — Wikipedia</a><span class="ref-meta">PACELC 定義</span></li>
+        <li><a href="https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf" target="_blank" rel="noopener">Dynamo: Amazon's Highly Available Key-value Store</a><span class="ref-meta">Cassandra 的祖父論文</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="cassandra_01_intro.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Cassandra 01 · 是什麼、何時用</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="cassandra_03_cql_modeling.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Cassandra 03 · CQL 與資料建模</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">6 堂 Cassandra 系列 <span class="progress-pill">2 / 6</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="cassandra_01_intro.html"><span class="course-nav-num">01</span><span>Cassandra 是什麼</span></a></li>
+        <li><a class="course-nav-item current" href="cassandra_02_architecture.html"><span class="course-nav-num">02</span><span>環狀架構與一致性</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_03_cql_modeling.html"><span class="course-nav-num">03</span><span>CQL 與資料建模</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_04_read_write_path.html"><span class="course-nav-num">04</span><span>讀寫路徑 / Compaction</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_05_v5_features.html"><span class="course-nav-num">05</span><span>5.0 新特性</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_06_ops_practice.html"><span class="course-nav-num">06</span><span>運維實務</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 Cassandra 課程系列 · Lesson 02
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

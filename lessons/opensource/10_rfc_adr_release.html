@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 10｜RFC、ADR、Release Management — 開源貢獻課程</title>
+<meta name="description" content="Rust RFC / Python PEP / TC39 模式、Michael Nygard ADR 範本、feature freeze → RC → GA 完整流程 — 大型專案怎麼做設計決策與發版。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 10 · 大型專案實務篇</div>
+    <h1 class="hero-title">RFC、ADR、<span>Release Management</span></h1>
+    <p class="hero-desc">大型專案怎麼做設計決策、留下歷史脈絡、把版本平穩送上線 — RFC / ADR 兩個關鍵文件 + 一條完整 release 流程。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 10 / 12 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 13 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>進階</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#why-doc">為什麼需要文件</a></li>
+      <li><a class="toc-link" href="#rfc">RFC</a></li>
+      <li><a class="toc-link" href="#rfc-template">RFC 範本</a></li>
+      <li><a class="toc-link" href="#adr">ADR</a></li>
+      <li><a class="toc-link" href="#adr-example">ADR 範例</a></li>
+      <li><a class="toc-link" href="#release-flow">Release 流程</a></li>
+      <li><a class="toc-link" href="#hotfix-flow">Hotfix 流程</a></li>
+      <li><a class="toc-link" href="#release-notes">Release Notes</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="why-doc">
+      <span class="section-eyebrow">01 — 為什麼需要文件</span>
+      <h2>程式碼回答「怎麼做」，文件回答「為什麼」</h2>
+
+      <p>大型專案維護幾年後最大的痛點：<strong>沒人記得當初為什麼這樣設計</strong>。看 git log 只能看到 what，看不到 why。</p>
+
+      <ul>
+        <li>「這個 mutex 為什麼放這？拿掉好像也沒事？」 → 拿掉一週後線上爆炸</li>
+        <li>「為什麼選 Postgres 不選 MongoDB？」 → 沒人記得當初討論</li>
+        <li>「這個 API 為什麼設計成 RESTful 不是 GraphQL？」 → 新人不知道，重做了一遍</li>
+      </ul>
+
+      <p>解法：<strong>RFC 跟 ADR 兩種文件</strong>。一個用在「動工前廣泛徵詢意見」，一個用在「決定後永久存檔說明」。</p>
+    </section>
+
+    <section id="rfc">
+      <span class="section-eyebrow">02 — RFC</span>
+      <h2>RFC：Request for Comments</h2>
+
+      <p>「請求意見」— 在做大決策前，把想法寫成文件邀請眾人 review。傳統來自：</p>
+
+      <ul>
+        <li><strong>IETF</strong> (1969 起) — 網路標準 (HTTP、TCP/IP 都是 RFC)</li>
+        <li><strong>Python PEP</strong> (Python Enhancement Proposal) — 2000 起</li>
+        <li><strong>Rust RFCs</strong> — 2014 起，現代開源專案的 RFC 標竿</li>
+        <li><strong>TC39 proposals</strong> — JavaScript 標準變更流程</li>
+        <li><strong>React / Vue</strong> — 也都建立了 RFC 流程</li>
+      </ul>
+
+      <h3>典型 RFC 流程</h3>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">寫 RFC 草稿</div>
+            <div class="timeline-desc">複製專案的 RFC 模板填好，開 PR 進 <code>rfcs/</code> 目錄。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">公開討論期 (通常 2-4 週)</div>
+            <div class="timeline-desc">社群成員在 PR 留言討論，作者持續修改。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">FCP — Final Comment Period</div>
+            <div class="timeline-desc">核心團隊提議「進入最終評論期」，再給 7-10 天提異議。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Accepted / Rejected</div>
+            <div class="timeline-desc">合併 PR (accepted) 或關閉 (rejected)。Accepted 的 RFC 拿到永久編號。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">5</div>
+          <div class="timeline-content">
+            <div class="timeline-title">追蹤實作 issue</div>
+            <div class="timeline-desc">RFC 被接受不代表立刻實作，會開 tracking issue 追進度。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="rfc-template">
+      <span class="section-eyebrow">03 — RFC 範本</span>
+      <h2>實務 RFC 範本 (Rust 風格)</h2>
+
+      <div class="section-card">
+<pre style="background:var(--paper2);padding:0.9rem 1.1rem;border-radius:8px;font-size:13px;line-height:1.7;font-family:var(--mono);overflow-x:auto;"># RFC: 改用 httpOnly cookie 取代 localStorage 存 session
+
+- Start Date: 2026-04-15
+- Authors: @jason
+- RFC PR: #421
+- Tracking Issue: (待填)
+
+## Summary
+把 session token 從 localStorage 改放到 httpOnly cookie，
+配合 CSRF token 機制防止 XSS 偷取 session。
+
+## Motivation
+目前用 localStorage 存 token 有兩個問題：
+1. 任何 XSS 都能讀取 token (高安全風險)
+2. SSR 時無法在伺服器端讀取 (需另外打 API 確認登入狀態)
+
+## Detailed Design
+1. 後端在登入成功時 Set-Cookie: session=...; HttpOnly; Secure; SameSite=Lax
+2. 前端不再讀取 token，改用 /api/me 取得當前使用者資訊
+3. 表單提交需附 CSRF token (從 cookie 讀，header 送)
+4. 提供遷移路徑：兩種方式並存 30 天，30 天後關閉舊路徑
+
+## Drawbacks
+- BREAKING CHANGE，所有依賴前端讀 token 的程式都要改
+- 跨子網域共享 session 需重新規劃 cookie domain
+
+## Alternatives Considered
+- A. 維持現狀但加 CSP (擋大部分但不是全部 XSS) → 不夠
+- B. 使用 SameSite=Strict (但會讓外部連結登入失敗) → 不夠
+
+## Unresolved Questions
+- 行動 App 怎麼處理？(目前共用 web 後端 API)
+- Service Worker 是否需要存取 token？</pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>RFC 寫得好的關鍵</strong>
+          <strong>「Alternatives Considered」</strong>區塊最重要 — 證明你有想過其他方案才提這個。沒有這段的 RFC 通常會被退回。<strong>「Drawbacks」</strong>誠實列出缺點也加分，比假裝沒有缺點可信度高。
+        </div>
+      </div>
+    </section>
+
+    <section id="adr">
+      <span class="section-eyebrow">04 — ADR</span>
+      <h2>ADR：Architecture Decision Record</h2>
+
+      <p>由 Michael Nygard 在 2011 年提出 (<a class="inline-link" href="https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions" target="_blank" rel="noopener">原文</a>)。<strong>ADR 是 RFC 的「成果記錄」版本</strong> — RFC 用在動工前討論，ADR 用在「決定後永久存檔說明這次選擇了什麼、為什麼、結果是什麼」。</p>
+
+      <h3>RFC vs ADR</h3>
+
+      <table>
+        <thead>
+          <tr><th>面向</th><th>RFC</th><th>ADR</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>時機</td><td>決策前 (邀請討論)</td><td>決策後 (記錄歷史)</td></tr>
+          <tr><td>長度</td><td>長 (5-30 頁都有)</td><td>短 (1-2 頁)</td></tr>
+          <tr><td>受眾</td><td>當下參與討論的人</td><td>未來幾年讀 codebase 的人</td></tr>
+          <tr><td>狀態變化</td><td>Draft → Accepted / Rejected</td><td>Proposed → Accepted → (Superseded)</td></tr>
+          <tr><td>存放位置</td><td><code>rfcs/</code></td><td><code>docs/adr/</code> 或 <code>docs/decisions/</code></td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>實務上很多團隊只用 ADR 不用 RFC</strong>
+          開源 / 大型公開專案：兩者都要 (社群參與)。中小團隊內部專案：只用 ADR 就夠 (討論在 Slack / 會議，記錄在 ADR)。
+        </div>
+      </div>
+    </section>
+
+    <section id="adr-example">
+      <span class="section-eyebrow">05 — ADR 範例</span>
+      <h2>Michael Nygard 格式：完整 ADR 範例</h2>
+
+      <details class="collapse" open>
+        <summary>展開查看完整 ADR 範例 <span class="collapse-tag">範本</span></summary>
+        <div class="collapse-body">
+<pre style="background:var(--paper2);padding:1rem;border-radius:8px;font-size:13px;line-height:1.7;font-family:var(--mono);overflow-x:auto;"># ADR-007: 使用 PostgreSQL 作為主要資料庫
+
+Date: 2026-04-15
+
+## Status
+Accepted
+
+## Context
+我們需要為新系統選擇資料庫。需求：
+- 預期 100k 筆資料起步，未來 5 年成長到 10M 筆
+- 有複雜的 JOIN 查詢 (報表用)
+- 需要事務 (transaction) 處理金流相關操作
+- 團隊主力工程師有 SQL 經驗
+- 部署目標是 AWS / GCP，需要 managed service 選項
+
+候選：
+- PostgreSQL
+- MySQL
+- MongoDB
+
+## Decision
+選擇 PostgreSQL 14。
+
+理由：
+1. 對複雜 JOIN 與事務的支援最完整
+2. 支援 JSON 欄位，未來如有半結構化需求也能處理
+3. AWS RDS / Cloud SQL 都有 managed 服務
+4. 工程師熟悉度高，學習成本最低
+5. 開源且授權友善 (PostgreSQL License)
+
+## Consequences
+
+### 正面
+- 不需擔心 ACID 限制
+- 大量現成生態 (PostGIS, TimescaleDB) 之後可擴充
+- 招募市場容易找懂的人
+
+### 負面
+- 比 MongoDB 在純 schema-less 場景靈活度低
+- 需要團隊投入 schema migration 流程設計
+- 寫操作擴展時需要 read replica + sharding (不是初期問題)
+
+### 後續行動
+- 用 Prisma 作為 ORM (見 ADR-008)
+- migration 流程用 Prisma Migrate
+- 上線前必須建立 backup + PITR (point-in-time recovery)</pre>
+        </div>
+      </details>
+
+      <h3>ADR 的 Status 流轉</h3>
+
+      <table>
+        <thead>
+          <tr><th>Status</th><th>意義</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Proposed</strong></td><td>提出但還在討論</td></tr>
+          <tr><td><strong>Accepted</strong></td><td>確定要做</td></tr>
+          <tr><td><strong>Deprecated</strong></td><td>不再推薦但仍在用</td></tr>
+          <tr><td><strong>Superseded by ADR-X</strong></td><td>被新的 ADR-X 取代</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>關鍵原則：ADR 永不刪除</strong>
+          就算決策被推翻，也是把舊 ADR 改成 <code>Superseded by ADR-N</code> 而不是刪掉。讓「歷史脈絡可追溯」是 ADR 的核心價值。
+        </div>
+      </div>
+
+      <p>工具：<a class="inline-link" href="https://github.com/npryce/adr-tools" target="_blank" rel="noopener">adr-tools</a> 提供 CLI 自動建檔；<a class="inline-link" href="https://adr.github.io" target="_blank" rel="noopener">adr.github.io</a> 整理多種變體格式。</p>
+    </section>
+
+    <section id="release-flow">
+      <span class="section-eyebrow">06 — Release 流程</span>
+      <h2>Feature Freeze → Code Freeze → RC → GA</h2>
+
+      <p>大型專案發版本不是「main 上的程式打 tag 就好」這麼簡單。穩定發版有一套完整流程：</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" aria-label="Release 流程時間軸">
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <!-- 主時間軸 -->
+            <line x1="40" y1="120" x2="680" y2="120" stroke="#0a0a0f" stroke-width="2"/>
+
+            <!-- 四個節點 -->
+            <circle cx="100" cy="120" r="10" fill="#7c3aed"/>
+            <circle cx="270" cy="120" r="10" fill="#ff3d1f"/>
+            <circle cx="440" cy="120" r="10" fill="#92400e"/>
+            <circle cx="610" cy="120" r="10" fill="#15803d"/>
+
+            <text x="100" y="100" text-anchor="middle" fill="#7c3aed" font-weight="700">Feature Freeze</text>
+            <text x="100" y="150" text-anchor="middle" fill="#6b6b7e" font-size="10">不再合新 feature</text>
+            <text x="100" y="170" text-anchor="middle" fill="#6b6b7e" font-size="10">只收 bug fix</text>
+
+            <text x="270" y="100" text-anchor="middle" fill="#ff3d1f" font-weight="700">Code Freeze</text>
+            <text x="270" y="150" text-anchor="middle" fill="#6b6b7e" font-size="10">連 bug fix 都不收</text>
+            <text x="270" y="170" text-anchor="middle" fill="#6b6b7e" font-size="10">只剩嚴重 regression</text>
+
+            <text x="440" y="100" text-anchor="middle" fill="#92400e" font-weight="700">RC (Release Candidate)</text>
+            <text x="440" y="150" text-anchor="middle" fill="#6b6b7e" font-size="10">發 v2.0.0-rc.1</text>
+            <text x="440" y="170" text-anchor="middle" fill="#6b6b7e" font-size="10">公測、找 regression</text>
+
+            <text x="610" y="100" text-anchor="middle" fill="#15803d" font-weight="700">GA</text>
+            <text x="610" y="150" text-anchor="middle" fill="#6b6b7e" font-size="10">正式版 v2.0.0</text>
+            <text x="610" y="170" text-anchor="middle" fill="#6b6b7e" font-size="10">general availability</text>
+
+            <text x="360" y="40" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">每個階段層層收緊，確保穩定性</text>
+
+            <text x="360" y="200" text-anchor="middle" fill="#6b6b7e" font-size="11">時間 →</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 10.1 — Release 四階段</div>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>小型專案不用走全套流程</strong>
+          上面這套是給「主版本升級」(例如 React 19、Rust 2024 edition) 用。日常 minor / patch release 直接 main 打 tag 就好。但 GA 跟 RC 概念在哪都適用 — 重要更新先發 beta / RC 試水溫。
+        </div>
+      </div>
+    </section>
+
+    <section id="hotfix-flow">
+      <span class="section-eyebrow">07 — Hotfix 流程</span>
+      <h2>線上爆炸：Hotfix 完整流程</h2>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">確認問題影響範圍</div>
+            <div class="timeline-desc">先看 monitoring / 錯誤追蹤 (Sentry / Datadog)。是部分使用者還是全炸？影響哪個功能？</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">考慮 rollback 而不是 forward fix</div>
+            <div class="timeline-desc">如果剛 deploy 沒多久，回退到上一版往往比現場修快。「forward fix」(往前推新 commit 修) 適合 rollback 不可行時。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">從 production 對應的 tag / branch 開 hotfix branch</div>
+            <div class="timeline-desc">不是從 main 最新開 — main 可能已有未上線的東西。從 <code>v1.4.2</code> tag 開 <code>hotfix/v1.4.3</code>。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">最小修改 + 補一個 regression test</div>
+            <div class="timeline-desc">只改要修的，不要順便 refactor。補測試確保這個 bug 不會再出現。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">5</div>
+          <div class="timeline-content">
+            <div class="timeline-title">PR + review + CI 過 + merge + 打 patch tag</div>
+            <div class="timeline-desc">即使緊急，<strong>review 不能跳過</strong> — 線上爆炸時的 patch 最容易引入新 bug。打 v1.4.3 tag。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">6</div>
+          <div class="timeline-content">
+            <div class="timeline-title">deploy 到 production</div>
+            <div class="timeline-desc">確認 monitoring 顯示問題消失。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">7</div>
+          <div class="timeline-content">
+            <div class="timeline-title">把 hotfix 合回 main / develop</div>
+            <div class="timeline-desc">否則下次 deploy main 時這個 bug 會再回來 (regression)。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">8</div>
+          <div class="timeline-content">
+            <div class="timeline-title">寫 incident postmortem</div>
+            <div class="timeline-desc"><strong>Blameless postmortem</strong> — 不究責、找根因、列 action items。Google SRE 流程。寫成 Markdown 進 ADR 或 incidents 目錄。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="release-notes">
+      <span class="section-eyebrow">08 — Release Notes</span>
+      <h2>Release Notes：自動產 vs 手寫</h2>
+
+      <h3>自動產 (Auto-generated)</h3>
+      <p>有 Conventional Commits 後，工具能直接從 git log 產出 release notes：</p>
+
+      <ul>
+        <li><strong>semantic-release</strong> — 自動 bump 版號 + 產 CHANGELOG.md + 發 GitHub Release</li>
+        <li><strong>changesets</strong> — 適合 monorepo</li>
+        <li><strong>release-drafter</strong> — 自動 draft GitHub Release，等人 review</li>
+        <li><strong>git-cliff</strong> — Rust 寫的高速生成器</li>
+      </ul>
+
+      <h3>手寫 (Curated)</h3>
+      <p>大型 release (主版本 / 旗艦功能) 通常會手寫一份「給人讀的」release notes，跟自動產的 changelog 並存。例如 Next.js 15、Rust 1.75 的 release blog 都是手寫的，會：</p>
+      <ul>
+        <li>強調最重要的 3-5 個改動</li>
+        <li>提供使用範例</li>
+        <li>列出 breaking change 與遷移路徑</li>
+        <li>感謝貢獻者</li>
+      </ul>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>業界做法</strong>
+          通常兩個都要：自動產 <code>CHANGELOG.md</code> 給機器讀 / 想看完整列表的進階使用者；手寫 release blog 給一般使用者。
+        </div>
+      </div>
+
+      <details class="collapse">
+        <summary>Multi-repo vs Monorepo / Release Train 模型 <span class="collapse-tag">深入</span></summary>
+        <div class="collapse-body">
+          <p style="margin-bottom:0.5rem;"><strong>Multi-repo</strong>：每個專案一個 repo，獨立版本 / 發版。多數小團隊用這個。</p>
+          <p style="margin-bottom:0.5rem;"><strong>Monorepo</strong>：多個 package 在同一個 repo。Google 整個公司用一個 monorepo；Vercel 的 turborepo / Nx 是 JS 生態工具。優點：跨 package 重構容易、共享 CI；缺點：版本管理複雜，需要 changesets / nx release 這種工具。</p>
+          <p style="margin-bottom:0.5rem;"><strong>Release Train</strong> (Android / Chrome 用)：固定週期 (例如 6 週) 發新版，這個週期內合進去的就有，沒合到的等下班車。優點：節奏穩定、deadline 明確；缺點：feature 沒趕上要等。</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "RFC 跟 ADR 的關鍵差別是什麼？",
+    "options": [
+      "RFC 是英文，ADR 是中文",
+      "RFC 是動工前邀請討論的長文件；ADR 是決策後永久存檔的精簡記錄",
+      "RFC 比較重要，ADR 不重要",
+      "完全一樣，只是叫法不同"
+    ],
+    "answer": 1,
+    "explain": "RFC = Request for Comments，動工前社群討論用，可以很長；ADR = Architecture Decision Record，事後留檔給未來幾年讀 codebase 的人，要精簡。實務上很多團隊只用 ADR 不用 RFC。"
+  },
+  {
+    "question": "決策被推翻後，舊的 ADR 應該怎麼處理？",
+    "options": [
+      "直接刪掉，避免混淆",
+      "把 Status 改成 <code>Superseded by ADR-N</code> 並保留所有內容",
+      "只留標題和結論",
+      "封存到另一個 repo"
+    ],
+    "answer": 1,
+    "explain": "ADR 永不刪除，這是核心原則。把 Status 改成 Superseded 並指向新 ADR，保留所有原文。讓「歷史脈絡可追溯」是 ADR 的核心價值。"
+  },
+  {
+    "question": "下列哪些是 hotfix 流程的<strong>最佳實務</strong>？(多選)",
+    "options": [
+      "從 production 對應的 tag 開 hotfix branch (不是從 main 最新)",
+      "最小修改 + 補一個 regression test",
+      "緊急情況直接強推 production，跳過 review",
+      "修完後要把 hotfix 合回 main / develop，避免 regression"
+    ],
+    "answer": [0, 1, 3],
+    "explain": "緊急情況更<strong>不能</strong>跳過 review — 線上爆炸時的 patch 最容易引入新 bug。其他三項都是業界標準做法。"
+  },
+  {
+    "question": "Feature Freeze 階段允許什麼樣的 commit 進入這個 release？",
+    "options": [
+      "只允許新功能",
+      "只允許 bug fix，不再收新 feature",
+      "什麼都不收，連 bug fix 都不行",
+      "完全沒限制"
+    ],
+    "answer": 1,
+    "explain": "Feature Freeze = 凍結功能但仍接受 bug fix。下一階段 Code Freeze 才連 bug fix 都不收 (除非嚴重 regression)。最後才發 RC → GA。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions" target="_blank" rel="noopener">Michael Nygard — Documenting Architecture Decisions (2011)</a><span class="ref-meta">ADR 原文</span></li>
+        <li><a href="https://adr.github.io" target="_blank" rel="noopener">adr.github.io</a><span class="ref-meta">ADR 各種變體格式</span></li>
+        <li><a href="https://github.com/rust-lang/rfcs" target="_blank" rel="noopener">Rust RFCs</a><span class="ref-meta">最被效仿的開源 RFC 流程</span></li>
+        <li><a href="https://peps.python.org/pep-0001/" target="_blank" rel="noopener">PEP 1 — PEP Purpose and Guidelines</a><span class="ref-meta">Python 提案流程</span></li>
+        <li><a href="https://github.com/npryce/adr-tools" target="_blank" rel="noopener">adr-tools (CLI)</a><span class="ref-meta">建立 ADR 的工具</span></li>
+        <li><a href="https://sre.google/sre-book/postmortem-culture/" target="_blank" rel="noopener">Google SRE — Postmortem Culture</a><span class="ref-meta">Blameless postmortem 標竿</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="09_ci_cd_hooks.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 09 · CI/CD、Hooks、Lint</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="11_dependencies_supply_chain.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 11 · 依賴管理與供應鏈安全</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">12 堂課程系列 <span class="progress-pill">10 / 12</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
+        <li><a class="course-nav-item" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
+        <li><a class="course-nav-item" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇</span></a></li>
+        <li><a class="course-nav-item" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
+        <li><a class="course-nav-item" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
+        <li><a class="course-nav-item" href="06_commits_versioning.html"><span class="course-nav-num">06</span><span>Commit、SemVer、Changelog</span></a></li>
+        <li><a class="course-nav-item" href="07_issues_project_mgmt.html"><span class="course-nav-num">07</span><span>Issue 與專案管理</span></a></li>
+        <li><a class="course-nav-item" href="08_testing_tdd.html"><span class="course-nav-num">08</span><span>測試金字塔與 TDD</span></a></li>
+        <li><a class="course-nav-item" href="09_ci_cd_hooks.html"><span class="course-nav-num">09</span><span>CI/CD、Hooks、Lint</span></a></li>
+        <li><a class="course-nav-item current" href="10_rfc_adr_release.html"><span class="course-nav-num">10</span><span>RFC、ADR、Release</span></a></li>
+        <li><a class="course-nav-item" href="11_dependencies_supply_chain.html"><span class="course-nav-num">11</span><span>依賴管理與供應鏈安全</span></a></li>
+        <li><a class="course-nav-item" href="12_first_contribution.html"><span class="course-nav-num">12</span><span>第一次貢獻實戰</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的開源協作課程系列 · Lesson 10
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

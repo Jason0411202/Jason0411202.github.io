@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 11｜依賴管理與供應鏈安全 — 開源貢獻課程</title>
+<meta name="description" content="鎖檔意義、Dependabot vs Renovate、CVE/GHSA、SECURITY.md、SBOM、SLSA — 從 left-pad、xz utils 真實案例學供應鏈安全。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 11 · 大型專案實務篇</div>
+    <h1 class="hero-title">依賴管理 <span>與供應鏈安全</span></h1>
+    <p class="hero-desc">現代專案 90% 的程式碼是別人寫的依賴。<strong>依賴 = 風險</strong> — 從 left-pad 到 xz utils 後門，這堂教你怎麼防。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 11 / 12 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 12 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>進階</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#why">為什麼依賴是風險</a></li>
+      <li><a class="toc-link" href="#cases">真實案例</a></li>
+      <li><a class="toc-link" href="#lockfile">鎖檔的意義</a></li>
+      <li><a class="toc-link" href="#audit">漏洞掃描</a></li>
+      <li><a class="toc-link" href="#bots">Dependabot vs Renovate</a></li>
+      <li><a class="toc-link" href="#cve">CVE / GHSA</a></li>
+      <li><a class="toc-link" href="#security-md">SECURITY.md</a></li>
+      <li><a class="toc-link" href="#sbom">SBOM / SLSA</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="why">
+      <span class="section-eyebrow">01 — 為什麼依賴是風險</span>
+      <h2>你寫的程式碼只佔 10%，剩下 90% 是別人的</h2>
+
+      <p>一個現代 Node.js 專案 <code>npm install</code> 後 <code>node_modules</code> 動輒幾百 MB、上千個套件。Python、Rust、Go 也類似。每一個依賴都帶著：</p>
+
+      <ul>
+        <li><strong>未知的 bug</strong> — 影響你的 production</li>
+        <li><strong>未知的安全漏洞</strong> — 攻擊者的入口</li>
+        <li><strong>未知的維護狀況</strong> — 作者哪天棄坑你不知道</li>
+        <li><strong>傳遞性依賴</strong> — 你直接裝 10 個，間接裝 800 個</li>
+      </ul>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>新增一個依賴前先問三個問題</strong>
+          ① 這個功能我自己寫要多久？(很短就別裝) ② 這個套件最近一年活躍嗎？(看 GitHub 的 commit / issue 回應) ③ 它的 transitive 依賴是怎樣？(用 <code>npm view &lt;pkg&gt; dependencies</code> 看)
+        </div>
+      </div>
+    </section>
+
+    <section id="cases">
+      <span class="section-eyebrow">02 — 真實案例</span>
+      <h2>三個讓全世界記住「依賴是風險」的事件</h2>
+
+      <h3>2016 — left-pad 事件</h3>
+      <p>Azer Koçulu 因為 npm 跟另一家公司商標糾紛，把自己所有套件下架，包括 <code>left-pad</code> (一個 17 行的字串補空格函式)。<strong>結果半個 JavaScript 生態系炸了</strong> — Babel、React、Node 全部建置失敗。</p>
+      <p><strong>教訓</strong>：不要用「微小到只有十幾行」的依賴；npm 也因此引入「unpublish 限制」(72 小時內、無人下載才能撤回)。</p>
+
+      <h3>2018 — event-stream 事件</h3>
+      <p>有個受歡迎的 npm 套件 <code>event-stream</code>，原作者沒空維護，把權限給了一個熱心的「貢獻者」。新主人接手後加入了一個依賴 <code>flatmap-stream</code>，<strong>裡面藏了竊取 Bitcoin 錢包私鑰的後門</strong>，影響數百萬下載。</p>
+      <p><strong>教訓</strong>：套件「換手」是供應鏈攻擊的高風險點。直接看 <code>package.json</code> 的依賴版本號鎖死、留意自動更新後的 PR diff。</p>
+
+      <h3>2024 — xz utils 後門 (CVE-2024-3094)</h3>
+      <p><strong>近年最嚴重的供應鏈攻擊。</strong> 攻擊者花了 <strong>2 年偽裝成善意貢獻者</strong>，逐步取得 xz utils (Linux 普遍依賴的壓縮函式庫) 的維護權，然後在 5.6.0 / 5.6.1 加入後門，可以從 SSH 遠端執行任意指令。</p>
+      <p>幸好被微軟工程師 Andres Freund 在 SSH 慢了 0.5 秒時發現。如果發現晚了一兩週、xz 進入 Debian / Ubuntu 穩定版，全世界 Linux 伺服器都可能被入侵。</p>
+      <p><strong>教訓</strong>：開源專案的單一維護者是攻擊者下手點。社區與政府開始重視「critical 開源專案要有多人維護」、推 SBOM、SLSA、artifact signing 等防護。</p>
+    </section>
+
+    <section id="lockfile">
+      <span class="section-eyebrow">03 — 鎖檔</span>
+      <h2>Lock 檔的意義</h2>
+
+      <p>沒有鎖檔，<code>install</code> 出來的依賴版本可能每次都不同 — 你機器跑得好好的，CI 上炸了。鎖檔記錄<strong>每個套件的精確版本 + 整顆依賴樹</strong>。</p>
+
+      <table>
+        <thead>
+          <tr><th>生態</th><th>鎖檔</th><th>備註</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>npm</td><td><code>package-lock.json</code></td><td>npm 5+ 預設</td></tr>
+          <tr><td>pnpm</td><td><code>pnpm-lock.yaml</code></td><td>記錄完整依賴樹 + 整合性 hash</td></tr>
+          <tr><td>yarn</td><td><code>yarn.lock</code></td><td>Yarn 1 / Yarn Berry 格式不同</td></tr>
+          <tr><td>Python (pip + Pipenv)</td><td><code>Pipfile.lock</code></td><td>但 pip 本身不強制鎖</td></tr>
+          <tr><td>Python (Poetry)</td><td><code>poetry.lock</code></td><td>建議用 Poetry / uv 取代純 pip</td></tr>
+          <tr><td>Rust</td><td><code>Cargo.lock</code></td><td>Library 不該 commit、binary 應該 commit</td></tr>
+          <tr><td>Go</td><td><code>go.sum</code></td><td>記錄 hash 確保整合性</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>鎖檔必須 commit 進版本控制</strong>
+          這是 Lesson 01 提過的鐵律。沒有鎖檔等於團隊每個人 / 每個 CI run 都用不同版本的依賴，bug 重現困難。
+        </div>
+      </div>
+
+      <h3>CI 上要用「frozen」模式</h3>
+      <p>所有套件管理器都有「不要解析、嚴格按 lock 檔裝」的旗標：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> npm ci                                <span class="tk-cm"># 不是 npm install</span>
+<span class="tk-pn">$</span> pnpm install <span class="tk-op">--frozen-lockfile</span>
+<span class="tk-pn">$</span> yarn install <span class="tk-op">--immutable</span>
+<span class="tk-pn">$</span> poetry install <span class="tk-op">--no-update</span>
+<span class="tk-pn">$</span> cargo build <span class="tk-op">--locked</span></code></pre>
+      </div>
+    </section>
+
+    <section id="audit">
+      <span class="section-eyebrow">04 — 漏洞掃描</span>
+      <h2>主動掃描已知漏洞</h2>
+
+      <p>各語言生態都有官方漏洞資料庫 + CLI 工具：</p>
+
+      <table>
+        <thead>
+          <tr><th>生態</th><th>指令</th><th>資料來源</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>npm</td><td><code>npm audit</code></td><td>GitHub Advisory Database</td></tr>
+          <tr><td>pnpm</td><td><code>pnpm audit</code></td><td>同上</td></tr>
+          <tr><td>Python</td><td><code>pip-audit</code></td><td>Python Packaging Authority + OSV</td></tr>
+          <tr><td>Rust</td><td><code>cargo audit</code></td><td>RustSec Advisory Database</td></tr>
+          <tr><td>Go</td><td><code>govulncheck</code></td><td>Go Vulnerability Database</td></tr>
+          <tr><td>跨語言</td><td>OWASP Dependency-Check</td><td>NVD (美國國家漏洞資料庫)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">output</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> npm audit
+
+<span class="tk-fn">axios</span>  &lt;1.6.0
+<span class="tk-st">Severity</span>: high
+SSRF in axios - https://github.com/advisories/GHSA-xxxx-xxxx
+fix available via `npm audit fix`
+node_modules/axios
+
+3 vulnerabilities (1 moderate, 2 high)</code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>把 audit 加進 CI</strong>
+          <code>npm audit --audit-level=high</code> 在 CI 跑，high / critical 漏洞讓 build 失敗。低風險的 (low / moderate) 通常不擋 build 但留紀錄。
+        </div>
+      </div>
+    </section>
+
+    <section id="bots">
+      <span class="section-eyebrow">05 — 自動更新</span>
+      <h2>Dependabot vs Renovate</h2>
+
+      <p>手動追依賴更新太累，業界用機器人自動開 PR 升版：</p>
+
+      <table>
+        <thead>
+          <tr><th>面向</th><th>Dependabot</th><th>Renovate</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>歸屬</td><td>GitHub 內建 (2019 收購)</td><td>Mend (前 WhiteSource) 開源 + SaaS</td></tr>
+          <tr><td>設定</td><td>簡單 (一個 yml)</td><td>強大但複雜</td></tr>
+          <tr><td>合 PR 策略</td><td>每個依賴一個 PR</td><td>可配置批次 / 群組更新</td></tr>
+          <tr><td>排程</td><td>固定間隔 (daily / weekly)</td><td>支援 cron / 時區 / quiet hours</td></tr>
+          <tr><td>支援生態</td><td>主流語言都有</td><td>更廣 (Docker base image / GitHub Actions / Terraform)</td></tr>
+          <tr><td>適合</td><td>多數專案這個就夠</td><td>大型 monorepo / 細緻控制</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Dependabot 設定範例</h3>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># .github/dependabot.yml</span>
+<span class="tk-kw">version</span>: <span class="tk-num">2</span>
+<span class="tk-kw">updates</span>:
+  - <span class="tk-kw">package-ecosystem</span>: <span class="tk-st">"npm"</span>
+    <span class="tk-kw">directory</span>: <span class="tk-st">"/"</span>
+    <span class="tk-kw">schedule</span>:
+      <span class="tk-kw">interval</span>: <span class="tk-st">"weekly"</span>
+      <span class="tk-kw">day</span>: <span class="tk-st">"monday"</span>
+    <span class="tk-kw">groups</span>:
+      <span class="tk-kw">eslint</span>:
+        <span class="tk-kw">patterns</span>: [<span class="tk-st">"eslint*"</span>]
+      <span class="tk-kw">testing</span>:
+        <span class="tk-kw">patterns</span>: [<span class="tk-st">"vitest*"</span>, <span class="tk-st">"@testing-library/*"</span>]
+    <span class="tk-kw">open-pull-requests-limit</span>: <span class="tk-num">5</span>
+
+  <span class="tk-cm"># GitHub Actions 也要更新</span>
+  - <span class="tk-kw">package-ecosystem</span>: <span class="tk-st">"github-actions"</span>
+    <span class="tk-kw">directory</span>: <span class="tk-st">"/"</span>
+    <span class="tk-kw">schedule</span>:
+      <span class="tk-kw">interval</span>: <span class="tk-st">"weekly"</span></code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>不要無腦合併 bot 開的 PR</strong>
+          就算 CI 過了，<strong>major version 升級必看 release notes</strong> — breaking change 可能 CI 抓不到 (例如新版改了某個 hook 的副作用)。Patch / minor 比較安全但仍要快速掃過 changelog。
+        </div>
+      </div>
+    </section>
+
+    <section id="cve">
+      <span class="section-eyebrow">06 — CVE / GHSA</span>
+      <h2>怎麼看 CVE 與 GHSA 識別碼</h2>
+
+      <table>
+        <thead>
+          <tr><th>系統</th><th>格式</th><th>誰發放</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>CVE</strong></td>
+            <td><code>CVE-2024-3094</code></td>
+            <td>MITRE / 美國 CISA — 跨平台通用識別碼</td>
+          </tr>
+          <tr>
+            <td><strong>GHSA</strong></td>
+            <td><code>GHSA-xxxx-xxxx-xxxx</code></td>
+            <td>GitHub Advisory — 開源套件專用</td>
+          </tr>
+          <tr>
+            <td><strong>NPM advisory</strong></td>
+            <td>數字 ID</td>
+            <td>npm 早期格式 (現多遷移到 GHSA)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>CVSS 評分</h3>
+      <p>每個 CVE 會給 0-10 的 CVSS (Common Vulnerability Scoring System) 分數：</p>
+      <ul>
+        <li><strong>9.0-10.0 Critical</strong> — 立刻處理</li>
+        <li><strong>7.0-8.9 High</strong> — 本週處理</li>
+        <li><strong>4.0-6.9 Medium</strong> — 排進近期 sprint</li>
+        <li><strong>0.1-3.9 Low</strong> — 看狀況</li>
+      </ul>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>分數高不一定影響你</strong>
+          例如某個漏洞需要「使用者已被釣魚 + 開啟特定設定」才能利用，CVSS 可能還是給 7.0，但實務影響極小。<strong>看完整描述、評估 attack vector 是否在你的使用情境下可達</strong>，再決定優先級。
+        </div>
+      </div>
+    </section>
+
+    <section id="security-md">
+      <span class="section-eyebrow">07 — SECURITY.md</span>
+      <h2>SECURITY.md：負責任的揭露流程</h2>
+
+      <p>有了專案後，<strong>必須讓人知道發現漏洞時該找誰、怎麼通報</strong>。否則安全研究員可能直接公開 issue (zero-day)，反而讓使用者陷入危險。</p>
+
+      <p>業界做法是放一個 <code>SECURITY.md</code> 在 repo 根目錄：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">markdown</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># Security Policy</span>
+
+## Supported Versions
+
+| Version | Supported          |
+| ------- | ------------------ |
+| 2.x     | :white_check_mark: |
+| 1.x     | :white_check_mark: (until 2026-12) |
+| &lt; 1.0   | :x:                |
+
+## Reporting a Vulnerability
+
+請<strong>不要</strong>透過公開 issue 通報安全漏洞。
+
+請改用以下任一方式：
+
+1. <strong>GitHub Private Vulnerability Reporting</strong> (推薦)
+   到 Security 分頁按「Report a vulnerability」
+2. <strong>Email</strong>: security@example.com (PGP key: 0xABCD1234)
+
+我們會在 48 小時內回覆，90 天內發補丁。
+依照 [CVD policy](https://...) 處理 — 在補丁發布前不會公開細節。
+
+## Hall of Fame
+感謝以下發現過漏洞的研究員：
+- @researcher1 (CVE-2024-1234)
+- @researcher2 (CVE-2024-5678)</code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>用 GitHub 的 Private Vulnerability Reporting</strong>
+          GitHub 2022 推出的功能 — repo Settings → Security → Private vulnerability reporting → Enable。研究員可以在 web UI 私下 file 漏洞，maintainer 在 private fork 修補後再公開。比 email 流程順很多。
+        </div>
+      </div>
+    </section>
+
+    <section id="sbom">
+      <span class="section-eyebrow">08 — SBOM / SLSA</span>
+      <h2>SBOM 與 SLSA — 供應鏈安全的下一步</h2>
+
+      <h3>SBOM (Software Bill of Materials)</h3>
+      <p>「軟體物料清單」 — 列出一個軟體用了哪些依賴、什麼版本、什麼授權。<strong>美國 2021 行政命令 14028 後成為政府採購軟體的必要文件</strong>。</p>
+
+      <p>主流 SBOM 格式：</p>
+      <ul>
+        <li><strong>SPDX</strong> — Linux Foundation 發起，ISO 標準</li>
+        <li><strong>CycloneDX</strong> — OWASP 維護，較聚焦安全</li>
+      </ul>
+
+      <p>產生 SBOM：<code>syft &lt;repo&gt;</code> (Anchore 開源工具) 或各 build tool 的內建支援。</p>
+
+      <h3>SLSA (Supply-chain Levels for Software Artifacts)</h3>
+      <p>Google 主推的供應鏈安全等級框架，分四級：</p>
+
+      <ul>
+        <li><strong>SLSA 1</strong> — 有自動化建置 + 可追溯來源</li>
+        <li><strong>SLSA 2</strong> — 用 hosted CI (GitHub Actions / GCB) + 簽名</li>
+        <li><strong>SLSA 3</strong> — 不可竄改的 build (含 ephemeral runner)</li>
+        <li><strong>SLSA 4</strong> — 最高，含 two-party review、可重現建置</li>
+      </ul>
+
+      <h3>Sigstore — 開源簽章</h3>
+      <p><a class="inline-link" href="https://www.sigstore.dev" target="_blank" rel="noopener">Sigstore</a> 是 Linux Foundation 的開源 artifact 簽章方案 (含 Cosign / Fulcio / Rekor)。npm、PyPI、GitHub Actions 都已支援。<strong>npm 從 2023 起對熱門套件強制要求 provenance</strong> — 證明這個套件是從哪個 CI / 哪個 commit 建置出來的。</p>
+
+      <details class="collapse">
+        <summary>private registry 與 internal mirror <span class="collapse-tag">深入</span></summary>
+        <div class="collapse-body">
+          <p>大企業會在內部架 mirror (Verdaccio、Artifactory、Nexus)，原因：</p>
+          <ul style="margin-left:1rem;font-size:13px;">
+            <li>下載速度快 (內網)</li>
+            <li>核准過的套件才能用 (黑名單 / 白名單)</li>
+            <li>留下審計紀錄</li>
+            <li>離線環境可用</li>
+            <li>避免上游下架 (left-pad 後遺症)</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="collapse">
+        <summary>版本鎖定策略：caret vs tilde vs exact <span class="collapse-tag">細節</span></summary>
+        <div class="collapse-body">
+          <table style="font-size:12px;">
+            <tr><td><code>"axios": "1.4.5"</code></td><td>完全鎖死</td></tr>
+            <tr><td><code>"axios": "~1.4.5"</code></td><td>允許 1.4.x (只 patch)</td></tr>
+            <tr><td><code>"axios": "^1.4.5"</code></td><td>允許 1.x.y (minor + patch，預設)</td></tr>
+            <tr><td><code>"axios": "*"</code></td><td>任何版本，<strong>不要用</strong></td></tr>
+          </table>
+          <p style="margin-top:0.6rem;font-size:13px;">應用程式：<code>^</code> 或 <code>~</code> + lock file 鎖定。Library：通常用 <code>^</code> 給使用者更大彈性。</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "下列哪些是 lock file 的<strong>正確</strong>用法？(多選)",
+    "options": [
+      "鎖檔 (<code>package-lock.json</code> 等) 必須 commit 進版本控制",
+      "本地 dev 用 <code>install</code>，CI 用 <code>npm ci</code> / <code>--frozen-lockfile</code>",
+      "鎖檔太大會拖慢 git，建議放進 .gitignore",
+      "鎖檔記錄整個依賴樹的精確版本與 hash"
+    ],
+    "answer": [0, 1, 3],
+    "explain": "鎖檔絕對要 commit。CI 用 frozen 模式確保版本完全一致。把鎖檔放進 gitignore = 災難 (Lesson 01 講過這是禁忌)。"
+  },
+  {
+    "question": "2024 年 xz utils 後門事件 (CVE-2024-3094) 給我們的最大教訓是什麼？",
+    "options": [
+      "Linux 不安全",
+      "開源專案的單一維護者是攻擊者下手點，社群需要重視 critical 專案的多人維護、SBOM、artifact signing",
+      "壓縮函式庫都應該禁用",
+      "Microsoft 不該發現這個漏洞"
+    ],
+    "answer": 1,
+    "explain": "攻擊者花 2 年偽裝成善意貢獻者取得維護權後植入後門。這事件後 OpenSSF / Linux Foundation 大力推動 critical 專案的多人維護、SBOM、Sigstore 等防護。"
+  },
+  {
+    "question": "為什麼專案應該放 <code>SECURITY.md</code>？",
+    "options": [
+      "GitHub 強制要求",
+      "讓安全研究員知道發現漏洞時該找誰、怎麼通報，避免直接公開 issue (zero-day) 反而傷害使用者",
+      "增加 repo 的星星數",
+      "完全沒必要"
+    ],
+    "answer": 1,
+    "explain": "Responsible disclosure 流程的起點。沒 SECURITY.md 的話，研究員可能直接公開 issue 暴露漏洞給攻擊者。配合 GitHub Private Vulnerability Reporting 可以有完整私下協作流程。"
+  },
+  {
+    "question": "下列哪個是處理 Dependabot 自動 PR 的<strong>最佳實務</strong>？",
+    "options": [
+      "全部直接點 merge，反正 CI 過了就好",
+      "全部關掉，自己手動更新",
+      "Patch / minor 升級看 CI + 快速掃 changelog；Major 升級必看 release notes 確認 breaking change",
+      "等到出大問題才更新"
+    ],
+    "answer": 2,
+    "explain": "Bot 開的 PR 要看分級處理。CI 抓不到所有 breaking change (例如新版改了某個 hook 的副作用)，major version 升級必看 release notes。長期不更新依賴會累積到「升級 = 災難」的程度。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://github.com/advisories" target="_blank" rel="noopener">GitHub Advisory Database</a><span class="ref-meta">開源漏洞中央資料庫</span></li>
+        <li><a href="https://docs.github.com/en/code-security/dependabot" target="_blank" rel="noopener">GitHub Dependabot 文件</a><span class="ref-meta">內建依賴自動更新</span></li>
+        <li><a href="https://docs.renovatebot.com" target="_blank" rel="noopener">Renovate 文件</a><span class="ref-meta">細緻可配置的替代方案</span></li>
+        <li><a href="https://owasp.org/www-project-dependency-check/" target="_blank" rel="noopener">OWASP Dependency-Check</a><span class="ref-meta">跨語言漏洞掃描</span></li>
+        <li><a href="https://slsa.dev" target="_blank" rel="noopener">slsa.dev</a><span class="ref-meta">供應鏈安全等級框架</span></li>
+        <li><a href="https://www.sigstore.dev" target="_blank" rel="noopener">sigstore.dev</a><span class="ref-meta">開源 artifact 簽章方案</span></li>
+        <li><a href="https://research.swtch.com/xz-timeline" target="_blank" rel="noopener">Russ Cox — xz utils backdoor timeline</a><span class="ref-meta">事件詳解</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="10_rfc_adr_release.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 10 · RFC、ADR、Release</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="12_first_contribution.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 12 · 第一次貢獻實戰</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">12 堂課程系列 <span class="progress-pill">11 / 12</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
+        <li><a class="course-nav-item" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
+        <li><a class="course-nav-item" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇</span></a></li>
+        <li><a class="course-nav-item" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
+        <li><a class="course-nav-item" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
+        <li><a class="course-nav-item" href="06_commits_versioning.html"><span class="course-nav-num">06</span><span>Commit、SemVer、Changelog</span></a></li>
+        <li><a class="course-nav-item" href="07_issues_project_mgmt.html"><span class="course-nav-num">07</span><span>Issue 與專案管理</span></a></li>
+        <li><a class="course-nav-item" href="08_testing_tdd.html"><span class="course-nav-num">08</span><span>測試金字塔與 TDD</span></a></li>
+        <li><a class="course-nav-item" href="09_ci_cd_hooks.html"><span class="course-nav-num">09</span><span>CI/CD、Hooks、Lint</span></a></li>
+        <li><a class="course-nav-item" href="10_rfc_adr_release.html"><span class="course-nav-num">10</span><span>RFC、ADR、Release</span></a></li>
+        <li><a class="course-nav-item current" href="11_dependencies_supply_chain.html"><span class="course-nav-num">11</span><span>依賴管理與供應鏈安全</span></a></li>
+        <li><a class="course-nav-item" href="12_first_contribution.html"><span class="course-nav-num">12</span><span>第一次貢獻實戰</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的開源協作課程系列 · Lesson 11
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

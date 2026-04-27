@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cassandra 01｜Cassandra 是什麼、何時用 — Cassandra 課程</title>
+<meta name="description" content="從關聯式資料庫的水平擴展痛點出發，認識 Cassandra 的「寬欄式 + AP + 無 master」定位，比較 MySQL / MongoDB / Redis，並用 Docker 起一個單節點動手玩 cqlsh。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Cassandra 01 · 概念入門</div>
+    <h1 class="hero-title">Cassandra 是什麼、<span>何時用</span></h1>
+    <p class="hero-desc">先建立詞彙：為什麼會有 NoSQL、Cassandra 為什麼是「寬欄式 + AP + 無 master」、跟 MySQL/MongoDB/Redis 怎麼區分。<strong>本堂含一個 Docker 單節點實作，5 分鐘可跑通。</strong>所有版本資訊以 Cassandra 5.0.8（2026/04 LTS）為準。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 1 / 6 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 13 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>初階 · 概念 + 實作</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#why-nosql">為何 NoSQL</a></li>
+      <li><a class="toc-link" href="#what-is-cassandra">Cassandra 是什麼</a></li>
+      <li><a class="toc-link" href="#wide-column">寬欄式</a></li>
+      <li><a class="toc-link" href="#cap">CAP 簡介</a></li>
+      <li><a class="toc-link" href="#compare">vs MySQL / Mongo / Redis</a></li>
+      <li><a class="toc-link" href="#fit">何時該用 / 不該用</a></li>
+      <li><a class="toc-link" href="#hands-on">Docker 動手玩</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="why-nosql">
+      <span class="section-eyebrow">01 — 起點</span>
+      <h2>為什麼會出現 Cassandra：關聯式 DB 的水平擴展痛苦</h2>
+      <p>關聯式資料庫（MySQL、PostgreSQL）為單台或主從架構而生。一旦資料量、寫入量超過一台機器的負荷，常見三條路：</p>
+      <ul>
+        <li><strong>讀寫分離</strong>：擴讀，但寫入仍卡在 primary。</li>
+        <li><strong>應用層分片（sharding）</strong>：要自己處理路由、跨片 join、再平衡，<em>幾乎所有大公司都踩過這個雷</em>。</li>
+        <li><strong>升級單機（vertical scaling）</strong>：換更大的機器，總有一天還是會撞牆。</li>
+      </ul>
+      <p>Cassandra 的設計目標是直接拿掉這個痛點：<strong>把分片、複寫、failover 全部內建，加機器即擴容</strong>。它出生於 Facebook（2008，給 Inbox Search 用），後來捐給 Apache，最初的論文受 Amazon Dynamo + Google Bigtable 兩篇影響。</p>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>一句話定位</strong>
+          Cassandra = <em>線性擴展的分散式寬欄式資料庫</em>，犧牲一部分一致性（AP 型），換到「每加一台機器，吞吐就接近線性增加」。
+        </div>
+      </div>
+    </section>
+
+    <section id="what-is-cassandra">
+      <span class="section-eyebrow">02 — 整體定位</span>
+      <h2>三個關鍵字：寬欄式、AP、無 master</h2>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" aria-label="Cassandra 三個關鍵字">
+          <defs>
+            <marker id="arrC1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="13">
+            <text x="360" y="30" text-anchor="middle" font-family="Syne, sans-serif" font-size="18" font-weight="700" fill="#0a0a0f">Cassandra 的三個身分</text>
+
+            <rect x="30"  y="70" width="200" height="170" rx="14" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="130" y="100" text-anchor="middle" font-weight="700" fill="#0a0a0f" font-size="15">① 寬欄式</text>
+            <text x="130" y="125" text-anchor="middle" fill="#6b6b7e" font-size="11">wide-column store</text>
+            <text x="130" y="155" text-anchor="middle" fill="#3a3a4a" font-size="12">資料結構：</text>
+            <text x="130" y="174" text-anchor="middle" fill="#3a3a4a" font-size="12">map&lt;PK, map&lt;CK, columns&gt;&gt;</text>
+            <text x="130" y="200" text-anchor="middle" fill="#6b6b7e" font-size="11">每個 partition 內</text>
+            <text x="130" y="217" text-anchor="middle" fill="#6b6b7e" font-size="11">可以有上百萬欄</text>
+
+            <rect x="260" y="70" width="200" height="170" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="360" y="100" text-anchor="middle" font-weight="700" fill="#4c1d95" font-size="15">② AP 型</text>
+            <text x="360" y="125" text-anchor="middle" fill="#7c3aed" font-size="11">CAP: 偏 Availability</text>
+            <text x="360" y="155" text-anchor="middle" fill="#3a3a4a" font-size="12">分區發生時，</text>
+            <text x="360" y="174" text-anchor="middle" fill="#3a3a4a" font-size="12">仍可讀寫，</text>
+            <text x="360" y="193" text-anchor="middle" fill="#3a3a4a" font-size="12">事後再「最終一致」。</text>
+            <text x="360" y="220" text-anchor="middle" fill="#6b6b7e" font-size="11">可調 consistency level</text>
+
+            <rect x="490" y="70" width="200" height="170" rx="14" fill="#0a0a0f" stroke="#0a0a0f"/>
+            <text x="590" y="100" text-anchor="middle" font-weight="700" fill="#fafaf8" font-size="15">③ 無 master</text>
+            <text x="590" y="125" text-anchor="middle" fill="#a8a8b8" font-size="11">peer-to-peer ring</text>
+            <text x="590" y="155" text-anchor="middle" fill="#e6e6f0" font-size="12">每台節點對等，</text>
+            <text x="590" y="174" text-anchor="middle" fill="#e6e6f0" font-size="12">沒有 primary</text>
+            <text x="590" y="193" text-anchor="middle" fill="#e6e6f0" font-size="12">→ 沒有單點故障</text>
+            <text x="590" y="220" text-anchor="middle" fill="#a8a8b8" font-size="11">線性擴展</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 C1.1 — Cassandra 一次記住三個關鍵字：寬欄式、AP、無 master</div>
+      </div>
+
+      <p>這三個身分互相依賴：因為<strong>無 master</strong>，所以每個寫入要在多個節點被同時接受；因為要在多節點同時接受，所以選了 <strong>AP</strong>（網路分區時優先可用）；因為要快速 append-only 寫入大量欄位，所以選了 <strong>寬欄式</strong> 儲存模型。</p>
+    </section>
+
+    <section id="wide-column">
+      <span class="section-eyebrow">03 — 資料模型</span>
+      <h2>什麼是「寬欄式」</h2>
+      <p>關聯式資料庫的 row 結構是固定的：你 <code>CREATE TABLE</code> 定義 5 欄，每一筆資料都有這 5 欄。寬欄式不一樣 — 同一張 table 裡，每筆資料（叫 partition 或 row）<strong>可以有不同數量的 column</strong>，而且一個 partition 內可放數百萬個 column 值。</p>
+
+      <p>更精準地說，Cassandra 的儲存模型是一個多層 map：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">概念</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code>map&lt;
+  PartitionKey,         <span class="tk-cm">// 決定資料放哪台機器</span>
+  map&lt;
+    ClusteringKey,      <span class="tk-cm">// partition 內排序</span>
+    map&lt;ColumnName, Value&gt;
+  &gt;
+&gt;</code></pre>
+      </div>
+
+      <p>舉個 stockbot 的例子：「依股票代碼查歷史報價」，partition key 就是 <code>symbol</code>（讓同一支股票的所有報價都在同一個節點），clustering key 是 <code>ts DESC</code>（時間倒序排），每個 timestamp 下放 <code>price/volume/bid/ask</code> 等欄位。下一堂課（C-02 / C-03）會深入。</p>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>不是 column-oriented，是 wide-column</strong>
+          很多人誤把 Cassandra 跟 ClickHouse、Redshift 這類「欄式儲存」混為一談。<em>欄式（columnar）</em>是把同一欄的所有值連續儲存來壓縮、加速 OLAP 掃描；<em>寬欄式（wide-column）</em>是 row 內部 column 數量可動態增長。Cassandra 是後者，內部其實仍以 partition 為單位連續寫入。
+        </div>
+      </div>
+    </section>
+
+    <section id="cap">
+      <span class="section-eyebrow">04 — CAP 簡介</span>
+      <h2>CAP 定理：分散式系統的「鐵三角」</h2>
+      <p>CAP 是 Eric Brewer 2000 年提出、Seth Gilbert &amp; Nancy Lynch 2002 證明的定理：在一個分散式系統中，當<strong>網路分區（Partition）發生時</strong>，你只能在<strong>一致性（Consistency）</strong>與<strong>可用性（Availability）</strong>之間二選一。</p>
+
+      <table>
+        <thead>
+          <tr><th>類型</th><th>選擇</th><th>代表</th><th>白話解釋</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CP</td>
+            <td>一致性 + 分區容忍</td>
+            <td>HBase、ZooKeeper、etcd、MongoDB（預設）</td>
+            <td>分區時拒絕服務，保證資料對齊</td>
+          </tr>
+          <tr>
+            <td><strong>AP</strong></td>
+            <td><strong>可用性 + 分區容忍</strong></td>
+            <td><strong>Cassandra、DynamoDB、Riak</strong></td>
+            <td>分區時繼續讀寫，事後修補（最終一致）</td>
+          </tr>
+          <tr>
+            <td>CA</td>
+            <td>一致性 + 可用性</td>
+            <td>單機 DB（不算分散式）</td>
+            <td>實務上不可達；網路分區一定會發生</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>「Cassandra 是 AP」其實要打折</strong>
+          Cassandra 提供 <em>可調的一致性</em>（tunable consistency）：寫入 / 讀取時可指定 <code>CONSISTENCY ONE / QUORUM / ALL ...</code>。當你選 <code>QUORUM</code>，公式 <code>R + W &gt; RF</code> 成立時，就能拿到強一致。<strong>所以 Cassandra 是「預設 AP、可選 CP」</strong>。下一堂 C-02 會展開講。
+        </div>
+      </div>
+    </section>
+
+    <section id="compare">
+      <span class="section-eyebrow">05 — 跟同類比較</span>
+      <h2>四個常聽到的服務一張表</h2>
+      <table>
+        <thead>
+          <tr><th>面向</th><th>Cassandra</th><th>MySQL</th><th>MongoDB</th><th>Redis</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>定位</td>
+            <td>分散式寬欄式</td>
+            <td>關聯式 RDBMS</td>
+            <td>文件導向</td>
+            <td>記憶體 KV / 資料結構</td>
+          </tr>
+          <tr>
+            <td>主要儲存</td>
+            <td>磁碟 + commit log</td>
+            <td>磁碟 + WAL</td>
+            <td>磁碟 + WiredTiger</td>
+            <td><strong>記憶體</strong>（可選持久化）</td>
+          </tr>
+          <tr>
+            <td>查詢能力</td>
+            <td>CQL，<strong>不能 join</strong>，主要 PK 查</td>
+            <td>SQL，full join</td>
+            <td>aggregation pipeline</td>
+            <td>指令 + Lua</td>
+          </tr>
+          <tr>
+            <td>擴展方式</td>
+            <td><strong>線性水平擴展</strong>（加節點即可）</td>
+            <td>垂直為主，水平要分庫</td>
+            <td>分片（mongos）</td>
+            <td>Cluster (16384 slots)</td>
+          </tr>
+          <tr>
+            <td>CAP 偏向</td>
+            <td>AP（可調）</td>
+            <td>CA（單機）/ CP（半同步）</td>
+            <td>CP（預設）</td>
+            <td>單機 CA / Cluster AP</td>
+          </tr>
+          <tr>
+            <td>強項</td>
+            <td>高寫入吞吐、時序、IoT</td>
+            <td>交易、強一致</td>
+            <td>schema-less、彈性</td>
+            <td>低延遲（亞毫秒）</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>Redis 系列會在 R-01 開講；本系列偏向「資料持久化、寫入量大、需要跨節點橫向擴展」的場景，而 Redis 系列偏向「亞毫秒延遲、資料結構操作、cache / queue」的場景。兩者經常並存。</p>
+    </section>
+
+    <section id="fit">
+      <span class="section-eyebrow">06 — 適用判斷</span>
+      <h2>什麼時候該用 Cassandra？什麼時候別用？</h2>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>適合</div>
+          <div class="compare-body">
+            <ul>
+              <li><strong>時序資料</strong>：股價、IoT sensor、log、metric。partition by entity，clustering by time。</li>
+              <li><strong>寫入量遠大於讀取</strong>：寫入是 append-only，所以 Cassandra 寫起來特別快。</li>
+              <li><strong>跨地理多 DC</strong>：原生支援多 datacenter 複寫，且每個 DC 可獨立讀寫。</li>
+              <li><strong>需要線性擴展</strong>：上線後預期資料量、吞吐持續成長，不希望未來改架構。</li>
+              <li><strong>單一 entity 為主的查詢</strong>：例如「給我這個用戶的所有訂單」、「給我這個 device 的所有事件」。</li>
+            </ul>
+          </div>
+        </div>
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>不適合</div>
+          <div class="compare-body">
+            <ul>
+              <li><strong>需要複雜 join / 動態查詢</strong>：CQL 不支援 join，schema 要為查詢設計。</li>
+              <li><strong>強交易（ACID）</strong>：Cassandra 有 LWT（Lightweight Transactions）但代價昂貴，不要當主交易系統。</li>
+              <li><strong>OLAP / ad-hoc 分析</strong>：請用 ClickHouse、BigQuery、Snowflake；Cassandra 不是分析引擎。</li>
+              <li><strong>資料量很小</strong>（單機塞得下）：殺雞用牛刀，PostgreSQL 更省事。</li>
+              <li><strong>頻繁更新同一筆 row</strong>：每次更新都會留 tombstone，後面 C-04 會講。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="hands-on">
+      <span class="section-eyebrow">07 — 動手玩</span>
+      <h2>5 分鐘起一個單節點 Cassandra</h2>
+
+      <p>Cassandra 5.0 起官方 Docker image 直接可用。先在本機開兩個終端視窗：</p>
+
+      <h3>終端 ① 起 Cassandra 節點</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">docker</span> run --rm --name cass5 \
+    <span class="tk-op">-p</span> 9042:9042 \
+    <span class="tk-op">-e</span> CASSANDRA_CLUSTER_NAME=<span class="tk-st">"DemoCluster"</span> \
+    cassandra:5.0
+
+<span class="tk-cm"># 等到 log 出現 "Startup complete" 再開下一個視窗
+# 第一次啟動需要 30~60 秒（Java 進程暖機 + schema 初始化）</span></code></pre>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>記憶體建議至少 4GB</strong>
+          Cassandra 是 JVM 進程，預設 heap 約 1/4 系統記憶體。Docker Desktop 的 VM 若只給 2GB 會頻繁 OOM。建議至少 4GB。
+        </div>
+      </div>
+
+      <h3>終端 ② 用 cqlsh 連進去</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 cqlsh
+
+Connected to DemoCluster at 127.0.0.1:9042
+[cqlsh 6.2.0 | Cassandra 5.0.8 | CQL spec 3.4.7 | Native protocol v5]
+Use HELP for help.
+cqlsh&gt; <span class="tk-fn">DESCRIBE</span> <span class="tk-kw">KEYSPACES</span>;
+
+system_auth     system_traces       system        system_distributed
+system_schema   system_virtual_schema</code></pre>
+      </div>
+
+      <p><strong>看到這幾個 system_*  keyspace 就代表叢集已就緒。</strong>「keyspace」是 Cassandra 的最上層命名空間，跟 PostgreSQL 的「database」類似。</p>
+
+      <h3>建立第一個 keyspace + table</h3>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">cql</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm">-- 建立 keyspace（單節點先用 SimpleStrategy / RF=1）</span>
+<span class="tk-kw">CREATE KEYSPACE</span> stockbot
+  <span class="tk-kw">WITH replication</span> = {
+    <span class="tk-st">'class'</span>: <span class="tk-st">'SimpleStrategy'</span>,
+    <span class="tk-st">'replication_factor'</span>: <span class="tk-num">1</span>
+  };
+
+<span class="tk-kw">USE</span> stockbot;
+
+<span class="tk-cm">-- 一張時序表：依 symbol 分 partition、依 ts 倒序排</span>
+<span class="tk-kw">CREATE TABLE</span> price_by_symbol (
+  symbol <span class="tk-kw">text</span>,
+  ts     <span class="tk-kw">timestamp</span>,
+  price  <span class="tk-kw">decimal</span>,
+  volume <span class="tk-kw">bigint</span>,
+  <span class="tk-kw">PRIMARY KEY</span> ((symbol), ts)
+) <span class="tk-kw">WITH CLUSTERING ORDER BY</span> (ts <span class="tk-kw">DESC</span>);
+
+<span class="tk-cm">-- 灌幾筆假資料</span>
+<span class="tk-kw">INSERT INTO</span> price_by_symbol (symbol, ts, price, volume)
+  <span class="tk-kw">VALUES</span> (<span class="tk-st">'TSLA'</span>, <span class="tk-st">'2026-04-27 09:30'</span>, <span class="tk-num">285.40</span>, <span class="tk-num">12500</span>);
+<span class="tk-kw">INSERT INTO</span> price_by_symbol (symbol, ts, price, volume)
+  <span class="tk-kw">VALUES</span> (<span class="tk-st">'TSLA'</span>, <span class="tk-st">'2026-04-27 09:31'</span>, <span class="tk-num">285.62</span>, <span class="tk-num">9800</span>);
+
+<span class="tk-cm">-- 查最新兩筆</span>
+<span class="tk-kw">SELECT</span> ts, price, volume
+  <span class="tk-kw">FROM</span> price_by_symbol
+  <span class="tk-kw">WHERE</span> symbol = <span class="tk-st">'TSLA'</span>
+  <span class="tk-kw">LIMIT</span> <span class="tk-num">2</span>;</code></pre>
+      </div>
+
+      <p>看到資料就成功了！這個 schema 之後在 C-03 會深入解釋為什麼這樣設計。</p>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>SimpleStrategy 只能用在單節點 demo</strong>
+          正式環境一定要用 <code>NetworkTopologyStrategy</code>（指定每個 DC 的 RF），這個下一堂會說明。<code>SimpleStrategy</code> 在多 DC 部署會出怪事。
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "下列哪一個情境<strong>最不適合</strong>用 Cassandra？",
+    "options": [
+      "IoT 系統收集數百萬個 device 的時序事件，未來要再擴點",
+      "後台報表系統需要做複雜 join 與多維度 ad-hoc 查詢",
+      "多地區部署，每個 region 都要可獨立讀寫",
+      "電商訂單流水，主要查詢是「給我這個用戶的訂單列表」"
+    ],
+    "answer": 1,
+    "explain": "Cassandra 的 CQL <strong>不支援 join</strong>，schema 是為「已知查詢」設計的。複雜 join + 多維 ad-hoc 屬於 OLAP，應該用 ClickHouse / BigQuery / Snowflake 或把資料 ETL 到分析系統。其他三項（時序、多 DC、按 entity 查）都是 Cassandra 的甜蜜點。"
+  },
+  {
+    "question": "「Cassandra 是 AP 型」這句話最精確的解讀是？",
+    "options": [
+      "Cassandra 永遠不能保證一致性，所以不能用在金融場景",
+      "Cassandra 預設偏 AP，但可透過 consistency level（如 QUORUM）達到強一致",
+      "Cassandra 是 CP 型，只是大家誤傳成 AP",
+      "Cassandra 可以同時兼具 C、A、P，沒有取捨"
+    ],
+    "answer": 1,
+    "explain": "Cassandra 提供 <em>tunable consistency</em>。當 <code>R + W &gt; RF</code>（例如 RF=3 + 讀 QUORUM + 寫 QUORUM）時即得到強一致。預設值偏 AP（因為要在分區時保持可用），但你能依場景調。CAP 定理本身不允許三者兼得（C 是錯的）。"
+  },
+  {
+    "question": "下列哪些敘述<strong>正確</strong>描述 Cassandra 的「寬欄式」？(多選)",
+    "options": [
+      "同一張 table 的不同 row（partition）可以有不同的 column 集合",
+      "把同一個 column 的所有值連續儲存以方便壓縮（這是欄式儲存的特徵）",
+      "一個 partition 內可放數百萬個 column 值",
+      "Cassandra 是 OLAP 引擎，專為分析查詢優化"
+    ],
+    "answer": [0, 2],
+    "explain": "(0)(2) 是 wide-column 的核心特徵。(1) 描述的是 <strong>columnar / column-oriented</strong>（如 ClickHouse、Parquet），跟 wide-column 是不同的概念，常被搞混。(3) 錯：Cassandra 是 OLTP 系統，分析應 ETL 到分析引擎。"
+  },
+  {
+    "question": "為什麼 Cassandra 是「無 master」架構？最主要的好處是？",
+    "options": [
+      "省去 leader election 演算法的實作複雜度",
+      "沒有單點故障，且任何節點都能接受讀寫，可線性擴展",
+      "讀寫一定比有 master 的系統快",
+      "因為沒人要當 master"
+    ],
+    "answer": 1,
+    "explain": "「無 master」（peer-to-peer ring）的真正價值是 <strong>沒有單點故障 + 線性擴展</strong>。每個節點對等，client 可連任一節點當 coordinator，整個叢集任何子集合掛掉，剩下的仍可服務。讀寫速度不一定比較快（強一致時還可能更慢），但擴展性與可用性是它最大的賣點。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://cassandra.apache.org/_/blog/Apache-Cassandra-5.0-Announcement.html" target="_blank" rel="noopener">Apache Cassandra 5.0 Announcement</a><span class="ref-meta">官方公告</span></li>
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/getting-started/index.html" target="_blank" rel="noopener">Cassandra Getting Started</a><span class="ref-meta">官方入門</span></li>
+        <li><a href="https://endoflife.date/apache-cassandra" target="_blank" rel="noopener">endoflife.date — Cassandra 版本支援表</a><span class="ref-meta">5.0.8 LTS</span></li>
+        <li><a href="https://hub.docker.com/_/cassandra" target="_blank" rel="noopener">cassandra Docker Hub</a><span class="ref-meta">官方 image</span></li>
+        <li><a href="https://en.wikipedia.org/wiki/CAP_theorem" target="_blank" rel="noopener">CAP theorem — Wikipedia</a><span class="ref-meta">CAP 定義</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev disabled" aria-disabled="true">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">這是 Cassandra 系列第一堂</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="cassandra_02_architecture.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Cassandra 02 · 環狀架構與一致性</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">6 堂 Cassandra 系列 <span class="progress-pill">1 / 6</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item current" href="cassandra_01_intro.html"><span class="course-nav-num">01</span><span>Cassandra 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_02_architecture.html"><span class="course-nav-num">02</span><span>環狀架構與一致性</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_03_cql_modeling.html"><span class="course-nav-num">03</span><span>CQL 與資料建模</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_04_read_write_path.html"><span class="course-nav-num">04</span><span>讀寫路徑 / Compaction</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_05_v5_features.html"><span class="course-nav-num">05</span><span>5.0 新特性</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_06_ops_practice.html"><span class="course-nav-num">06</span><span>運維實務</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 Cassandra 課程系列 · Lesson 01
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

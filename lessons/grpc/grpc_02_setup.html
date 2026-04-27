@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 02｜環境安裝與工具鏈 — gRPC 課程</title>
+<meta name="description" content="把 gRPC for Go 的工具鏈一次裝齊:Go、protoc、protoc-gen-go、protoc-gen-go-grpc,並理解每個工具的職責,跑通第一個 .proto → .pb.go 的完整流程。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 02 · 環境準備</div>
+    <h1 class="hero-title">環境安裝<span>與工具鏈</span></h1>
+    <p class="hero-desc">把四個工具一次裝齊、理解每個工具負責什麼、跑通第一個 <code>.proto → .pb.go</code> 的編譯流程。<strong>學完這堂,你的電腦就能開始寫 gRPC 服務了。</strong></p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 2 / 10 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 12 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>初階 · 動手</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#toolchain">工具鏈總覽</a></li>
+      <li><a class="toc-link" href="#go">安裝 Go</a></li>
+      <li><a class="toc-link" href="#protoc">安裝 protoc</a></li>
+      <li><a class="toc-link" href="#plugins">安裝兩個 plugin</a></li>
+      <li><a class="toc-link" href="#hello">第一支 hello.proto</a></li>
+      <li><a class="toc-link" href="#buf">認識 buf</a></li>
+      <li><a class="toc-link" href="#troubleshoot">疑難排解</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="toolchain">
+      <span class="section-eyebrow">01 — 工具鏈總覽</span>
+      <h2>四個工具,各司其職</h2>
+      <p>很多人裝環境裝到放棄,是因為不知道哪個工具負責什麼。先把四件事釐清:</p>
+
+      <table>
+        <thead>
+          <tr><th>工具</th><th>是什麼</th><th>裝在哪</th><th>本課版本</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>go</code></td>
+            <td>Go 編譯器與套件管理</td>
+            <td>系統(brew/winget/官方安裝包)</td>
+            <td>1.24+ (官方建議「最新兩個主版本之一」)</td>
+          </tr>
+          <tr>
+            <td><code>protoc</code></td>
+            <td>Protocol Buffers 編譯器(C++ 寫的)</td>
+            <td>系統(brew/apt/winget)</td>
+            <td>33+ (本課寫於 2026/04,當前 v34.1)</td>
+          </tr>
+          <tr>
+            <td><code>protoc-gen-go</code></td>
+            <td>protoc 的 plugin,把 message 生成 Go struct</td>
+            <td>Go bin(<code>$(go env GOPATH)/bin</code>)</td>
+            <td><code>@latest</code></td>
+          </tr>
+          <tr>
+            <td><code>protoc-gen-go-grpc</code></td>
+            <td>protoc 的 plugin,把 service 生成 Go gRPC stub</td>
+            <td>Go bin</td>
+            <td><code>@latest</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" aria-label="工具鏈流程圖">
+          <defs>
+            <marker id="arr14" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="12">
+            <text x="360" y="28" text-anchor="middle" font-family="Syne, sans-serif" font-size="16" font-weight="700" fill="#0a0a0f">.proto 檔案 → 生成 Go 程式碼</text>
+
+            <rect x="30" y="80" width="120" height="60" rx="10" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="90" y="105" text-anchor="middle" font-weight="700" fill="#0a0a0f">hello.proto</text>
+            <text x="90" y="125" text-anchor="middle" fill="#6b6b7e" font-size="10">手寫</text>
+
+            <rect x="200" y="60" width="180" height="100" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="290" y="85" text-anchor="middle" font-weight="700" fill="#4c1d95">protoc</text>
+            <text x="290" y="108" text-anchor="middle" fill="#4c1d95" font-size="10">+ protoc-gen-go</text>
+            <text x="290" y="125" text-anchor="middle" fill="#4c1d95" font-size="10">+ protoc-gen-go-grpc</text>
+            <text x="290" y="148" text-anchor="middle" fill="#6b6b7e" font-size="10">兩個 plugin 各跑一次</text>
+
+            <rect x="430" y="60" width="240" height="100" rx="10" fill="#0a0a0f" stroke="#0a0a0f"/>
+            <text x="550" y="85" text-anchor="middle" font-weight="700" fill="#fafaf8">生成檔</text>
+            <text x="550" y="108" text-anchor="middle" fill="#fcd34d" font-size="11">hello.pb.go</text>
+            <text x="550" y="125" text-anchor="middle" fill="#a8a8b8" font-size="10">message → struct</text>
+            <text x="550" y="142" text-anchor="middle" fill="#5eead4" font-size="11">hello_grpc.pb.go</text>
+
+            <line x1="150" y1="110" x2="200" y2="110" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arr14)"/>
+            <line x1="380" y1="110" x2="430" y2="110" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arr14)"/>
+
+            <text x="360" y="200" text-anchor="middle" fill="#6b6b7e" font-size="11">protoc 本身只懂 .proto,真正生成 Go code 的是兩個 plugin</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 14.1 — protoc 的雙 plugin 架構</div>
+      </div>
+    </section>
+
+    <section id="go">
+      <span class="section-eyebrow">02 — 安裝 Go</span>
+      <h2>確認 Go 版本</h2>
+      <p>gRPC-go 官方文件寫:「any one of the <strong>two latest major releases of Go</strong>」 — 用最新或前一個主版本即可。寫這份教材時(2026/04)是 Go 1.24/1.25。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 看現在裝的版本</span>
+<span class="tk-pn">$</span> <span class="tk-fn">go</span> version
+go version go1.24.2 darwin/arm64
+
+<span class="tk-cm"># macOS 用 Homebrew</span>
+<span class="tk-pn">$</span> <span class="tk-fn">brew</span> install go
+
+<span class="tk-cm"># Windows 用 winget</span>
+<span class="tk-pn">$</span> <span class="tk-fn">winget</span> install GoLang.Go
+
+<span class="tk-cm"># Linux 直接抓官方 tarball 最穩(套件庫的版本通常落後)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">curl</span> <span class="tk-op">-LO</span> https://go.dev/dl/go1.24.2.linux-amd64.tar.gz
+<span class="tk-pn">$</span> <span class="tk-fn">sudo</span> tar <span class="tk-op">-C</span> /usr/local <span class="tk-op">-xzf</span> go1.24.2.linux-amd64.tar.gz</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>確認 GOPATH/bin 在 PATH 內</strong>
+          下一節要用 <code>go install</code> 裝 plugin,它會放到 <code>$(go env GOPATH)/bin</code>。如果 PATH 沒包到這個目錄,<code>protoc</code> 會找不到 plugin。
+          <pre style="margin-top:0.5rem;background:var(--paper3);padding:0.6rem;border-radius:6px;font-size:12px;">export PATH="$PATH:$(go env GOPATH)/bin"</pre>
+          把這行加進你的 <code>~/.zshrc</code> / <code>~/.bashrc</code> / Windows 環境變數。
+        </div>
+      </div>
+    </section>
+
+    <section id="protoc">
+      <span class="section-eyebrow">03 — 安裝 protoc</span>
+      <h2>protoc — Protocol Buffers 編譯器</h2>
+      <p><code>protoc</code> 本體是一個 C++ 寫的命令列工具,負責把 <code>.proto</code> 解析成中間表示(descriptor),再交給 plugin 生成各語言的 code。三個平台的官方推薦裝法:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">macOS</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">brew</span> install protobuf
+<span class="tk-pn">$</span> <span class="tk-fn">protoc</span> <span class="tk-op">--version</span>
+libprotoc 34.1</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">Linux (Debian/Ubuntu)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 套件庫版本(通常較舊)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">sudo</span> apt install <span class="tk-op">-y</span> protobuf-compiler
+<span class="tk-pn">$</span> <span class="tk-fn">protoc</span> <span class="tk-op">--version</span>
+
+<span class="tk-cm"># 想要最新版,從 GitHub Release 抓 pre-built binary</span>
+<span class="tk-pn">$</span> <span class="tk-fn">curl</span> <span class="tk-op">-LO</span> https://github.com/protocolbuffers/protobuf/releases/download/v34.1/protoc-34.1-linux-x86_64.zip
+<span class="tk-pn">$</span> <span class="tk-fn">unzip</span> protoc-34.1-linux-x86_64.zip <span class="tk-op">-d</span> $HOME/.local
+<span class="tk-pn">$</span> <span class="tk-fn">export</span> PATH=<span class="tk-st">"$PATH:$HOME/.local/bin"</span></code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">Windows</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">&gt;</span> <span class="tk-fn">winget</span> install protobuf
+<span class="tk-pn">&gt;</span> <span class="tk-fn">protoc</span> <span class="tk-op">--version</span>
+libprotoc 34.1</code></pre>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>確保版本 ≥ 33.0</strong>
+          官方 2026 文件示例使用 v33+,某些較新 proto3 行為(例如 well-known types 的某些 import path)在舊版會出錯。如果 <code>apt</code> 裝起來的版本太舊,改用 GitHub Release pre-built。
+        </div>
+      </div>
+    </section>
+
+    <section id="plugins">
+      <span class="section-eyebrow">04 — 兩個 plugin</span>
+      <h2>protoc-gen-go 與 protoc-gen-go-grpc</h2>
+      <p><code>protoc</code> 自己只懂 <code>.proto</code> 的語法,真正把它變成 Go code 的是兩個 plugin。它們是 Go 寫的,所以用 <code>go install</code> 裝:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 1. message → Go struct(處理資料結構)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">go</span> install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+
+<span class="tk-cm"># 2. service → Go gRPC stub(處理 RPC)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">go</span> install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+<span class="tk-cm"># 確認兩個工具都在 PATH 上</span>
+<span class="tk-pn">$</span> which protoc-gen-go protoc-gen-go-grpc
+/Users/jason/go/bin/protoc-gen-go
+/Users/jason/go/bin/protoc-gen-go-grpc</code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>為什麼是「兩個」 plugin 而不是一個?</strong>
+          因為 protobuf(資料序列化)和 gRPC(RPC 協定)是兩件獨立的事 — 你可以只用 protobuf 不用 gRPC。Go 官方把它們拆成兩個倉庫、兩個 plugin,這樣 protobuf 升版不會綁死 gRPC,反之亦然。<code>--go_out</code> 處理 message,<code>--go-grpc_out</code> 處理 service。
+        </div>
+      </div>
+    </section>
+
+    <section id="hello">
+      <span class="section-eyebrow">05 — 第一支 hello.proto</span>
+      <h2>跑通完整流程:從 .proto 到生成 Go 檔</h2>
+      <p>建一個最小專案來驗證環境。整個目標是讓你看到「<code>.proto</code> 寫進去 → 兩個 <code>.pb.go</code> 跑出來」。</p>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">建立專案</div>
+            <div class="timeline-desc">新開資料夾、初始化 Go module。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">寫 hello.proto</div>
+            <div class="timeline-desc">定義一個最小的 service 與 message。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">執行 protoc</div>
+            <div class="timeline-desc">同時呼叫兩個 plugin,生成 Go code。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">確認生成檔</div>
+            <div class="timeline-desc">應該會多兩個 <code>*.pb.go</code> 檔。</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Step 1 — 建立專案</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">mkdir</span> grpc-hello <span class="tk-op">&amp;&amp;</span> <span class="tk-fn">cd</span> grpc-hello
+<span class="tk-pn">$</span> <span class="tk-fn">go</span> mod init example.com/hello
+<span class="tk-pn">$</span> <span class="tk-fn">mkdir</span> proto</code></pre>
+      </div>
+
+      <h3>Step 2 — 寫 proto/hello.proto</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">proto/hello.proto</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">syntax</span> = <span class="tk-st">"proto3"</span>;
+
+<span class="tk-kw">package</span> hello;
+
+<span class="tk-cm">// Go 生成檔的 import path,必填</span>
+<span class="tk-kw">option</span> go_package = <span class="tk-st">"example.com/hello/proto;hellopb"</span>;
+
+<span class="tk-kw">service</span> Greeter {
+  <span class="tk-kw">rpc</span> SayHello (HelloRequest) <span class="tk-kw">returns</span> (HelloReply);
+}
+
+<span class="tk-kw">message</span> HelloRequest {
+  <span class="tk-kw">string</span> name = <span class="tk-num">1</span>;
+}
+
+<span class="tk-kw">message</span> HelloReply {
+  <span class="tk-kw">string</span> message = <span class="tk-num">1</span>;
+}</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong><code>option go_package</code> 必填</strong>
+          沒有它 <code>protoc-gen-go</code> 會報錯。格式是 <code>"完整 import path;package 別名"</code>。本例中生成檔會放到 <code>proto/</code> 資料夾,Go package 名是 <code>hellopb</code>。第 3 課會深入講 proto 語法。
+        </div>
+      </div>
+
+      <h3>Step 3 — 執行 protoc</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">protoc</span> <span class="tk-op">\</span>
+    <span class="tk-op">--go_out=.</span> <span class="tk-op">--go_opt=paths=source_relative</span> <span class="tk-op">\</span>
+    <span class="tk-op">--go-grpc_out=.</span> <span class="tk-op">--go-grpc_opt=paths=source_relative</span> <span class="tk-op">\</span>
+    proto/hello.proto</code></pre>
+      </div>
+
+      <p style="margin-top:0.6rem;">這條指令的四個 flag 含意:</p>
+      <table>
+        <thead>
+          <tr><th>Flag</th><th>作用</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--go_out=.</code></td><td>呼叫 <code>protoc-gen-go</code> plugin,輸出根目錄為當前目錄</td></tr>
+          <tr><td><code>--go_opt=paths=source_relative</code></td><td>生成檔放到「跟 .proto 同一個資料夾」(否則會依 go_package 路徑深層展開)</td></tr>
+          <tr><td><code>--go-grpc_out=.</code></td><td>呼叫 <code>protoc-gen-go-grpc</code> plugin,生成 gRPC 部分</td></tr>
+          <tr><td><code>--go-grpc_opt=paths=source_relative</code></td><td>同上,放到 .proto 旁邊</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Step 4 — 確認結果</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">tree</span> proto/
+proto/
+├── hello.proto
+├── hello.pb.go            <span class="tk-cm"># message 變成的 Go struct(由 protoc-gen-go 生成)</span>
+└── hello_grpc.pb.go       <span class="tk-cm"># service 變成的 gRPC stub(由 protoc-gen-go-grpc 生成)</span></code></pre>
+      </div>
+
+      <p>這兩個檔案<strong>不要手動編輯</strong>(每次 <code>protoc</code> 都會覆蓋),也<strong>建議 commit 進 git</strong>(這樣 CI 不需要裝 protoc)— 後者實務上有兩派意見,本課傾向 commit 進去。</p>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>環境驗證完成!</strong>
+          看到兩個 <code>*.pb.go</code> 檔出現,代表你的 gRPC 開發環境已經就緒。第 3 課會深入講 proto 語法,第 4 課會把這個 hello service 寫到能跑。
+        </div>
+      </div>
+    </section>
+
+    <section id="buf">
+      <span class="section-eyebrow">06 — 認識 buf</span>
+      <h2>buf — 現代化的 protoc 替代方案</h2>
+      <p><code>protoc</code> 用久了會發現幾個痛點:</p>
+      <ul>
+        <li>flag 一長串,每個專案都要寫一份 Makefile</li>
+        <li>無法 <code>import</code> 跨專案的 proto(要自己處理 <code>--proto_path</code>)</li>
+        <li>沒有 lint、沒有 breaking change 偵測</li>
+        <li>plugin 版本管理一團亂</li>
+      </ul>
+
+      <p><code>buf</code>(<a class="inline-link" href="https://buf.build" target="_blank" rel="noopener">buf.build</a>)是 Buf 這家公司開源的工具,把上述痛點全部解決:用一份 <code>buf.yaml</code> 配置取代散亂的 flag,還能 lint proto 風格、偵測破壞性改動、版本鎖定 plugin。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># macOS</span>
+<span class="tk-pn">$</span> <span class="tk-fn">brew</span> install bufbuild/buf/buf
+
+<span class="tk-cm"># 後續操作(等於上面那長串 protoc)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">buf</span> generate
+<span class="tk-pn">$</span> <span class="tk-fn">buf</span> lint
+<span class="tk-pn">$</span> <span class="tk-fn">buf</span> breaking <span class="tk-op">--against</span> <span class="tk-st">'.git#branch=main'</span></code></pre>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>本課還是用 protoc 教</strong>
+          因為 <code>protoc</code> 是 source of truth、官方範例都用它,先學會基礎再用 <code>buf</code> 加速。中大型專案幾乎都會切到 <code>buf</code>,你工作時可以再轉。
+        </div>
+      </div>
+    </section>
+
+    <section id="troubleshoot">
+      <span class="section-eyebrow">07 — 疑難排解</span>
+      <h2>常見錯誤對照表</h2>
+
+      <details class="collapse">
+        <summary><code>protoc-gen-go: program not found or is not executable</code> <span class="collapse-tag">最常見</span></summary>
+        <div class="collapse-body">
+          <p><code>protoc</code> 找不到 plugin。<strong>原因 99% 是 PATH 沒有包到 <code>$(go env GOPATH)/bin</code></strong>。</p>
+          <pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;"><code><span class="tk-pn">$</span> <span class="tk-fn">go</span> env GOPATH
+/Users/jason/go
+
+<span class="tk-pn">$</span> <span class="tk-fn">echo</span> <span class="tk-st">'export PATH="$PATH:$(go env GOPATH)/bin"'</span> <span class="tk-op">&gt;&gt;</span> ~/.zshrc
+<span class="tk-pn">$</span> <span class="tk-fn">source</span> ~/.zshrc</code></pre>
+        </div>
+      </details>
+
+      <details class="collapse">
+        <summary><code>Missing go_package option in proto file</code> <span class="collapse-tag">常見</span></summary>
+        <div class="collapse-body">
+          <p><code>.proto</code> 沒寫 <code>option go_package = "...";</code>。每個 <code>.proto</code> 都<strong>必填</strong>這行,<code>protoc-gen-go</code> 用它決定 Go import path。</p>
+        </div>
+      </details>
+
+      <details class="collapse">
+        <summary>生成檔被放到很深的子資料夾,而不是 .proto 旁邊 <span class="collapse-tag">常見</span></summary>
+        <div class="collapse-body">
+          <p>沒加 <code>--go_opt=paths=source_relative</code>(以及對應的 <code>--go-grpc_opt=paths=source_relative</code>)。預設行為會依 <code>go_package</code> 的 import path 展開出 <code>example.com/hello/proto/hello.pb.go</code> 這種深層結構,加上這個 flag 才會放到 <code>.proto</code> 旁邊。</p>
+        </div>
+      </details>
+
+      <details class="collapse">
+        <summary>生成檔內容怪怪的,跟 grpc.io 教學長得不一樣 <span class="collapse-tag">進階</span></summary>
+        <div class="collapse-body">
+          <p>可能是 plugin 太舊或太新,生成 API 有變。<code>protoc-gen-go-grpc</code> v1.5 起改用 <code>NewClient</code> 介面,舊版生成的 stub 用 <code>NewXxxServiceClient(*grpc.ClientConn)</code>。重新 <code>go install ...@latest</code> 一次。</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "<code>protoc</code>、<code>protoc-gen-go</code>、<code>protoc-gen-go-grpc</code> 三者的關係是?",
+    "options": [
+      "三個都是 protoc 的別名,功能相同",
+      "protoc 是編譯器主程式,後兩者是 plugin。message 由 protoc-gen-go 處理,service 由 protoc-gen-go-grpc 處理",
+      "protoc-gen-go 是新版,protoc-gen-go-grpc 是舊版,可以擇一安裝",
+      "protoc 處理 Go,protoc-gen-go 處理其他語言,protoc-gen-go-grpc 處理串流"
+    ],
+    "answer": 1,
+    "explain": "<code>protoc</code> 本體用 C++ 寫,只負責解析 <code>.proto</code> 語法產生 descriptor,真正的 code 生成交給 plugin。protobuf 與 gRPC 是兩件獨立的事,所以 plugin 也分兩個 — 你可以只裝 <code>protoc-gen-go</code> 用 protobuf 序列化但不開 gRPC service。"
+  },
+  {
+    "question": "下列哪一個是 <code>protoc</code> 找不到 plugin (<code>protoc-gen-go: program not found</code>) 的<strong>最常見原因</strong>?",
+    "options": [
+      "Go 版本太舊",
+      "沒裝 protoc",
+      "<code>$(go env GOPATH)/bin</code> 沒加進 PATH 環境變數",
+      "防火牆擋住了 protoc 跟 plugin 的通訊"
+    ],
+    "answer": 2,
+    "explain": "<code>go install</code> 會把 plugin 放到 <code>$(go env GOPATH)/bin</code>。<code>protoc</code> 是用 PATH 找 <code>protoc-gen-XXX</code> 這個執行檔(對應 <code>--XXX_out</code> flag),PATH 找不到就跳這個錯。把 GOPATH/bin 加進 PATH 就好。"
+  },
+  {
+    "question": "下列關於 <code>--go_opt=paths=source_relative</code> 的描述,哪一項<strong>正確</strong>?",
+    "options": [
+      "它讓生成檔依 go_package 的完整 import path 展開到深層子資料夾",
+      "它讓生成檔放在跟 .proto 同一個資料夾,而不是依 go_package 展開",
+      "它告訴 protoc 用相對路徑找 import 的其他 .proto",
+      "它是必填 flag,沒加會編譯失敗"
+    ],
+    "answer": 1,
+    "explain": "<strong>預設</strong>(沒加這個 flag)行為才是依 <code>go_package</code> import path 展開。加上 <code>paths=source_relative</code> 後,生成檔會跟原 <code>.proto</code> 並排,小專案這樣比較好管理。<code>--go-grpc_opt</code> 也要對應加。"
+  },
+  {
+    "question": "下列哪些是 <code>buf</code> 比 <code>protoc</code> 好用的地方?(多選)",
+    "options": [
+      "用 buf.yaml 配置取代一長串命令列 flag",
+      "可以對 .proto 做 lint,強制風格一致",
+      "可以偵測 schema 的 breaking change(例如改了 field number)",
+      "可以完全取代 Go 編譯器,不需要再裝 Go"
+    ],
+    "answer": [0, 1, 2],
+    "explain": "<code>buf</code> 是 protoc 的<strong>友好封裝</strong>,提供配置、lint、breaking detection、plugin 版本管理。但它和 Go 編譯器是不同層的東西,還是需要裝 Go 才能編 .pb.go 出來的 Go 程式碼。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://grpc.io/docs/languages/go/quickstart/" target="_blank" rel="noopener">grpc.io — Quick start (Go)</a><span class="ref-meta">本課流程的源頭</span></li>
+        <li><a href="https://protobuf.dev/installation/" target="_blank" rel="noopener">protobuf.dev — Protocol Buffer Compiler Installation</a><span class="ref-meta">protoc 三平台安裝</span></li>
+        <li><a href="https://github.com/protocolbuffers/protobuf/releases" target="_blank" rel="noopener">protocolbuffers/protobuf — Releases</a><span class="ref-meta">protoc 最新版下載</span></li>
+        <li><a href="https://pkg.go.dev/google.golang.org/protobuf/cmd/protoc-gen-go" target="_blank" rel="noopener">pkg.go.dev — protoc-gen-go</a><span class="ref-meta">message plugin</span></li>
+        <li><a href="https://pkg.go.dev/google.golang.org/grpc/cmd/protoc-gen-go-grpc" target="_blank" rel="noopener">pkg.go.dev — protoc-gen-go-grpc</a><span class="ref-meta">service plugin</span></li>
+        <li><a href="https://buf.build/docs" target="_blank" rel="noopener">buf.build/docs</a><span class="ref-meta">buf 官方文件</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="grpc_01_intro.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 01 · gRPC 是什麼</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="grpc_03_protobuf_syntax.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 03 · Protobuf 語法完整版</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">10 堂 gRPC 系列 <span class="progress-pill">2 / 10</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="grpc_01_intro.html"><span class="course-nav-num">01</span><span>gRPC 是什麼</span></a></li>
+        <li><a class="course-nav-item current" href="grpc_02_setup.html"><span class="course-nav-num">02</span><span>環境安裝與工具鏈</span></a></li>
+        <li><a class="course-nav-item" href="grpc_03_protobuf_syntax.html"><span class="course-nav-num">03</span><span>Protobuf 語法</span></a></li>
+        <li><a class="course-nav-item" href="grpc_04_unary_rpc.html"><span class="course-nav-num">04</span><span>Unary RPC 實戰</span></a></li>
+        <li><a class="course-nav-item" href="grpc_05_streaming_rpc.html"><span class="course-nav-num">05</span><span>三種 Streaming</span></a></li>
+        <li><a class="course-nav-item" href="grpc_06_context_metadata.html"><span class="course-nav-num">06</span><span>Context / Metadata</span></a></li>
+        <li><a class="course-nav-item" href="grpc_07_error_handling.html"><span class="course-nav-num">07</span><span>錯誤處理</span></a></li>
+        <li><a class="course-nav-item" href="grpc_08_interceptors.html"><span class="course-nav-num">08</span><span>Interceptors</span></a></li>
+        <li><a class="course-nav-item" href="grpc_09_tls_auth.html"><span class="course-nav-num">09</span><span>TLS / Auth</span></a></li>
+        <li><a class="course-nav-item" href="grpc_10_connection_lifecycle.html"><span class="course-nav-num">10</span><span>連線生命週期</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 gRPC 課程系列 · Lesson 02
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

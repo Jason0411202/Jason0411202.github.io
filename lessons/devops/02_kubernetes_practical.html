@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 02｜Kubernetes 日常操作實務 — DevOps 實務系列</title>
+<meta name="description" content="從 kubectl 心智模型出發，掌握每天會用到的 Pod 排錯、Workload 管理、網路設定、Helm chart、TUI 工具與資源容量調校。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 02 · DevOps 實務篇</div>
+    <h1 class="hero-title">Kubernetes <span>日常操作實務</span></h1>
+    <p class="hero-desc">從 kubectl 心智模型出發，把每天 SRE / 後端工程師會用到的 K8s 操作一次學會。<strong>不是教你 control plane 內部原理，是讓你在線上事故發生時 30 秒內找到問題。</strong></p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 2 / 5 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 75 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>DevOps</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#kubectl-mental-model">kubectl 心智模型</a></li>
+      <li><a class="toc-link" href="#five-verbs">五個動詞</a></li>
+      <li><a class="toc-link" href="#pod-troubleshooting">Pod 排錯</a></li>
+      <li><a class="toc-link" href="#workload">Workload 管理</a></li>
+      <li><a class="toc-link" href="#networking">網路與設定</a></li>
+      <li><a class="toc-link" href="#helm">Helm chart</a></li>
+      <li><a class="toc-link" href="#tui-tools">TUI 工具</a></li>
+      <li><a class="toc-link" href="#capacity-tuning">資源調校</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="kubectl-mental-model">
+      <span class="section-eyebrow">01 — kubectl 心智模型</span>
+      <h2>三層概念：context、namespace、kubeconfig</h2>
+      <p>很多 K8s 災難都是<strong>在錯的 cluster 上下了正確的指令</strong>。在按下 Enter 之前，你必須知道：「我這個指令會打到哪一座 cluster、用什麼身份、預設操作哪一個 namespace？」這三個問題的答案就在 kubeconfig 裡。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" aria-label="kubeconfig 結構圖">
+          <defs>
+            <marker id="arrK" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="13">
+            <text x="380" y="34" text-anchor="middle" font-family="Syne, sans-serif" font-size="18" font-weight="700" fill="#0a0a0f">~/.kube/config 的三大區</text>
+            <text x="380" y="56" text-anchor="middle" fill="#6b6b7e" font-size="12">context = clusters × users 的組合 + 預設 namespace</text>
+
+            <!-- kubeconfig 容器 -->
+            <rect x="40" y="80" width="680" height="270" rx="14" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5" stroke-dasharray="4 4"/>
+            <text x="60" y="105" font-weight="700" fill="#0a0a0f" font-size="13">kubeconfig (YAML)</text>
+
+            <!-- clusters 區 -->
+            <rect x="60" y="125" width="180" height="200" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="150" y="150" text-anchor="middle" font-weight="700" fill="#4c1d95">clusters</text>
+            <text x="150" y="172" text-anchor="middle" fill="#6b6b7e" font-size="11">API server 端點 + CA</text>
+            <line x1="80" y1="184" x2="220" y2="184" stroke="#c4b5fd" stroke-width="1"/>
+            <text x="150" y="208" text-anchor="middle" fill="#4c1d95" font-size="11">- name: prod</text>
+            <text x="150" y="226" text-anchor="middle" fill="#6b6b7e" font-size="10">https://prod.k8s:6443</text>
+            <text x="150" y="262" text-anchor="middle" fill="#4c1d95" font-size="11">- name: staging</text>
+            <text x="150" y="280" text-anchor="middle" fill="#6b6b7e" font-size="10">https://stg.k8s:6443</text>
+            <text x="150" y="310" text-anchor="middle" fill="#4c1d95" font-size="11">- name: dev</text>
+
+            <!-- users 區 -->
+            <rect x="280" y="125" width="180" height="200" rx="10" fill="#fef3c7" stroke="#92400e" stroke-width="1.5"/>
+            <text x="370" y="150" text-anchor="middle" font-weight="700" fill="#78350f">users</text>
+            <text x="370" y="172" text-anchor="middle" fill="#6b6b7e" font-size="11">身份憑證 (token / cert)</text>
+            <line x1="300" y1="184" x2="440" y2="184" stroke="#fbbf24" stroke-width="1"/>
+            <text x="370" y="208" text-anchor="middle" fill="#78350f" font-size="11">- name: admin</text>
+            <text x="370" y="226" text-anchor="middle" fill="#6b6b7e" font-size="10">client-cert / token</text>
+            <text x="370" y="262" text-anchor="middle" fill="#78350f" font-size="11">- name: dev-readonly</text>
+            <text x="370" y="280" text-anchor="middle" fill="#6b6b7e" font-size="10">OIDC token</text>
+
+            <!-- contexts 區 -->
+            <rect x="500" y="125" width="200" height="200" rx="10" fill="#dcfce7" stroke="#15803d" stroke-width="1.5"/>
+            <text x="600" y="150" text-anchor="middle" font-weight="700" fill="#14532d">contexts</text>
+            <text x="600" y="172" text-anchor="middle" fill="#6b6b7e" font-size="11">cluster + user + ns 組合</text>
+            <line x1="520" y1="184" x2="680" y2="184" stroke="#86efac" stroke-width="1"/>
+            <text x="600" y="208" text-anchor="middle" fill="#14532d" font-size="11">- name: prod-admin</text>
+            <text x="600" y="224" text-anchor="middle" fill="#6b6b7e" font-size="10">cluster: prod</text>
+            <text x="600" y="240" text-anchor="middle" fill="#6b6b7e" font-size="10">user: admin · ns: default</text>
+            <text x="600" y="270" text-anchor="middle" fill="#14532d" font-size="11">- name: stg-dev</text>
+            <text x="600" y="286" text-anchor="middle" fill="#6b6b7e" font-size="10">cluster: staging</text>
+            <text x="600" y="302" text-anchor="middle" fill="#6b6b7e" font-size="10">user: dev-readonly · ns: app</text>
+
+            <!-- 連接線 -->
+            <line x1="240" y1="220" x2="280" y2="220" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#arrK)" stroke-dasharray="3 3"/>
+            <line x1="460" y1="220" x2="500" y2="220" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#arrK)" stroke-dasharray="3 3"/>
+
+            <text x="380" y="370" text-anchor="middle" fill="#6b6b7e" font-size="11">current-context: prod-admin  ← 由它決定指令打到哪</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 24.1 — kubeconfig 三大區與 current-context 的關係</div>
+      </div>
+
+      <h3>每天必背的三個切換指令</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 1. 看目前所有 contexts，星號 (*) 標記目前用的那個</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> config get-contexts
+CURRENT   NAME          CLUSTER    AUTHINFO        NAMESPACE
+*         prod-admin    prod       admin           default
+          stg-dev       staging    dev-readonly    app
+          dev           dev        admin           default
+
+<span class="tk-cm"># 2. 看目前 context (簡短版)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> config current-context
+prod-admin
+
+<span class="tk-cm"># 3. 切 context</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> config use-context stg-dev
+
+<span class="tk-cm"># 4. 改變目前 context 的預設 namespace (不切 cluster)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> config set-context <span class="tk-op">--current</span> <span class="tk-op">--namespace=</span><span class="tk-st">&lt;your-ns&gt;</span></code></pre>
+      </div>
+
+      <div class="callout callout-danger">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>每次操作前先確認 context</strong>
+          業界最常見的 K8s 災難是「以為自己在 dev，結果 <code>kubectl delete</code> 打在 prod」。把<code>kubectl config current-context</code>放進你的 shell prompt，或用 <code>kubectx</code> / <code>k9s</code> 隨時可見。永遠不要 muscle memory 直接打 <code>kubectl delete</code>。
+        </div>
+      </div>
+
+      <h3>多份 kubeconfig 怎麼合併</h3>
+      <p>很多公司會發給你多份 config（每個 cluster 一份）。<code>KUBECONFIG</code> 環境變數可以用冒號（Linux/macOS）或分號（Windows）串接多個檔案，<code>kubectl</code> 會把它們合併在記憶體裡使用：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 暫時合併三個 config (Linux / macOS)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">export</span> KUBECONFIG=~/.kube/config:~/.kube/prod.yaml:~/.kube/stg.yaml
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> config get-contexts        <span class="tk-cm"># 三份 config 的 context 都列出來</span>
+
+<span class="tk-cm"># 永久合併到 ~/.kube/config (做完記得備份原本的)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> config view <span class="tk-op">--flatten</span> &gt; ~/.kube/merged
+<span class="tk-pn">$</span> <span class="tk-fn">mv</span> ~/.kube/merged ~/.kube/config</code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>kubectx + kubens 是必裝</strong>
+          把 <code>kubectl config use-context</code> 變成 <code>kubectx prod-admin</code>，把 <code>set-context --current --namespace</code> 變成 <code>kubens &lt;your-ns&gt;</code>。每個 K8s 老手電腦上都有，下節會教安裝。
+        </div>
+      </div>
+    </section>
+
+    <section id="five-verbs">
+      <span class="section-eyebrow">02 — 每天會用的五個動詞</span>
+      <h2>get / describe / logs / exec / port-forward</h2>
+      <p>kubectl 有幾百個 subcommand，但 90% 的工作日只會用到下面五個。把它們玩熟，你就能應付絕大多數的線上排查。</p>
+
+      <h3>kubectl get — 看資源狀態</h3>
+      <p><code>get</code> 是儀表板。常用旗標一次看完：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 基本</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> get pods                              <span class="tk-cm"># 目前 namespace 的 pods</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> get pods <span class="tk-op">-A</span>                           <span class="tk-cm"># 所有 namespace</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> get pods <span class="tk-op">-n</span> <span class="tk-st">&lt;your-ns&gt;</span>                 <span class="tk-cm"># 指定 namespace</span>
+
+<span class="tk-cm"># -o wide 多兩欄 (Node、Pod IP)，排查網路必備</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> get pods <span class="tk-op">-o</span> wide
+
+<span class="tk-cm"># -o yaml 看完整資源定義 (含 status)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> get pod <span class="tk-st">&lt;pod-name&gt;</span> <span class="tk-op">-o</span> yaml
+
+<span class="tk-cm"># Label selector：抓某個 release 的所有資源</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> get all <span class="tk-op">-l</span> app.kubernetes.io/instance=<span class="tk-st">&lt;release&gt;</span>
+
+<span class="tk-cm"># Field selector：抓所有不在 Running 的 pod</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> get pods <span class="tk-op">--field-selector</span>=status.phase!=Running <span class="tk-op">-A</span>
+
+<span class="tk-cm"># JSONPath：只抽取你要的欄位 (寫 script 必用)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> get pods <span class="tk-op">-o</span> jsonpath=<span class="tk-st">'{.items[*].metadata.name}'</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> get pods <span class="tk-op">-o</span> jsonpath=<span class="tk-st">'{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}'</span></code></pre>
+      </div>
+
+      <h3>kubectl describe — 看 events 與細節</h3>
+      <p><code>describe</code> 跟 <code>get -o yaml</code> 差別在：它會幫你撈出對應的 <strong>Events</strong>，這是 K8s 的 syslog，所有調度、健康檢查、image pull 失敗都會出現在這裡。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> describe pod <span class="tk-st">&lt;pod-name&gt;</span> <span class="tk-op">-n</span> <span class="tk-st">&lt;your-ns&gt;</span>
+
+<span class="tk-cm"># 重點通常在最下面的 Events 區段，例如：</span>
+<span class="tk-cm"># Events:</span>
+<span class="tk-cm">#   Type    Reason     Age   From     Message</span>
+<span class="tk-cm">#   ----    ------     ----  ----     -------</span>
+<span class="tk-cm">#   Normal  Scheduled  2m    default-scheduler  Successfully assigned ...</span>
+<span class="tk-cm">#   Warning Failed     1m    kubelet  Failed to pull image "example-app:v9": ...</span>
+
+<span class="tk-cm"># 也能直接撈 namespace 內的所有 events，按時間排序</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> get events <span class="tk-op">-n</span> <span class="tk-st">&lt;your-ns&gt;</span> <span class="tk-op">--sort-by=</span>.lastTimestamp</code></pre>
+      </div>
+
+      <h3>kubectl logs — 看容器輸出</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 基本：看單一 pod 的 stdout/stderr</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> logs <span class="tk-st">&lt;pod-name&gt;</span>
+
+<span class="tk-cm"># -f follow，像 tail -f</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> logs <span class="tk-op">-f</span> <span class="tk-st">&lt;pod-name&gt;</span>
+
+<span class="tk-cm"># --previous：看上一輪 (crash 前) 的 stdout — 排查 CrashLoopBackOff 必用</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> logs <span class="tk-st">&lt;pod-name&gt;</span> <span class="tk-op">--previous</span>
+
+<span class="tk-cm"># 多容器 pod：指定容器</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> logs <span class="tk-st">&lt;pod-name&gt;</span> <span class="tk-op">-c</span> <span class="tk-st">&lt;container&gt;</span>
+
+<span class="tk-cm"># 只看最近 100 行 + 最近 10 分鐘</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> logs <span class="tk-st">&lt;pod-name&gt;</span> <span class="tk-op">--tail=</span><span class="tk-num">100</span> <span class="tk-op">--since=</span><span class="tk-num">10</span>m
+
+<span class="tk-cm"># 一次看一個 deployment 底下所有 pod 的 log (用 selector)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> logs <span class="tk-op">-l</span> app.kubernetes.io/name=<span class="tk-st">&lt;app&gt;</span> <span class="tk-op">--tail=</span><span class="tk-num">50</span> <span class="tk-op">-f</span></code></pre>
+      </div>
+
+      <h3>kubectl exec — 進 pod 內 shell</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 開互動式 shell</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> exec <span class="tk-op">-it</span> <span class="tk-st">&lt;pod-name&gt;</span> <span class="tk-op">--</span> sh
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> exec <span class="tk-op">-it</span> <span class="tk-st">&lt;pod-name&gt;</span> <span class="tk-op">-c</span> <span class="tk-st">&lt;container&gt;</span> <span class="tk-op">--</span> bash
+
+<span class="tk-cm"># 跑單一指令</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> exec <span class="tk-st">&lt;pod-name&gt;</span> <span class="tk-op">--</span> env
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> exec <span class="tk-st">&lt;pod-name&gt;</span> <span class="tk-op">--</span> ls /etc/config</code></pre>
+      </div>
+
+      <h3>kubectl port-forward — debug 內部服務</h3>
+      <p>當 Service 是 ClusterIP，從外面碰不到，<code>port-forward</code> 是你 debug 的瑞士刀：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 把本機 8080 對到 pod 的 80</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> port-forward <span class="tk-st">&lt;pod-name&gt;</span> <span class="tk-num">8080</span>:<span class="tk-num">80</span>
+
+<span class="tk-cm"># 對 service (推薦：service 後面誰當 endpoint 由 K8s 決定)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> port-forward svc/<span class="tk-st">&lt;svc-name&gt;</span> <span class="tk-num">8080</span>:<span class="tk-num">80</span>
+
+<span class="tk-cm"># 連 DB 來除錯資料 (注意：這條會把 prod DB 暴露在你筆電上！)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> port-forward <span class="tk-op">-n</span> <span class="tk-st">&lt;your-ns&gt;</span> svc/postgres <span class="tk-num">5432</span>:<span class="tk-num">5432</span></code></pre>
+      </div>
+
+      <h3>順手好用：kubectl cp</h3>
+      <p>從 pod 把檔案抓出來，或塞檔案進去：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># pod 的檔 → 本機</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> cp <span class="tk-st">&lt;your-ns&gt;</span>/<span class="tk-st">&lt;pod&gt;</span>:/var/log/app.log ./app.log
+
+<span class="tk-cm"># 本機 → pod (只在 debug 用，正式環境檔案應由 image / ConfigMap 管)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> cp ./fix.sh <span class="tk-st">&lt;your-ns&gt;</span>/<span class="tk-st">&lt;pod&gt;</span>:/tmp/fix.sh</code></pre>
+      </div>
+
+      <h3>動詞速查表</h3>
+      <table>
+        <thead>
+          <tr><th>動詞</th><th>用途</th><th>什麼時候用</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>get</code></td><td>列出資源狀態</td><td>儀表板，先看狀態</td></tr>
+          <tr><td><code>describe</code></td><td>看詳細 + Events</td><td>狀態不對時下一步</td></tr>
+          <tr><td><code>logs</code></td><td>看 stdout/stderr</td><td>應用程式層問題</td></tr>
+          <tr><td><code>exec</code></td><td>進 pod 內 shell</td><td>內部檔案系統 / 環境變數查驗</td></tr>
+          <tr><td><code>port-forward</code></td><td>本機連集群內服務</td><td>沒 Ingress 時 debug 唯一解</td></tr>
+          <tr><td><code>cp</code></td><td>檔案進出 pod</td><td>抓 log / 塞臨時 patch</td></tr>
+          <tr><td><code>top</code></td><td>看 CPU/Memory 使用率</td><td>OOM / CPU throttle 排查</td></tr>
+          <tr><td><code>rollout</code></td><td>看/控制部署版本</td><td>Deployment 升級回滾</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>alias 一次設好</strong>
+          幾乎每個 K8s 老手都把 <code>kubectl</code> alias 成 <code>k</code>。在 <code>~/.bashrc</code> 加上 <code>alias k=kubectl</code>，再加 <code>complete -F __start_kubectl k</code>（zsh 用對應語法）就有 tab 補全。一天可省幾百次按鍵。
+        </div>
+      </div>
+    </section>
+
+    <section id="pod-troubleshooting">
+      <span class="section-eyebrow">03 — Pod 狀態排錯</span>
+      <h2>五種「Pod 不健康」的故障流程</h2>
+      <p><code>kubectl get pods</code> 出來不是 <code>Running</code> 就是有事。下面這條 timeline 是經驗法則，五種最常見的不健康狀態各自要看的東西：</p>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Pending — 還沒被排到 Node 上</div>
+            <div class="timeline-desc"><code>kubectl describe pod</code> 看 Events。常見三大原因：(1) 沒有 Node 有足夠 CPU/Memory；(2) PVC 還在 binding；(3) Node 上有 taint 而 pod 沒對應 toleration。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">ImagePullBackOff — 抓不到 image</div>
+            <div class="timeline-desc">image tag 拼錯、private registry 沒設 <code>imagePullSecrets</code>、registry 暫時掛掉都會中。<code>describe</code> 的 Events 會直接寫 "manifest unknown" 或 "401 Unauthorized"。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">CrashLoopBackOff — 開起來就死，重複重啟</div>
+            <div class="timeline-desc"><code>kubectl logs &lt;pod&gt; --previous</code> 看上一輪輸出。或 <code>describe</code> 看 <code>lastState.terminated.reason</code> / <code>exitCode</code>。常見：missing env var、依賴的 service 還沒起、health check 設太嚴。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">OOMKilled — 記憶體爆掉被 kernel 殺掉</div>
+            <div class="timeline-desc">describe 會看到 <code>Reason: OOMKilled</code>、<code>ExitCode: 137</code>。對策：調高 <code>resources.limits.memory</code>，或先用 <code>kubectl top pod</code> + Prometheus 看真實尖峰用量再設值。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">5</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Error — 通用失敗</div>
+            <div class="timeline-desc">看 <code>exitCode</code>：<code>1</code> 是應用程式錯誤、<code>137</code> 是 OOM、<code>139</code> 是 segfault、<code>143</code> 是收到 SIGTERM 沒處理乾淨。配合 <code>logs</code> 看真實錯誤訊息。</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>狀態與下一步速查</h3>
+      <table>
+        <thead>
+          <tr><th>狀態</th><th>意義</th><th>下一步指令</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Pending</code></td><td>還沒排上 Node</td><td><code>kubectl describe pod</code> 看 Events</td></tr>
+          <tr><td><code>ContainerCreating</code></td><td>正在拉 image / mount volume</td><td>等 30 秒；超過用 describe</td></tr>
+          <tr><td><code>ImagePullBackOff</code></td><td>image 抓不到</td><td>檢查 tag、imagePullSecrets</td></tr>
+          <tr><td><code>CrashLoopBackOff</code></td><td>開起來就死</td><td><code>kubectl logs --previous</code></td></tr>
+          <tr><td><code>OOMKilled</code></td><td>RAM 爆掉</td><td>調高 limits.memory</td></tr>
+          <tr><td><code>Error</code></td><td>通用失敗</td><td>看 exitCode + logs</td></tr>
+          <tr><td><code>Completed</code></td><td>正常結束 (Job 用)</td><td>不是錯誤，Job/CronJob 是正常</td></tr>
+          <tr><td><code>Evicted</code></td><td>Node 資源壓力被趕走</td><td>看 Node 容量，考慮加 PDB</td></tr>
+        </tbody>
+      </table>
+
+      <h3>kubectl debug — distroless image 的救星</h3>
+      <p>越來越多 image 是 distroless / scratch（沒有 shell、沒有 <code>curl</code>），<code>kubectl exec</code> 進去什麼都做不了。<code>kubectl debug</code> 注入一個臨時的 <strong>ephemeral container</strong>，跟目標容器共享 PID / network namespace，等於開了一個 debug sidecar：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 用 busybox 注入一個 ephemeral container 共享 target 的 namespace</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> debug <span class="tk-op">-it</span> <span class="tk-st">&lt;pod&gt;</span> <span class="tk-op">--image=</span>busybox:1.36 <span class="tk-op">--target=</span><span class="tk-st">&lt;container&gt;</span>
+
+<span class="tk-cm"># 進去後可以看 target 的 process / 網路</span>
+/ # ps aux               <span class="tk-cm"># 看到 target container 的 process</span>
+/ # nslookup db.svc.cluster.local
+/ # wget <span class="tk-op">-O-</span> http://localhost:8080/health
+
+<span class="tk-cm"># --copy-to：複製一個新 pod 並改 image / command (不影響原 pod)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> debug <span class="tk-st">&lt;pod&gt;</span> <span class="tk-op">--copy-to=</span>debug-copy <span class="tk-op">--image=</span>busybox:1.36 <span class="tk-op">--</span> sh</code></pre>
+      </div>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">!</span>直接 ephemeral container</div>
+          <div class="compare-body">
+            <strong>共享 target pod 的 namespace</strong>，能直接看到 target process、它打開的 socket。但因為注入到 live pod，無法改 target 的 entrypoint / env，也不能在 production 上隨便試。
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>--copy-to 複製版</div>
+          <div class="compare-body">
+            <strong>克隆一份新 pod</strong>，可以改 image、改 command、塞 sleep infinity。原本的 production pod 完全不動。<strong>線上排查 production pod 比較安全的做法。</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>ephemeral container 不能刪</strong>
+          <code>kubectl debug</code> 注入後，那個 ephemeral container 會留在 pod spec 裡直到 pod 被刪掉重建。在 production 對<strong>很多 pod 都用 debug 注入</strong>會把資源吃光，記得做完事 pod 砍掉重來。
+        </div>
+      </div>
+    </section>
+
+    <section id="workload">
+      <span class="section-eyebrow">04 — Workload 管理</span>
+      <h2>Deployment、StatefulSet、Job 怎麼選</h2>
+
+      <h3>Deployment 的 rolling update 怎麼安全升級</h3>
+      <p>Deployment 預設策略 <code>RollingUpdate</code>：一次取代一部份 pod，全部換完才算完成。兩個關鍵旗標：</p>
+
+      <table>
+        <thead>
+          <tr><th>欄位</th><th>意思</th><th>建議值</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>maxSurge</code></td><td>升級時允許多開幾個 pod</td><td>25% 或 1（小規模）</td></tr>
+          <tr><td><code>maxUnavailable</code></td><td>升級時允許暫時不可用幾個</td><td>25% 或 0（要無中斷）</td></tr>
+        </tbody>
+      </table>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">apiVersion</span>: apps/v1
+<span class="tk-kw">kind</span>: Deployment
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: <span class="tk-st">example-app</span>
+<span class="tk-kw">spec</span>:
+  <span class="tk-kw">replicas</span>: <span class="tk-num">4</span>
+  <span class="tk-kw">strategy</span>:
+    <span class="tk-kw">type</span>: <span class="tk-st">RollingUpdate</span>
+    <span class="tk-kw">rollingUpdate</span>:
+      <span class="tk-kw">maxSurge</span>: <span class="tk-num">1</span>            <span class="tk-cm"># 升級時最多多開 1 個</span>
+      <span class="tk-kw">maxUnavailable</span>: <span class="tk-num">0</span>      <span class="tk-cm"># 不容忍任何 downtime</span>
+  <span class="tk-kw">selector</span>:
+    <span class="tk-kw">matchLabels</span>:
+      <span class="tk-kw">app</span>: <span class="tk-st">example-app</span>
+  <span class="tk-kw">template</span>:
+    <span class="tk-kw">metadata</span>:
+      <span class="tk-kw">labels</span>:
+        <span class="tk-kw">app</span>: <span class="tk-st">example-app</span>
+    <span class="tk-kw">spec</span>:
+      <span class="tk-kw">containers</span>:
+        - <span class="tk-kw">name</span>: <span class="tk-st">app</span>
+          <span class="tk-kw">image</span>: <span class="tk-st">example-app:v1.4.0</span>
+          <span class="tk-kw">readinessProbe</span>:
+            <span class="tk-kw">httpGet</span>:
+              <span class="tk-kw">path</span>: <span class="tk-st">/healthz</span>
+              <span class="tk-kw">port</span>: <span class="tk-num">8080</span></code></pre>
+      </div>
+
+      <h3>rollout：升級監控與回滾</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 看升級進度 (會 block 直到全部完成或失敗)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> rollout status deploy/<span class="tk-st">&lt;deploy-name&gt;</span>
+
+<span class="tk-cm"># 看歷史 (CHANGE-CAUSE 來自 annotation)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> rollout history deploy/<span class="tk-st">&lt;deploy-name&gt;</span>
+REVISION  CHANGE-CAUSE
+1         &lt;none&gt;
+2         <span class="tk-st">"upgrade to v1.4.0"</span>
+3         <span class="tk-st">"hotfix v1.4.1"</span>
+
+<span class="tk-cm"># 回滾到上一版</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> rollout undo deploy/<span class="tk-st">&lt;deploy-name&gt;</span>
+
+<span class="tk-cm"># 回滾到指定版本</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> rollout undo deploy/<span class="tk-st">&lt;deploy-name&gt;</span> <span class="tk-op">--to-revision=</span><span class="tk-num">1</span>
+
+<span class="tk-cm"># 手動觸發 rollout (例如改了 ConfigMap，pod 不會自動重啟)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> rollout restart deploy/<span class="tk-st">&lt;deploy-name&gt;</span></code></pre>
+      </div>
+
+      <h3>scale vs HPA — 一個經典陷阱</h3>
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>HPA 會吃掉你的 kubectl scale</strong>
+          如果這個 Deployment 已經被 HorizontalPodAutoscaler 管理，你下 <code>kubectl scale --replicas=2</code> 之後幾秒鐘 HPA 就會根據 CPU/Memory 指標把它調回 5。要先<strong>暫停 HPA</strong>（<code>kubectl delete hpa</code> 或改 <code>minReplicas</code>）才會生效。
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 手動 scale</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> scale deploy <span class="tk-st">&lt;deploy-name&gt;</span> <span class="tk-op">--replicas=</span><span class="tk-num">5</span>
+
+<span class="tk-cm"># 看有沒有 HPA 在管</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> get hpa
+NAME           REFERENCE                 TARGETS         MINPODS   MAXPODS   REPLICAS
+example-app    Deployment/example-app    cpu: 65%/70%    2         10        5</code></pre>
+      </div>
+
+      <h3>StatefulSet vs Deployment</h3>
+      <p>選擇規則很簡單：應用程式需不需要「<strong>穩定的身份</strong>」？</p>
+
+      <table>
+        <thead>
+          <tr><th>需求</th><th>Deployment</th><th>StatefulSet</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Pod 名稱</td><td>隨機（<code>&lt;app&gt;-7d8f...</code>）</td><td>有序（<code>&lt;app&gt;-0</code>、<code>&lt;app&gt;-1</code>）</td></tr>
+          <tr><td>啟動順序</td><td>同時併發</td><td>嚴格從 0 開始順序起</td></tr>
+          <tr><td>持久存儲</td><td>shared / 無</td><td>每個 pod 自己的 PVC</td></tr>
+          <tr><td>網路身份</td><td>共用 Service 後面</td><td>每個 pod 獨立 DNS</td></tr>
+          <tr><td>典型用途</td><td>無狀態 web、API</td><td>DB、訊息佇列、ZK、etcd</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Job vs CronJob</h3>
+      <p>Job 跑一次（DB schema migration、批次匯入），CronJob 是 cron 排程的 Job。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 一次性：跑一次 schema migration 就好</span>
+<span class="tk-kw">apiVersion</span>: batch/v1
+<span class="tk-kw">kind</span>: Job
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: <span class="tk-st">db-migrate-v1.5.0</span>
+<span class="tk-kw">spec</span>:
+  <span class="tk-kw">backoffLimit</span>: <span class="tk-num">3</span>
+  <span class="tk-kw">template</span>:
+    <span class="tk-kw">spec</span>:
+      <span class="tk-kw">restartPolicy</span>: <span class="tk-st">OnFailure</span>
+      <span class="tk-kw">containers</span>:
+        - <span class="tk-kw">name</span>: <span class="tk-st">migrate</span>
+          <span class="tk-kw">image</span>: <span class="tk-st">example-app:v1.5.0</span>
+          <span class="tk-kw">command</span>: [<span class="tk-st">"./migrate.sh"</span>]
+---
+<span class="tk-cm"># 排程：每天凌晨 3 點備份</span>
+<span class="tk-kw">apiVersion</span>: batch/v1
+<span class="tk-kw">kind</span>: CronJob
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: <span class="tk-st">nightly-backup</span>
+<span class="tk-kw">spec</span>:
+  <span class="tk-kw">schedule</span>: <span class="tk-st">"0 3 * * *"</span>
+  <span class="tk-kw">successfulJobsHistoryLimit</span>: <span class="tk-num">3</span>
+  <span class="tk-kw">failedJobsHistoryLimit</span>: <span class="tk-num">3</span>
+  <span class="tk-kw">jobTemplate</span>:
+    <span class="tk-kw">spec</span>:
+      <span class="tk-kw">template</span>:
+        <span class="tk-kw">spec</span>:
+          <span class="tk-kw">restartPolicy</span>: <span class="tk-st">OnFailure</span>
+          <span class="tk-kw">containers</span>:
+            - <span class="tk-kw">name</span>: <span class="tk-st">backup</span>
+              <span class="tk-kw">image</span>: <span class="tk-st">example-app/backup:v1</span>
+              <span class="tk-kw">command</span>: [<span class="tk-st">"/usr/local/bin/backup.sh"</span>]</code></pre>
+      </div>
+    </section>
+
+    <section id="networking">
+      <span class="section-eyebrow">05 — 網路與設定</span>
+      <h2>Service、Ingress、ConfigMap、Secret</h2>
+
+      <h3>Service 三種類型，三種用途</h3>
+      <table>
+        <thead>
+          <tr><th>類型</th><th>對外可見性</th><th>什麼時候用</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>ClusterIP</code> (預設)</td><td>只有集群內部能連</td><td>內部微服務之間溝通；99% 的 service 都用這個</td></tr>
+          <tr><td><code>NodePort</code></td><td>每個 Node 開一個 port (30000–32767)</td><td>開發、本機測試；prod 不建議直接用</td></tr>
+          <tr><td><code>LoadBalancer</code></td><td>雲端 LB 拉一個外部 IP</td><td>有雲商支援時，公開單一服務</td></tr>
+          <tr><td><code>ExternalName</code></td><td>DNS CNAME</td><td>把外部服務（例如 RDS）包成集群內可解析的 service</td></tr>
+        </tbody>
+      </table>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">apiVersion</span>: v1
+<span class="tk-kw">kind</span>: Service
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: <span class="tk-st">example-app</span>
+<span class="tk-kw">spec</span>:
+  <span class="tk-kw">type</span>: <span class="tk-st">ClusterIP</span>
+  <span class="tk-kw">selector</span>:
+    <span class="tk-kw">app</span>: <span class="tk-st">example-app</span>
+  <span class="tk-kw">ports</span>:
+    - <span class="tk-kw">name</span>: <span class="tk-st">http</span>
+      <span class="tk-kw">port</span>: <span class="tk-num">80</span>          <span class="tk-cm"># Service 對外 (給其他 pod 連) 的 port</span>
+      <span class="tk-kw">targetPort</span>: <span class="tk-num">8080</span>   <span class="tk-cm"># pod 內部容器實際在聽的 port</span></code></pre>
+      </div>
+
+      <h3>集群內 DNS：三種長度都能用</h3>
+      <p>K8s 內建 CoreDNS 為每個 Service 配一個固定的 DNS 名字。同一 namespace 內，三種寫法都通：</p>
+
+      <table>
+        <thead>
+          <tr><th>長度</th><th>寫法</th><th>使用情境</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>完整 FQDN</td><td><code>&lt;svc&gt;.&lt;ns&gt;.svc.cluster.local</code></td><td>跨 namespace 最保險，也是內部實際解析的全名</td></tr>
+          <tr><td>簡短</td><td><code>&lt;svc&gt;.&lt;ns&gt;</code></td><td>跨 namespace 寫法，常用</td></tr>
+          <tr><td>最短</td><td><code>&lt;svc&gt;</code></td><td>同 namespace 內最常見</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Ingress：path-based 與 host-based 路由</h3>
+      <p>Ingress 是 L7 入口。實作通常是 <strong>nginx-ingress</strong> 或雲商的 ALB / GLB。一個 Ingress 可以同時做：</p>
+      <ul>
+        <li><strong>host-based</strong>：<code>api.example.com</code> 跟 <code>web.example.com</code> 走不同 service</li>
+        <li><strong>path-based</strong>：<code>/api/*</code> 給 backend、<code>/*</code> 給前端 SPA</li>
+        <li><strong>TLS termination</strong>：HTTPS 在 Ingress 解掉，後面 Service 跑 HTTP</li>
+      </ul>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">apiVersion</span>: networking.k8s.io/v1
+<span class="tk-kw">kind</span>: Ingress
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: <span class="tk-st">example-app</span>
+  <span class="tk-kw">annotations</span>:
+    <span class="tk-kw">nginx.ingress.kubernetes.io/ssl-redirect</span>: <span class="tk-st">"true"</span>
+    <span class="tk-kw">nginx.ingress.kubernetes.io/proxy-body-size</span>: <span class="tk-st">"20m"</span>
+    <span class="tk-kw">cert-manager.io/cluster-issuer</span>: <span class="tk-st">letsencrypt-prod</span>
+<span class="tk-kw">spec</span>:
+  <span class="tk-kw">ingressClassName</span>: <span class="tk-st">nginx</span>
+  <span class="tk-kw">tls</span>:
+    - <span class="tk-kw">hosts</span>: [<span class="tk-st">app.example.com</span>]
+      <span class="tk-kw">secretName</span>: <span class="tk-st">app-tls</span>
+  <span class="tk-kw">rules</span>:
+    - <span class="tk-kw">host</span>: <span class="tk-st">app.example.com</span>
+      <span class="tk-kw">http</span>:
+        <span class="tk-kw">paths</span>:
+          - <span class="tk-kw">path</span>: <span class="tk-st">/api</span>
+            <span class="tk-kw">pathType</span>: <span class="tk-st">Prefix</span>
+            <span class="tk-kw">backend</span>:
+              <span class="tk-kw">service</span>:
+                <span class="tk-kw">name</span>: <span class="tk-st">example-app-api</span>
+                <span class="tk-kw">port</span>:
+                  <span class="tk-kw">number</span>: <span class="tk-num">80</span>
+          - <span class="tk-kw">path</span>: <span class="tk-st">/</span>
+            <span class="tk-kw">pathType</span>: <span class="tk-st">Prefix</span>
+            <span class="tk-kw">backend</span>:
+              <span class="tk-kw">service</span>:
+                <span class="tk-kw">name</span>: <span class="tk-st">example-app-web</span>
+                <span class="tk-kw">port</span>:
+                  <span class="tk-kw">number</span>: <span class="tk-num">80</span></code></pre>
+      </div>
+
+      <h3>nginx-ingress 常用 annotations</h3>
+      <table>
+        <thead>
+          <tr><th>Annotation</th><th>用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>nginx.ingress.kubernetes.io/rewrite-target</code></td><td>路徑改寫，例如 <code>/api/v1/x</code> → <code>/x</code></td></tr>
+          <tr><td><code>nginx.ingress.kubernetes.io/ssl-redirect</code></td><td>強制 HTTP → HTTPS</td></tr>
+          <tr><td><code>nginx.ingress.kubernetes.io/proxy-body-size</code></td><td>上傳大小上限（預設 1m）</td></tr>
+          <tr><td><code>nginx.ingress.kubernetes.io/proxy-read-timeout</code></td><td>後端回應 timeout（秒）</td></tr>
+          <tr><td><code>nginx.ingress.kubernetes.io/cors-allow-origin</code></td><td>CORS 跨域</td></tr>
+          <tr><td><code>nginx.ingress.kubernetes.io/limit-rps</code></td><td>每秒請求數限速</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ConfigMap vs Secret</h3>
+      <p>兩者結構幾乎一樣，差別是「<strong>定位</strong>」。</p>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>ConfigMap</div>
+          <div class="compare-body">
+            放<strong>非機密</strong>的設定：feature flag、URL endpoint、log level、時區、Java 設定檔。明文存在 etcd。
+          </div>
+        </div>
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">!</span>Secret</div>
+          <div class="compare-body">
+            放<strong>機密</strong>的：API key、DB 密碼、TLS 私鑰。<strong>注意：Secret 不是加密！只是 base64 編碼。</strong>真正的加密要打開 <code>EncryptionConfiguration</code>，或改用 SealedSecrets / External Secrets / Vault。
+          </div>
+        </div>
+      </div>
+
+      <h3>三種注入方式</h3>
+      <table>
+        <thead>
+          <tr><th>方式</th><th>YAML 寫法</th><th>適合</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>單一 key 為 env</td>
+            <td><code>env.valueFrom.configMapKeyRef</code></td>
+            <td>挑幾個欄位變成環境變數</td>
+          </tr>
+          <tr>
+            <td>整批為 env</td>
+            <td><code>envFrom.configMapRef</code></td>
+            <td>整個 ConfigMap 全部變環境變數</td>
+          </tr>
+          <tr>
+            <td>掛成檔案</td>
+            <td><code>volumes</code> + <code>volumeMounts</code></td>
+            <td>應用程式只接受設定檔（如 nginx.conf、application.yaml）</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">spec</span>:
+  <span class="tk-kw">containers</span>:
+    - <span class="tk-kw">name</span>: <span class="tk-st">app</span>
+      <span class="tk-kw">image</span>: <span class="tk-st">example-app:v1</span>
+      <span class="tk-cm"># (1) 挑單一 key 變成環境變數</span>
+      <span class="tk-kw">env</span>:
+        - <span class="tk-kw">name</span>: <span class="tk-st">LOG_LEVEL</span>
+          <span class="tk-kw">valueFrom</span>:
+            <span class="tk-kw">configMapKeyRef</span>:
+              <span class="tk-kw">name</span>: <span class="tk-st">app-config</span>
+              <span class="tk-kw">key</span>: <span class="tk-st">log_level</span>
+        - <span class="tk-kw">name</span>: <span class="tk-st">DB_PASSWORD</span>
+          <span class="tk-kw">valueFrom</span>:
+            <span class="tk-kw">secretKeyRef</span>:
+              <span class="tk-kw">name</span>: <span class="tk-st">app-secret</span>
+              <span class="tk-kw">key</span>: <span class="tk-st">db_password</span>
+      <span class="tk-cm"># (2) 整個 ConfigMap 全變環境變數</span>
+      <span class="tk-kw">envFrom</span>:
+        - <span class="tk-kw">configMapRef</span>:
+            <span class="tk-kw">name</span>: <span class="tk-st">app-config</span>
+        - <span class="tk-kw">secretRef</span>:
+            <span class="tk-kw">name</span>: <span class="tk-st">app-secret</span>
+      <span class="tk-cm"># (3) 掛成 /etc/app/config.yaml 檔案</span>
+      <span class="tk-kw">volumeMounts</span>:
+        - <span class="tk-kw">name</span>: <span class="tk-st">config</span>
+          <span class="tk-kw">mountPath</span>: <span class="tk-st">/etc/app</span>
+          <span class="tk-kw">readOnly</span>: <span class="tk-num">true</span>
+  <span class="tk-kw">volumes</span>:
+    - <span class="tk-kw">name</span>: <span class="tk-st">config</span>
+      <span class="tk-kw">configMap</span>:
+        <span class="tk-kw">name</span>: <span class="tk-st">app-config</span></code></pre>
+      </div>
+
+      <details class="collapse">
+        <summary>ConfigMap 改了，pod 不會自動重啟 <span class="collapse-tag">陷阱</span></summary>
+        <div class="collapse-body">
+          <p style="margin-bottom:0.5rem;">這是新手最常踩的雷之一：</p>
+          <ul style="margin-left:1rem;font-size:14px;">
+            <li><strong>用 env 注入</strong>：環境變數在 pod 啟動時就讀好，ConfigMap 改了 pod 完全不會察覺，要 <code>kubectl rollout restart</code> 才會生效。</li>
+            <li><strong>用 volume 掛載</strong>：檔案內容會被 kubelet 自動更新（約 1 分鐘延遲），但<strong>應用程式自己要重新讀檔</strong>，K8s 不會 SIGHUP 它。</li>
+          </ul>
+          <p style="margin-top:0.6rem;font-size:13px;color:var(--muted);">實務上常用 stakater/Reloader 之類的 controller，看到 ConfigMap / Secret 變動就自動觸發 rollout。</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="helm">
+      <span class="section-eyebrow">06 — Helm chart 操作</span>
+      <h2>Helm：K8s 的 package manager</h2>
+      <p>把幾十個 YAML 模板化、參數化、版本化，一條指令裝完整套服務 — 這就是 Helm 在做的事。</p>
+
+      <h3>Chart 的目錄長相</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">text</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>example-chart/
+├── Chart.yaml          <span class="tk-cm"># chart 的 metadata (name / version / appVersion)</span>
+├── Chart.lock          <span class="tk-cm"># dependency 鎖版本 (相當於 lockfile)</span>
+├── values.yaml         <span class="tk-cm"># 預設參數</span>
+├── values-prod.yaml    <span class="tk-cm"># 環境覆寫 (慣例命名)</span>
+├── charts/             <span class="tk-cm"># dependency 抓下來的 sub-chart</span>
+└── templates/
+    ├── _helpers.tpl    <span class="tk-cm"># 共用的 named template (相當於 macro)</span>
+    ├── deployment.yaml
+    ├── service.yaml
+    ├── ingress.yaml
+    └── configmap.yaml</code></pre>
+      </div>
+
+      <h3>三條最常用的指令</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># (1) 本機渲染：不接觸集群，把 chart 渲染成最終的 manifest YAML</span>
+<span class="tk-cm">#     除錯時的第一步！能看出 template 有沒有寫對</span>
+<span class="tk-pn">$</span> <span class="tk-fn">helm</span> template <span class="tk-st">&lt;release&gt;</span> ./example-chart <span class="tk-op">-f</span> values-prod.yaml
+
+<span class="tk-cm"># (2) 安裝或升級 (冪等：沒裝過就 install，裝過就 upgrade)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">helm</span> upgrade <span class="tk-op">--install</span> <span class="tk-st">&lt;release&gt;</span> ./example-chart \
+      <span class="tk-op">-n</span> <span class="tk-st">&lt;your-ns&gt;</span> <span class="tk-op">--create-namespace</span> \
+      <span class="tk-op">-f</span> values.yaml <span class="tk-op">-f</span> values-prod.yaml \
+      <span class="tk-op">--set</span> image.tag=<span class="tk-st">v1.5.0</span>
+
+<span class="tk-cm"># (3) helm-diff plugin：upgrade 前先看會變什麼</span>
+<span class="tk-pn">$</span> <span class="tk-fn">helm</span> plugin install https://github.com/databus23/helm-diff
+<span class="tk-pn">$</span> <span class="tk-fn">helm</span> diff upgrade <span class="tk-st">&lt;release&gt;</span> ./example-chart <span class="tk-op">-f</span> values-prod.yaml
+
+<span class="tk-cm"># 其他常用</span>
+<span class="tk-pn">$</span> <span class="tk-fn">helm</span> list <span class="tk-op">-A</span>                                  <span class="tk-cm"># 看所有 release</span>
+<span class="tk-pn">$</span> <span class="tk-fn">helm</span> history <span class="tk-st">&lt;release&gt;</span> <span class="tk-op">-n</span> <span class="tk-st">&lt;your-ns&gt;</span>      <span class="tk-cm"># 看升級歷史</span>
+<span class="tk-pn">$</span> <span class="tk-fn">helm</span> rollback <span class="tk-st">&lt;release&gt;</span> <span class="tk-num">3</span> <span class="tk-op">-n</span> <span class="tk-st">&lt;your-ns&gt;</span>   <span class="tk-cm"># 回滾到第 3 版</span>
+<span class="tk-pn">$</span> <span class="tk-fn">helm</span> uninstall <span class="tk-st">&lt;release&gt;</span> <span class="tk-op">-n</span> <span class="tk-st">&lt;your-ns&gt;</span>    <span class="tk-cm"># 卸載</span></code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong><code>helm template</code> 是除錯神器</strong>
+          當 <code>helm upgrade</code> 失敗只給你一行神祕錯誤，先在本機 <code>helm template</code> 渲染出最終 YAML，肉眼掃一遍就知道哪裡縮排錯、哪個 value 沒帶到。<strong>它完全不接觸集群，可以隨便試。</strong>
+        </div>
+      </div>
+
+      <h3>_helpers.tpl 與 named templates</h3>
+      <p>每個 K8s 物件都要重複寫一堆 labels（<code>app</code>、<code>version</code>、<code>release</code>...），把這些抽到 <code>_helpers.tpl</code> 變成 named template，需要的地方 <code>{{ include "..." . }}</code>：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># templates/_helpers.tpl</span>
+{{<span class="tk-op">/*</span> 共用 labels {{ include "myapp.labels" . }} <span class="tk-op">*/</span>}}
+{{- <span class="tk-kw">define</span> <span class="tk-st">"myapp.labels"</span> -}}
+app.kubernetes.io/name: {{ .Chart.Name }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- <span class="tk-kw">end</span> -}}</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># templates/deployment.yaml — 任何地方需要那組 labels 就 include 它</span>
+<span class="tk-kw">apiVersion</span>: apps/v1
+<span class="tk-kw">kind</span>: Deployment
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: {{ include <span class="tk-st">"myapp.fullname"</span> . }}
+  <span class="tk-kw">labels</span>:
+    {{- include <span class="tk-st">"myapp.labels"</span> . | nindent <span class="tk-num">4</span> }}</code></pre>
+      </div>
+
+      <h3>Helm vs Kustomize 怎麼選</h3>
+      <table>
+        <thead>
+          <tr><th>面向</th><th>Helm</th><th>Kustomize</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>核心概念</td><td>模板 + 參數</td><td>純 YAML overlay</td></tr>
+          <tr><td>學習曲線</td><td>需學 Go template</td><td>幾乎只是 YAML</td></tr>
+          <tr><td>跨環境</td><td><code>-f values-prod.yaml</code></td><td><code>overlays/prod/</code></td></tr>
+          <tr><td>第三方套件</td><td>生態完整（artifacthub.io）</td><td>沒有正式 registry</td></tr>
+          <tr><td>適合</td><td>裝<strong>別人</strong>的東西（DB、Ingress controller）</td><td>管<strong>自己</strong>的東西（簡單 + 顯式）</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>實務上常常兩個並用</strong>
+          公司內部自家應用程式用 Kustomize 管（diff 看得清楚），第三方依賴（PostgreSQL、Redis、cert-manager、ingress-nginx）就裝官方 Helm chart。<strong>下一堂 Argo CD 會看到這兩個怎麼跟 GitOps 整合。</strong>
+        </div>
+      </div>
+    </section>
+
+    <section id="tui-tools">
+      <span class="section-eyebrow">07 — TUI / 加速工具</span>
+      <h2>k9s、Headlamp、Lens、krew</h2>
+
+      <h3>k9s — 即時 cluster dashboard</h3>
+      <p>純 kubectl 的工作流是「打指令 → 看輸出 → 再打下一條」。<strong>k9s</strong> 把它變成連線 cluster 的全螢幕 TUI，所有資源即時刷新，所有操作快捷鍵：</p>
+
+      <table>
+        <thead>
+          <tr><th>快捷鍵 / 指令</th><th>動作</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>:pods</code></td><td>切到 pod 列表</td></tr>
+          <tr><td><code>:deploy</code></td><td>切到 Deployment 列表</td></tr>
+          <tr><td><code>:svc</code></td><td>切到 Service 列表</td></tr>
+          <tr><td><code>:ns</code></td><td>切換 namespace</td></tr>
+          <tr><td><code>:ctx</code></td><td>切換 context</td></tr>
+          <tr><td><kbd>l</kbd></td><td>看選取資源的 logs</td></tr>
+          <tr><td><kbd>s</kbd></td><td>進 shell（<code>kubectl exec</code>）</td></tr>
+          <tr><td><kbd>d</kbd></td><td>describe</td></tr>
+          <tr><td><kbd>y</kbd></td><td>看 YAML</td></tr>
+          <tr><td><kbd>Ctrl+d</kbd></td><td>刪除（要再按 enter 確認）</td></tr>
+        </tbody>
+      </table>
+
+      <h3>其他選擇</h3>
+      <ul>
+        <li><strong>Headlamp</strong> — CNCF Sandbox 的開源 GUI，跨平台 desktop app + web，比 k9s 對非 CLI 使用者友善。</li>
+        <li><strong>Lens</strong> — 商業化的 desktop app，免費版功能足夠個人用，企業版有 SSO、RBAC、多 cluster 整合。</li>
+        <li><strong>OpenLens</strong> — Lens 的開源 fork，少了官方擴充但夠用。</li>
+      </ul>
+
+      <h3>kubectl krew — plugin 管理器</h3>
+      <p>krew 是 kubectl 的 brew，一條指令裝插件。下面這幾個近乎必裝：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 安裝 krew (官方腳本，請先讀過再執行)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> krew install ctx ns tree neat who-can
+
+<span class="tk-cm"># 切 context (取代 kubectl config use-context)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> ctx prod-admin
+
+<span class="tk-cm"># 切 namespace (取代 set-context --current --namespace=...)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> ns <span class="tk-st">&lt;your-ns&gt;</span>
+
+<span class="tk-cm"># 看「誰擁有誰」的樹狀圖 — Deployment / ReplicaSet / Pod 一目瞭然</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> tree deploy <span class="tk-st">&lt;deploy-name&gt;</span>
+
+<span class="tk-cm"># 把 kubectl get -o yaml 的輸出整理乾淨 (拿掉 status / managedFields)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> get pod <span class="tk-st">&lt;pod&gt;</span> <span class="tk-op">-o</span> yaml | <span class="tk-fn">kubectl</span> neat
+
+<span class="tk-cm"># 看誰有權做某事 (RBAC 反查)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> who-can delete pods <span class="tk-op">-n</span> <span class="tk-st">&lt;your-ns&gt;</span></code></pre>
+      </div>
+
+      <h3>純 kubectl vs k9s + plugins</h3>
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">!</span>純 kubectl</div>
+          <div class="compare-body">
+            <strong>排查一個 pod 平均 5–8 條指令</strong>：<code>get pods</code> → <code>describe</code> → <code>logs</code> → <code>logs -c sidecar</code> → <code>exec</code> → ...。每條指令都要打完整 namespace、pod 名稱。一次只看一個資源。
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>k9s + krew plugins</div>
+          <div class="compare-body">
+            <strong>進 k9s，:pods → 上下選 → 按 d/l/s 即時看細節</strong>。<code>kubectl ns</code> 切 namespace 不用打長指令、<code>tree</code> 看擁有關係一眼清楚。同樣的事 1 分鐘變 10 秒。
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="capacity-tuning">
+      <span class="section-eyebrow">08 — 資源容量調校</span>
+      <h2>requests / limits / QoS class</h2>
+
+      <h3>kubectl top — 即時用量</h3>
+      <p>需要 cluster 裝 <strong>metrics-server</strong>（多數雲商 managed K8s 預設有）。沒裝的話 <code>kubectl top</code> 會直接報錯。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 看每個 Node 的 CPU / 記憶體用量</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> top node
+NAME           CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+node-1         420m         21%    3200Mi          40%
+node-2         1100m        55%    5800Mi          72%
+
+<span class="tk-cm"># 看每個 Pod 的用量 (按 CPU 排序)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> top pod <span class="tk-op">-A</span> <span class="tk-op">--sort-by=</span>cpu
+
+<span class="tk-cm"># 多容器 pod，看到容器層級</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> top pod <span class="tk-st">&lt;pod&gt;</span> <span class="tk-op">--containers</span></code></pre>
+      </div>
+
+      <h3>從 Prometheus 看歷史趨勢</h3>
+      <p><code>kubectl top</code> 只看「<strong>現在</strong>」。要設合理的 <code>requests / limits</code>，要看一週 / 一個月的歷史尖峰。常用兩條 PromQL：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">promql</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 某 namespace 內每個 pod 的 working set memory (近 7 天 P99)</span>
+quantile_over_time(<span class="tk-num">0.99</span>,
+  container_memory_working_set_bytes{namespace=<span class="tk-st">"&lt;your-ns&gt;"</span>, container!=<span class="tk-st">""</span>}[<span class="tk-num">7</span>d]
+)
+
+<span class="tk-cm"># 某 deployment 的 CPU 使用率 (近 1 小時)</span>
+sum(rate(
+  container_cpu_usage_seconds_total{namespace=<span class="tk-st">"&lt;your-ns&gt;"</span>, pod=~<span class="tk-st">"example-app-.*"</span>}[<span class="tk-num">5</span>m]
+)) by (pod)</code></pre>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>下一堂課的伏筆</strong>
+          這兩個 metric 名稱會在 Lesson 04 (監控實務) 再見。先記住：<code>working_set_bytes</code> 是 K8s 用來判斷 OOM 的依據，比 RSS 更準。
+        </div>
+      </div>
+
+      <h3>requests vs limits — 兩組不同意義的數字</h3>
+      <table>
+        <thead>
+          <tr><th>欄位</th><th>調度器看</th><th>kernel 強制</th><th>建議寫法</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>requests</code></td>
+            <td>✓ 用來決定能塞到哪個 Node</td>
+            <td>✗</td>
+            <td>填「平均使用量 + 一點 buffer」</td>
+          </tr>
+          <tr>
+            <td><code>limits</code></td>
+            <td>✗</td>
+            <td>✓ 超過 CPU 會被 throttle、超過記憶體會被 OOMKill</td>
+            <td>填「P99 / 尖峰 + 安全係數」</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">resources</span>:
+  <span class="tk-kw">requests</span>:                <span class="tk-cm"># 排程器以這個算 Node 容量</span>
+    <span class="tk-kw">cpu</span>: <span class="tk-st">"100m"</span>           <span class="tk-cm"># 100 millicores = 0.1 vCPU</span>
+    <span class="tk-kw">memory</span>: <span class="tk-st">"256Mi"</span>
+  <span class="tk-kw">limits</span>:                  <span class="tk-cm"># 超過這條 kernel 出手</span>
+    <span class="tk-kw">cpu</span>: <span class="tk-st">"500m"</span>           <span class="tk-cm"># CPU 超過 → throttle (變慢但不死)</span>
+    <span class="tk-kw">memory</span>: <span class="tk-st">"512Mi"</span>       <span class="tk-cm"># Memory 超過 → OOMKilled (直接砍掉)</span></code></pre>
+      </div>
+
+      <h3>QoS class：三個等級</h3>
+      <p>K8s 根據你<strong>怎麼設 requests / limits</strong>，自動把 pod 分到三種 QoS class。Node 資源不足時，<strong>從低等級先趕</strong>。</p>
+
+      <table>
+        <thead>
+          <tr><th>QoS class</th><th>條件</th><th>被 evict 順序</th><th>適合</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Guaranteed</strong></td>
+            <td>每個容器 requests == limits（CPU 和 memory 都要設）</td>
+            <td>最後</td>
+            <td>核心服務、DB、必須穩的</td>
+          </tr>
+          <tr>
+            <td><strong>Burstable</strong></td>
+            <td>有設 requests 但 ≠ limits（最常見）</td>
+            <td>中</td>
+            <td>大多數 web app / API</td>
+          </tr>
+          <tr>
+            <td><strong>BestEffort</strong></td>
+            <td>完全沒設 requests 或 limits</td>
+            <td>最先（資源不足直接被踢）</td>
+            <td>跑批次工作、臨時 debug</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>實務建議</strong>
+          所有正式服務最低也要 Burstable —— 至少把 <code>requests</code> 設好。核心 DB / 訊息佇列再考慮 Guaranteed。<strong>BestEffort 永遠不該出現在 production。</strong>
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 5</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "想看 Pod crash 之前最後一輪的 stdout/stderr，要下哪一條指令？",
+    "options": [
+      "<code>kubectl logs &lt;pod&gt;</code>",
+      "<code>kubectl logs &lt;pod&gt; --previous</code>",
+      "<code>kubectl describe pod &lt;pod&gt;</code>",
+      "<code>kubectl exec -it &lt;pod&gt; -- cat /var/log/last.log</code>"
+    ],
+    "answer": 1,
+    "explain": "<code>--previous</code>（簡寫 <code>-p</code>）會抓上一輪 container 的輸出。Pod 已經 crash 重啟過後，現在的 logs 是新一輪，必須用 <code>--previous</code> 才看得到死前的訊息。排查 <code>CrashLoopBackOff</code> 必用。"
+  },
+  {
+    "question": "某 Deployment 已經被 HPA 管理，<code>minReplicas: 2 / maxReplicas: 10</code>，目前 HPA 計算結果是 5。這時候你下 <code>kubectl scale deploy --replicas=2</code>，會發生什麼？",
+    "options": [
+      "Replicas 會永久變成 2，HPA 不再生效",
+      "kubectl 會直接報錯拒絕執行",
+      "Replicas 會暫時變成 2，但下個 HPA 評估週期 (約 15 秒) 又被調回 5",
+      "HPA 與手動 scale 互斥，要先 patch HPA 設定"
+    ],
+    "answer": 2,
+    "explain": "HPA 是 controller，會持續比對「目標 replicas」與「實際 replicas」。<code>kubectl scale</code> 改完後 HPA 下個評估循環（預設 15 秒）就會再算一次目標值並調回去。<strong>真的想手動控制要先 <code>kubectl delete hpa</code> 或調 <code>minReplicas</code>。</strong>"
+  },
+  {
+    "question": "下列哪些東西<strong>適合</strong>放在 ConfigMap 裡？(多選)",
+    "options": [
+      "應用程式 log level、feature flag",
+      "外部 API 的 URL endpoint",
+      "資料庫密碼、第三方 API key",
+      "TLS 私鑰"
+    ],
+    "answer": [0, 1],
+    "explain": "ConfigMap 放<strong>非機密</strong>設定就好。密碼、API key、私鑰要放 Secret —— 而且要記得 <strong>Secret 預設只是 base64 編碼，不是加密</strong>。真正要加密請打開 EncryptionConfiguration、或改用 SealedSecrets / External Secrets / Vault。"
+  },
+  {
+    "question": "Service 類型是 <code>ClusterIP</code>，從筆電（集群外部）能不能直接連到它的 IP？",
+    "options": [
+      "可以，ClusterIP 是公開的",
+      "不可以，ClusterIP 只在集群內部可達；要透過 Ingress、NodePort 或 <code>kubectl port-forward</code>",
+      "看雲商設定",
+      "只要拿到 kubeconfig 就能連"
+    ],
+    "answer": 1,
+    "explain": "<code>ClusterIP</code> 是 K8s 內部 SDN 的虛擬 IP，只在 cluster 網段裡才路由得到。從外部要進來：(1) <strong>Ingress</strong> (production)、(2) <strong>NodePort / LoadBalancer</strong>、或 (3) <strong><code>kubectl port-forward</code></strong> (debug)。"
+  },
+  {
+    "question": "<code>helm template &lt;release&gt; ./chart -f values.yaml</code> 的主要用途是？",
+    "options": [
+      "把 chart 安裝到集群",
+      "升級已存在的 release",
+      "本機把 chart 渲染成最終的 manifest YAML，<strong>不接觸集群</strong>，方便除錯",
+      "驗證 chart 簽章"
+    ],
+    "answer": 2,
+    "explain": "<code>helm template</code> 是純客戶端動作，把 Go template + values 渲染成普通 YAML 並印出來。<strong>它不會碰任何 cluster、不需要 kubeconfig</strong>。當 <code>helm upgrade</code> 失敗只給你一行神秘錯誤，先 <code>helm template</code> 看渲染結果是除錯第一步。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://kubernetes.io/docs/reference/kubectl/quick-reference/" target="_blank" rel="noopener">kubectl Cheat Sheet</a><span class="ref-meta">官方速查</span></li>
+        <li><a href="https://kubernetes.io/docs/reference/kubectl/jsonpath/" target="_blank" rel="noopener">JSONPath Support</a><span class="ref-meta">-o jsonpath 完整語法</span></li>
+        <li><a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/" target="_blank" rel="noopener">Field Selectors</a><span class="ref-meta">--field-selector 用法</span></li>
+        <li><a href="https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/" target="_blank" rel="noopener">Debug Running Pods</a><span class="ref-meta">debug 完整流程</span></li>
+        <li><a href="https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/" target="_blank" rel="noopener">Ephemeral Containers</a><span class="ref-meta">kubectl debug 機制</span></li>
+        <li><a href="https://kubernetes.io/docs/concepts/services-networking/service/" target="_blank" rel="noopener">Service</a><span class="ref-meta">四種類型完整說明</span></li>
+        <li><a href="https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/" target="_blank" rel="noopener">nginx-ingress Annotations</a><span class="ref-meta">所有 annotation 列表</span></li>
+        <li><a href="https://kubernetes.io/docs/concepts/configuration/configmap/" target="_blank" rel="noopener">ConfigMap</a><span class="ref-meta">注入方式</span></li>
+        <li><a href="https://kubernetes.io/docs/concepts/configuration/secret/" target="_blank" rel="noopener">Secret</a><span class="ref-meta">含加密設定</span></li>
+        <li><a href="https://helm.sh/docs/topics/charts/" target="_blank" rel="noopener">Helm: Charts</a><span class="ref-meta">Chart.yaml / values 結構</span></li>
+        <li><a href="https://helm.sh/docs/chart_template_guide/named_templates/" target="_blank" rel="noopener">Helm: Named Templates</a><span class="ref-meta">_helpers.tpl 用法</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="01_azure_devops.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 01 · Azure DevOps 實務</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="03_argocd_gitops.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 03 · Argo CD GitOps</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">5 堂 DevOps 系列 <span class="progress-pill">2 / 5</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="01_azure_devops.html"><span class="course-nav-num">01</span><span>Azure DevOps</span></a></li>
+        <li><a class="course-nav-item current" href="02_kubernetes_practical.html"><span class="course-nav-num">02</span><span>Kubernetes</span></a></li>
+        <li><a class="course-nav-item" href="03_argocd_gitops.html"><span class="course-nav-num">03</span><span>Argo CD</span></a></li>
+        <li><a class="course-nav-item" href="04_prometheus_grafana.html"><span class="course-nav-num">04</span><span>Prometheus + Grafana</span></a></li>
+        <li><a class="course-nav-item" href="05_elk_log_analysis.html"><span class="course-nav-num">05</span><span>ELK</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 DevOps 實務課程系列 · Lesson 02
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

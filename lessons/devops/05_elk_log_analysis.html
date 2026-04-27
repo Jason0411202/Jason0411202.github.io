@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 05｜ELK — 日誌蒐集與分析 — DevOps 實務系列</title>
+<meta name="description" content="從一條 log 的旅程出發，串接 Fluent Bit + Elasticsearch + Kibana：建立 Data View、寫 KQL 查詢、用 Lens 出圖、做 Dashboard、設 Alerting Rule，並實際維運 Production index。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 05 · DevOps 實務篇</div>
+    <h1 class="hero-title">ELK <span>日誌蒐集與分析</span></h1>
+    <p class="hero-desc">監控告訴你「服務出狀況」，<strong>log 才告訴你「為什麼出狀況」</strong>。這堂課我們把 Fluent Bit + Elasticsearch + Kibana 串成一條穩定的 pipeline，並學會用 KQL、Lens、Dashboard、Alerting 把 log 變成可以被搜尋、聚合、告警的結構化資料。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 5 / 5 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 65 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>DevOps</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#log-pipeline">日誌管線</a></li>
+      <li><a class="toc-link" href="#kibana-orientation">Kibana UI</a></li>
+      <li><a class="toc-link" href="#data-view">Data View</a></li>
+      <li><a class="toc-link" href="#discover-kql">Discover & KQL</a></li>
+      <li><a class="toc-link" href="#lens">Lens 視覺化</a></li>
+      <li><a class="toc-link" href="#dashboards">Dashboard</a></li>
+      <li><a class="toc-link" href="#alerting">Alerting</a></li>
+      <li><a class="toc-link" href="#production-ops">Production 維運</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="log-pipeline">
+      <span class="section-eyebrow">01 — 日誌管線</span>
+      <h2>一條 log 的旅程：從 <code>println</code> 到 Kibana</h2>
+      <p>「我在程式裡 print 了一行錯誤訊息，怎麼讓它出現在 Kibana 的搜尋欄裡？」這個過程比想像中經過更多手。先看完整的 5 步：</p>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">App 寫到 stdout / stderr</div>
+            <div class="timeline-desc">應用層用 <code>fmt.Println</code> / <code>console.log</code> / <code>logger.info(...)</code> 輸出，<strong>不要寫到本地檔案</strong>。container 的世界裡 stdout 才是合約。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Container runtime 落地成檔</div>
+            <div class="timeline-desc">containerd / cri-o 會把 stdout 寫到 host node 的 <code>/var/log/containers/&lt;pod&gt;_&lt;ns&gt;_&lt;container&gt;.log</code>，每行包成 JSON 並附上 timestamp / stream。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Fluent Bit DaemonSet 在每個 node 讀檔</div>
+            <div class="timeline-desc">tail 那些 log 檔、<strong>用 Kubernetes filter 補上 namespace / pod / container / labels metadata</strong>、用 JSON parser 拆出結構化欄位。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Push 到 Elasticsearch</div>
+            <div class="timeline-desc">寫進 <code>&lt;app&gt;-YYYY.MM.DD</code> 之類的 daily index。ES 自動幫你建 mapping，欄位變成可被搜尋的 inverted index。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">5</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Kibana Data View 查詢</div>
+            <div class="timeline-desc">Kibana 不直接讀 log 檔，它透過 Data View（pattern <code>&lt;app&gt;-*</code>）跟 ES 對話。<code>@timestamp</code> 是 time field，所有的 KQL / Lens / Dashboard 都建立在 Data View 之上。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="diagram">
+        <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" aria-label="ELK log pipeline 流向圖">
+          <defs>
+            <marker id="elkArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="12">
+            <text x="380" y="32" text-anchor="middle" font-family="Syne, sans-serif" font-size="17" font-weight="700" fill="#0a0a0f">log 從應用程式到 Kibana 的 5 步旅程</text>
+            <text x="380" y="52" text-anchor="middle" fill="#6b6b7e" font-size="11">紫色箭頭 = 資料流向 ; 灰底框 = 資料的中繼站</text>
+
+            <!-- Step 1: App -->
+            <rect x="20" y="100" width="120" height="100" rx="10" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="80" y="130" text-anchor="middle" font-weight="700" fill="#0a0a0f" font-size="13">App Pod</text>
+            <text x="80" y="150" text-anchor="middle" fill="#6b6b7e" font-size="10">println / logger</text>
+            <text x="80" y="168" text-anchor="middle" fill="#0f766e" font-size="10">→ stdout</text>
+            <text x="80" y="188" text-anchor="middle" fill="#6b6b7e" font-size="9">輸出 JSON 最佳</text>
+
+            <!-- Step 2: container log file -->
+            <rect x="170" y="100" width="120" height="100" rx="10" fill="#eeede8" stroke="#c8c7be" stroke-width="1.5"/>
+            <text x="230" y="130" text-anchor="middle" font-weight="700" fill="#0a0a0f" font-size="13">Node 檔案</text>
+            <text x="230" y="150" text-anchor="middle" fill="#6b6b7e" font-size="10">/var/log/</text>
+            <text x="230" y="168" text-anchor="middle" fill="#6b6b7e" font-size="10">containers/*.log</text>
+
+            <!-- Step 3: fluent bit -->
+            <rect x="320" y="100" width="120" height="100" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.8"/>
+            <text x="380" y="128" text-anchor="middle" font-weight="700" fill="#4c1d95" font-size="13">Fluent Bit</text>
+            <text x="380" y="146" text-anchor="middle" fill="#4c1d95" font-size="10">DaemonSet</text>
+            <text x="380" y="166" text-anchor="middle" fill="#6b6b7e" font-size="10">+ k8s metadata</text>
+            <text x="380" y="184" text-anchor="middle" fill="#6b6b7e" font-size="10">+ JSON parse</text>
+
+            <!-- Step 4: ES -->
+            <rect x="470" y="100" width="120" height="100" rx="10" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="530" y="130" text-anchor="middle" font-weight="700" fill="#0a0a0f" font-size="13">Elasticsearch</text>
+            <text x="530" y="150" text-anchor="middle" fill="#6b6b7e" font-size="10">index:</text>
+            <text x="530" y="168" text-anchor="middle" fill="#0f766e" font-size="10">&lt;app&gt;-YYYY.MM.DD</text>
+            <text x="530" y="186" text-anchor="middle" fill="#6b6b7e" font-size="9">ILM 管理生命週期</text>
+
+            <!-- Step 5: Kibana -->
+            <rect x="620" y="100" width="120" height="100" rx="10" fill="#0a0a0f" stroke="#0a0a0f"/>
+            <text x="680" y="130" text-anchor="middle" font-weight="700" fill="#fafaf8" font-size="13">Kibana</text>
+            <text x="680" y="150" text-anchor="middle" fill="#a8a8b8" font-size="10">Data View</text>
+            <text x="680" y="168" text-anchor="middle" fill="#a8a8b8" font-size="10">Discover / Lens</text>
+            <text x="680" y="186" text-anchor="middle" fill="#a8a8b8" font-size="10">Dashboard / Rule</text>
+
+            <!-- Arrows -->
+            <line x1="140" y1="150" x2="170" y2="150" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#elkArr)"/>
+            <line x1="290" y1="150" x2="320" y2="150" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#elkArr)"/>
+            <line x1="440" y1="150" x2="470" y2="150" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#elkArr)"/>
+            <line x1="590" y1="150" x2="620" y2="150" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#elkArr)"/>
+
+            <!-- Labels under boxes -->
+            <text x="80"  y="232" text-anchor="middle" fill="#a8a8b8" font-size="10">① 寫 log</text>
+            <text x="230" y="232" text-anchor="middle" fill="#a8a8b8" font-size="10">② runtime 落地</text>
+            <text x="380" y="232" text-anchor="middle" fill="#a8a8b8" font-size="10">③ tail + enrich</text>
+            <text x="530" y="232" text-anchor="middle" fill="#a8a8b8" font-size="10">④ index + search</text>
+            <text x="680" y="232" text-anchor="middle" fill="#a8a8b8" font-size="10">⑤ 查詢 + 視覺化</text>
+
+            <!-- 底部備註 -->
+            <text x="380" y="280" text-anchor="middle" fill="#6b6b7e" font-size="11">Fluent Bit 是這條 pipeline 的關鍵：它是唯一同時看得到「檔案內容」與「Kubernetes metadata」的人</text>
+            <text x="380" y="298" text-anchor="middle" fill="#6b6b7e" font-size="11">少了它，ES 裡只有純文字，沒有 namespace / pod 標籤，也就無從聚合與過濾</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 1.1 — 一條 log 的 5 步旅程：app → node → Fluent Bit → ES → Kibana</div>
+      </div>
+
+      <h3>為什麼 namespace 過濾這麼重要</h3>
+      <p>在一個動輒幾十個 namespace 的 cluster 裡，<code>kube-system</code>、<code>ingress-nginx</code>、<code>cert-manager</code> 這些系統 namespace 噴出來的 log 通常是業務 log 的數倍。在 Fluent Bit 設定中加上 <strong>namespace allowlist 或 denylist</strong>，能讓 ES index 大小直接降 5 - 10 倍：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml · fluent-bit configmap</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 只收業務 namespace；用 grep filter 過濾</span>
+[FILTER]
+    Name        kubernetes
+    Match       kube.*
+    Merge_Log   On
+    Keep_Log    Off
+
+[FILTER]
+    Name        grep
+    Match       kube.*
+    <span class="tk-cm"># 只保留 namespace 是 &lt;ns&gt; / production / staging 的</span>
+    Regex       $kubernetes['namespace_name'] ^(&lt;ns&gt;|production|staging)$
+
+[FILTER]
+    Name        grep
+    Match       kube.*
+    <span class="tk-cm"># 排除健康檢查 noise</span>
+    Exclude     log /healthz</code></pre>
+      </div>
+
+      <h3>JSON 結構化 vs 純文字 log</h3>
+      <p>同一個錯誤事件，<strong>應用程式輸出 JSON 還是純文字</strong>，會徹底改變 Kibana 裡能做的事。</p>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>純文字 log</div>
+          <div class="compare-body">
+            <code>2026-04-28 12:31:09 ERROR /api/orders 500 latency=842ms user=u_42</code>
+            ES 只把它當成一坨 <code>message</code> 字串。想找「latency 超過 500ms 的 POST」？只能 wildcard <code>latency=*</code>，找不出範圍，更不能聚合算 p95。
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>JSON 結構化 log</div>
+          <div class="compare-body">
+            <code>{"ts":"2026-04-28T12:31:09Z","level":"error","path":"/api/orders","status":500,"latency_ms":842,"user_id":"u_42"}</code>
+            ES 自動把 <code>status</code> 變 int、<code>latency_ms</code> 變 float。<strong>能 range 查詢、能 aggregate、能畫 p95 line chart。</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>要讓 log 變結構化，<u>應用程式本身</u>就要先輸出 JSON</strong>
+          Fluent Bit 的 JSON parser 只能解開「app 已經是 JSON」的 log。常見做法：Go 用 <code>logrus</code> 的 <code>JSONFormatter</code> 或 <code>zap</code>；Node.js 用 <code>pino</code>；Python 用 <code>python-json-logger</code>。<strong>不要</strong>還在 print 純文字然後寄望下游用 regex 拆 — 那條路又脆又慢。
+        </div>
+      </div>
+
+      <h3>Index 命名與 ILM 基礎</h3>
+      <p>常見命名 pattern：</p>
+
+      <table>
+        <thead>
+          <tr><th>Pattern</th><th>例子</th><th>適用</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>&lt;app&gt;-YYYY.MM.DD</code></td><td><code>example-app-2026.04.28</code></td><td>每天一個 index，舊資料容易整批刪</td></tr>
+          <tr><td><code>logstash-YYYY.MM.DD</code></td><td><code>logstash-2026.04.28</code></td><td>遺留命名，ECK 預設模板還會用</td></tr>
+          <tr><td><code>&lt;app&gt;-&lt;env&gt;-*</code></td><td><code>example-app-prod-000001</code></td><td>搭配 rollover，靠 ILM 自動切新 index</td></tr>
+        </tbody>
+      </table>
+
+      <p>ILM (Index Lifecycle Management) 把 index 的生命分成幾個階段，每個階段做不同的事：</p>
+
+      <table>
+        <thead>
+          <tr><th>階段</th><th>典型動作</th><th>用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>hot</strong></td><td>rollover (達到 50GB 或 1 天就切新 index)</td><td>剛寫進來、被頻繁查詢的資料</td></tr>
+          <tr><td><strong>warm</strong></td><td>force merge、降 replica、移到便宜 node</td><td>偶爾查詢、不再寫入</td></tr>
+          <tr><td><strong>cold / frozen</strong></td><td>搬到 searchable snapshot</td><td>合規保留、極少查詢</td></tr>
+          <tr><td><strong>delete</strong></td><td>30/60/90 天後直接刪</td><td>釋放磁碟，控成本</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="kibana-orientation">
+      <span class="section-eyebrow">02 — Kibana 全景</span>
+      <h2>Kibana 8.x 的 UI 地圖</h2>
+      <p>第一次打開 Kibana 8 會有點迷路，因為左上角那個 hamburger menu 把功能塞得很滿。先記住這張地圖，後面 5 個 section 都在這上面操作。</p>
+
+      <h3>準備工作：取密碼 + port-forward</h3>
+      <p>如果你用 ECK (Elastic Cloud on Kubernetes) 安裝，初始 elastic 密碼會放在 secret 裡：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 1. 抓 elastic super-user 的密碼</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> <span class="tk-op">-n</span> elastic-system get secret \
+    &lt;es&gt;-es-elastic-user <span class="tk-op">-o</span> jsonpath=<span class="tk-st">'{.data.elastic}'</span> | base64 <span class="tk-op">-d</span>; echo
+
+<span class="tk-cm"># 2. port-forward Kibana service 到本機 5601</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> <span class="tk-op">-n</span> elastic-system port-forward svc/&lt;kibana&gt;-kb-http 5601
+
+<span class="tk-cm"># 3. 瀏覽器開 https://localhost:5601</span>
+<span class="tk-cm">#    帳號 elastic、密碼貼上面那個</span></code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>port-forward 是 dev 用，不是 prod 用</strong>
+          正式環境應該要把 Kibana 套到 Ingress + OIDC SSO 後面，並且用獨立的低權限 role 給工程師查 log，<strong>不要</strong>所有人共用 <code>elastic</code> super-user。
+        </div>
+      </div>
+
+      <h3>Hamburger menu 的兩大區塊</h3>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>Analytics — 平常用</div>
+          <div class="compare-body">
+            <ul style="margin:0 0 0 1rem;font-size:13px;">
+              <li><strong>Discover</strong> — 看 log，下 KQL</li>
+              <li><strong>Dashboards</strong> — 組好的儀表板</li>
+              <li><strong>Visualize Library</strong> — 存好的圖表</li>
+              <li><strong>Lens</strong> — 拖拉式新建圖表</li>
+              <li><strong>Maps</strong> — 地理視覺化（IP / GeoIP 用得到）</li>
+            </ul>
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>Management — 偶爾用</div>
+          <div class="compare-body">
+            <ul style="margin:0 0 0 1rem;font-size:13px;">
+              <li><strong>Stack Management</strong>
+                <ul style="margin-top:4px;">
+                  <li>Data Views — 定義要查哪些 index</li>
+                  <li>Index Lifecycle Policies — ILM</li>
+                  <li>Index Management — 看 index 大小</li>
+                  <li>Connectors / Rules — 告警設定</li>
+                </ul>
+              </li>
+              <li><strong>Dev Tools</strong> — 直接打 ES API</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <p>整堂課我們會在這兩個區塊輪流跳。先記住路徑大概在哪，之後就不會覺得迷宮。</p>
+    </section>
+
+    <section id="data-view">
+      <span class="section-eyebrow">03 — Data View</span>
+      <h2>第一個 Data View：把 index 變成 Kibana 看得懂的東西</h2>
+      <p>Kibana 不是直接讀 ES index，它讀的是「Data View」（舊版叫 Index Pattern）。一個 Data View 包了三件事：<strong>哪些 index、用哪個欄位當時間、欄位怎麼解讀</strong>。</p>
+
+      <h3>建立步驟</h3>
+      <ol>
+        <li>左上 hamburger → <strong>Stack Management</strong></li>
+        <li>左側 Kibana → <strong>Data Views</strong></li>
+        <li>右上 <strong>Create data view</strong></li>
+        <li>填三個欄位：
+          <ul>
+            <li><strong>Name</strong>：<code>&lt;app&gt;-logs</code> (給人看的名字)</li>
+            <li><strong>Index pattern</strong>：<code>&lt;app&gt;-*</code> (對應 ES 那邊的 index)</li>
+            <li><strong>Timestamp field</strong>：<code>@timestamp</code> (時間軸要靠它)</li>
+          </ul>
+        </li>
+        <li>按 <strong>Save data view to Kibana</strong></li>
+      </ol>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>欄位列表是 snapshot，不會自動跟</strong>
+          當你的應用新增了一個欄位（例如多輸出 <code>request_id</code>），Kibana 不會自動知道。要回到 Data View 詳細頁，按右上角的 <strong>Refresh field list</strong>，新欄位才會出現在 Discover 的 sidebar。
+        </div>
+      </div>
+
+      <h3>典型 Data View 範例</h3>
+      <table>
+        <thead>
+          <tr><th>用途</th><th>Name</th><th>Index pattern</th><th>Time field</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>單一服務</td><td><code>&lt;app&gt;-logs</code></td><td><code>&lt;app&gt;-*</code></td><td><code>@timestamp</code></td></tr>
+          <tr><td>整個 cluster</td><td><code>cluster-logs-all</code></td><td><code>logstash-*,fluentbit-*</code></td><td><code>@timestamp</code></td></tr>
+          <tr><td>指標型 metric (跟 log 同樣思路)</td><td><code>metricbeat</code></td><td><code>metricbeat-*</code></td><td><code>@timestamp</code></td></tr>
+        </tbody>
+      </table>
+
+      <p>同一個 Data View 可以對到多個 index pattern，逗號分隔。但<strong>不要把一個業務跟一個系統 namespace 混在同一個 Data View</strong>，會讓查詢條件變很長。</p>
+    </section>
+
+    <section id="discover-kql">
+      <span class="section-eyebrow">04 — Discover & KQL</span>
+      <h2>Discover：log 工程師每天 90% 的時間都在這頁</h2>
+      <p>Analytics → Discover。打開後左邊選剛才的 Data View，畫面會分成三塊：</p>
+
+      <ul>
+        <li><strong>右上時間選擇器</strong> — 時間範圍 <code>Last 15 minutes</code> / <code>Today</code> / <code>absolute date</code>。incident 排查時通常切成 <code>Last 5 minutes</code>，再開 <strong>auto-refresh 10s</strong> 變即時 tail。</li>
+        <li><strong>左側欄位 sidebar</strong> — Available fields vs Selected fields；上方搜尋框可以篩欄位名稱。</li>
+        <li><strong>右側主畫面</strong> — 上方 histogram 顯示分佈，下方表格列出每筆 document。</li>
+      </ul>
+
+      <h3>用「加 column」把表格變得有意義</h3>
+      <p>預設只看到 <code>@timestamp</code> 跟 <code>_source</code>（一坨 JSON），完全沒法快速掃。從左 sidebar 把這幾個欄位加成 column，畫面馬上有可讀性：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">columns</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 推薦的標準 5 欄</span>
+@timestamp
+kubernetes.namespace_name
+method
+path
+status
+latency_ms
+
+<span class="tk-cm"># 點任一 row 左邊的展開箭頭，可以看完整 document JSON</span>
+<span class="tk-cm"># 滑鼠 hover 在欄位值上會出現 + / - 按鈕，一鍵加成 filter</span></code></pre>
+      </div>
+
+      <h3>KQL 五式</h3>
+      <p>KQL (Kibana Query Language) 是 Kibana 的查詢方言，比 Lucene 直觀。學會這五式就能應付 95% 的 log 排查：</p>
+
+      <table>
+        <thead>
+          <tr><th>類型</th><th>語法</th><th>例子</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>等於</td><td><code>field:value</code></td><td><code>level:"error"</code></td></tr>
+          <tr><td>數字範圍</td><td><code>field &gt;= n</code> / <code>&gt;</code> / <code>&lt;=</code></td><td><code>status &gt;= 500</code></td></tr>
+          <tr><td>萬用字元</td><td><code>field:value*</code></td><td><code>path:/api/*</code></td></tr>
+          <tr><td>布林組合</td><td><code>AND</code> / <code>OR</code> / <code>NOT</code></td><td><code>level:"error" AND NOT path:"/healthz"</code></td></tr>
+          <tr><td>欄位存在</td><td><code>field:*</code></td><td><code>request_id:*</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>實戰查詢範例</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">kql</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 找這個 namespace 的所有 5xx</span>
+kubernetes.namespace_name:<span class="tk-st">"&lt;ns&gt;"</span> AND status &gt;= 500
+
+<span class="tk-cm"># error level 但排除健康檢查雜訊</span>
+level:<span class="tk-st">"error"</span> AND NOT path:<span class="tk-st">"/healthz"</span>
+
+<span class="tk-cm"># 慢的 POST 請求</span>
+latency_ms &gt; 500 AND method:<span class="tk-st">"POST"</span>
+
+<span class="tk-cm"># 同一個 request 的所有 log（如果你有埋 trace_id）</span>
+trace_id:<span class="tk-st">"abc123"</span>
+
+<span class="tk-cm"># 多個 status 都要</span>
+status:(500 OR 502 OR 503 OR 504)</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>數字欄位不能用 wildcard</strong>
+          <code>status:5*</code> 看似合理，但 <code>status</code> 是 int，wildcard 只對 keyword/text 有效。要寫 <code>status &gt;= 500</code> 才正確。剛開始幾乎所有人都會踩這個雷。
+        </div>
+      </div>
+
+      <h3>KQL ↔ Lucene 切換</h3>
+      <p>查詢框右邊的小 <strong>KQL</strong> 標籤可以切到 <strong>Lucene</strong>。Lucene 的優勢是支援 regex (<code>field:/regex/</code>) 跟 fuzzy (<code>~</code>)，KQL 沒有。日常用 KQL，只有少數需要 regex 的場合切過去。</p>
+
+      <h3>Saved Search 與 CSV 匯出</h3>
+      <p>按右上 <strong>Save</strong> 把當前 Discover 狀態（filter + columns + Data View + 時間）存成 Saved Search，下次直接打開、也可以拿去 Dashboard 當 panel。要把表格匯出給非工程師看，<strong>Share → Generate CSV report</strong>，最多 10000 筆。</p>
+
+      <details class="collapse">
+        <summary>KQL 進階技巧 cheat sheet <span class="collapse-tag">深入</span></summary>
+        <div class="collapse-body">
+<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># nested 欄位（k8s metadata 通常是 nested）</span>
+kubernetes.labels.app:<span class="tk-st">"&lt;app&gt;"</span>
+
+<span class="tk-cm"># 多值欄位 array contain</span>
+tags:(<span class="tk-st">"slow"</span> AND <span class="tk-st">"retry"</span>)
+
+<span class="tk-cm"># 否定多個值</span>
+NOT level:(<span class="tk-st">"debug"</span> OR <span class="tk-st">"trace"</span>)
+
+<span class="tk-cm"># 文字含關鍵字（會走 analyzer，可能斷詞）</span>
+message:<span class="tk-st">"connection refused"</span>
+
+<span class="tk-cm"># 完全比對（用 .keyword sub-field）</span>
+message.keyword:<span class="tk-st">"connection refused"</span>
+
+<span class="tk-cm"># 範圍 inclusive / exclusive 寫法</span>
+latency_ms:[100 TO 500]      <span class="tk-cm"># inclusive</span>
+latency_ms:{100 TO 500}      <span class="tk-cm"># exclusive</span>
+
+<span class="tk-cm"># 判斷欄位「不存在」</span>
+NOT request_id:*</code></pre>
+        </div>
+      </details>
+    </section>
+
+    <section id="lens">
+      <span class="section-eyebrow">05 — Lens 視覺化</span>
+      <h2>Lens：拖拉欄位就出圖</h2>
+      <p>Analytics → Lens（或 Discover 右上「Visualize」也會帶你進來）。Lens 是 Kibana 8 主推的圖表編輯器：你拖欄位進 X / Y / Break down，它幫你猜圖表類型；不滿意可以右上角換。</p>
+
+      <h3>三大常用視覺化類型</h3>
+      <table>
+        <thead>
+          <tr><th>類型</th><th>適合的問題</th><th>範例</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Bar (vertical / stacked)</strong></td><td>分類×時間的計數</td><td>每分鐘 5xx vs 4xx vs 2xx 數量</td></tr>
+          <tr><td><strong>Line</strong></td><td>連續指標隨時間變化</td><td>p95 latency 趨勢線</td></tr>
+          <tr><td><strong>Metric / Gauge</strong></td><td>單一數字 KPI</td><td>過去 5 分鐘錯誤總筆數</td></tr>
+          <tr><td><strong>Table / Top values</strong></td><td>誰最多</td><td>Top 10 path、Top 10 error pod</td></tr>
+          <tr><td><strong>Heat map</strong></td><td>兩維度交叉</td><td>每小時 × namespace 的錯誤分佈</td></tr>
+        </tbody>
+      </table>
+
+      <h3>範例 1：log 量隨時間變化（stacked bar by status）</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">lens config</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 操作步驟</span>
+1. Data View      = &lt;app&gt;-logs
+2. 拖 @timestamp 到 Horizontal axis
+3. 拖 status      到 Vertical axis     → Lens 自動變 Count of records
+4. 拖 status      到 Break down by     → 變成 stacked bar
+5. 圖表類型右上選 Bar vertical stacked
+6. 命名: <span class="tk-st">"&lt;app&gt; · log volume by status"</span></code></pre>
+      </div>
+
+      <h3>範例 2：Top 10 path</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">lens config</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>1. 圖表類型      = Bar horizontal
+2. Vertical axis = Top values of <span class="tk-st">"path"</span> (size 10)
+3. Horizontal    = Count of records
+4. 排序          = By Count of records descending
+5. 命名: <span class="tk-st">"Top 10 paths · last 24h"</span></code></pre>
+      </div>
+
+      <h3>範例 3：p95 latency line</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">lens config</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>1. 圖表類型     = Line
+2. Horizontal   = @timestamp (auto interval)
+3. Vertical     = Percentile of <span class="tk-st">"latency_ms"</span> at <span class="tk-st">"95"</span>
+4. (可選) Break down by <span class="tk-st">"path"</span> 看每條 endpoint 的 p95
+5. 命名: <span class="tk-st">"latency p95 by path"</span></code></pre>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>多 layer 疊加：line + bar 同框</strong>
+          Lens 右側的 <em>Layers</em> 區可以加第二層。常見組合：bar 顯示請求數量、線疊加顯示 p95 latency。視覺上一眼看出「量大 + 慢」的時段是什麼時候。
+        </div>
+      </div>
+
+      <p>圖表做好後按右上 <strong>Save</strong>，存到 <strong>Visualize Library</strong>。下一節 Dashboard 會直接從 Library 抓進來。</p>
+    </section>
+
+    <section id="dashboards">
+      <span class="section-eyebrow">06 — Dashboard</span>
+      <h2>把單個圖表組成有故事的 Dashboard</h2>
+      <p>單獨的 Lens 是片段；Dashboard 是整套故事。一個好的服務 Dashboard 通常回答這三個問題：</p>
+
+      <ul>
+        <li><strong>現在</strong> — 過去 5 分鐘 RPS、錯誤率、p95 latency（top 大字 metric）</li>
+        <li><strong>趨勢</strong> — log volume / error rate / latency 的 line chart</li>
+        <li><strong>Top N</strong> — 哪個 path、哪個 pod、哪個 user 出問題最多</li>
+      </ul>
+
+      <h3>建立流程</h3>
+      <ol>
+        <li>Analytics → <strong>Dashboards</strong> → <strong>Create dashboard</strong></li>
+        <li>右上 <strong>Add from library</strong> 把剛存的 Lens 加進來</li>
+        <li>拖大小、排版（建議 metric 放最上，趨勢圖中段，Top N 放下方）</li>
+        <li>每個 panel 點右上齒輪可以加 <strong>panel-level filter</strong>（例如固定 <code>kubernetes.namespace_name:"&lt;ns&gt;"</code>）</li>
+        <li>整個 dashboard 加全域 filter / KQL，整片同步收斂</li>
+        <li>右上 <strong>Save</strong></li>
+      </ol>
+
+      <h3>Controls：給觀看者的快速 filter</h3>
+      <p>Dashboard 上方可以加 <strong>Controls</strong>，讓非工程師同事也能 self-service 切換條件：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">controls config</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 進入 dashboard edit 模式 → 上方 Controls → Add control</span>
+
+Control 1:
+  type:    Options list
+  field:   status                         <span class="tk-cm"># 下拉多選 200/404/500</span>
+  label:   <span class="tk-st">"HTTP status"</span>
+
+Control 2:
+  type:    Options list
+  field:   kubernetes.pod_name            <span class="tk-cm"># 多選 pod</span>
+  label:   <span class="tk-st">"Pod"</span>
+
+Control 3:
+  type:    Range slider
+  field:   latency_ms
+  label:   <span class="tk-st">"Latency (ms)"</span>
+
+<span class="tk-cm"># Save controls 後，這些選擇器會掛在 dashboard 最上方</span>
+<span class="tk-cm"># 觀看者點選後整片 dashboard 都會跟著更新</span></code></pre>
+      </div>
+
+      <h3>分享方式</h3>
+      <table>
+        <thead>
+          <tr><th>方式</th><th>內容</th><th>適合場景</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Permalink (Snapshot)</td><td>當下狀態凍結成 URL，含時間範圍與 filter</td><td>Slack 貼給同事看「這個時段的 incident」</td></tr>
+          <tr><td>Permalink (Saved object)</td><td>連結指向 Saved Dashboard，內容會跟著更新</td><td>放進 wiki / runbook</td></tr>
+          <tr><td>Embed code</td><td>iframe 嵌進內部入口</td><td>內部 Status Page</td></tr>
+          <tr><td>PNG / PDF report</td><td>排程產出靜態快照</td><td>每週週報、合規存證</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>Dashboard 不是越炫越好</strong>
+          每個 panel 都要能回答一個明確問題。如果一張圖你自己也說不出「這在告訴我什麼」，那它就只是裝飾。把那種圖刪掉，整個 dashboard 會立刻好用 3 倍。
+        </div>
+      </div>
+    </section>
+
+    <section id="alerting">
+      <span class="section-eyebrow">07 — Alerting</span>
+      <h2>從「事後查 log」進化到「主動被通知」</h2>
+      <p>到這一節為止，我們做的都是 <strong>pull</strong>：人去查 log、看 dashboard。Alerting 把它翻過來變 <strong>push</strong>：條件命中就主動敲你 Slack。Kibana 的 Alerting framework 由三個概念組成：</p>
+
+      <table>
+        <thead>
+          <tr><th>概念</th><th>是什麼</th><th>例子</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Connector</strong></td><td>對外通訊的端點（一次性設好就重複用）</td><td>Slack webhook、SMTP、PagerDuty、generic Webhook</td></tr>
+          <tr><td><strong>Rule</strong></td><td>定期執行的條件（cron + query + threshold）</td><td>每分鐘檢查最近 5 分鐘 5xx 是否 &gt; 10</td></tr>
+          <tr><td><strong>Action</strong></td><td>Rule 命中時要做什麼，必須綁一個 Connector</td><td>呼叫 Slack connector 發訊息</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Step 1：建一個 Slack Connector</h3>
+      <ol>
+        <li>Stack Management → <strong>Alerts and Insights</strong> → <strong>Connectors</strong></li>
+        <li><strong>Create connector</strong> → 選 <strong>Slack</strong></li>
+        <li>填入 Slack Incoming Webhook URL（從 Slack App config 複製過來）</li>
+        <li>命名 <code>slack-prod-alerts</code> → Save</li>
+      </ol>
+
+      <h3>Step 2：建一條 Rule</h3>
+      <p>路徑：Stack Management → <strong>Alerts and Insights</strong> → <strong>Rules</strong> → <strong>Create rule</strong>。下面以 <em>Elasticsearch query</em> 類型為例：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">rule config</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>Name:         <span class="tk-st">"&lt;app&gt; 5xx surge"</span>
+Rule type:    Elasticsearch query
+Index:        &lt;app&gt;-*
+Time field:   @timestamp
+Query (KQL):  status &gt;= 500
+Time window:  last 5 minutes
+
+Threshold:
+  WHEN: count of documents
+  IS:   &gt; 10
+  OVER: last 5 minutes
+
+Schedule:     every 1 minute
+Notify:       Only on status change   <span class="tk-cm"># 避免 spam</span>
+
+<span class="tk-cm"># Action</span>
+Connector:    slack-prod-alerts
+Run when:     Query matched
+Message:
+  :rotating_light: <span class="tk-st">{{rule.name}}</span> fired
+  Hits: <span class="tk-st">{{context.hits}}</span> over last 5m
+  &lt;<span class="tk-st">{{context.link}}</span>|Open in Kibana&gt;</code></pre>
+      </div>
+
+      <p>常用的 mustache 變數：<code>{{rule.name}}</code>、<code>{{context.hits}}</code>、<code>{{context.title}}</code>、<code>{{context.link}}</code>、<code>{{date}}</code>。</p>
+
+      <h3>Maintenance Windows：計畫部署時的消音閥</h3>
+      <p>每次部署一定會有短暫 5xx，照原本 rule 一定會吵。Stack Management → <strong>Maintenance Windows</strong> → <strong>Create</strong> 設一個時段（也可以 RRULE 週期化），那段時間命中的 rule 不會發 action：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">maintenance window</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>Name:        <span class="tk-st">"&lt;app&gt; release window"</span>
+Start:       2026-04-29 10:00 (Asia/Taipei)
+Duration:    30 minutes
+Filter:      kibana.alert.rule.tags:<span class="tk-st">"&lt;app&gt;"</span>   <span class="tk-cm"># 只壓這支服務的 rule</span>
+Repeat:      Weekly · 每週二 10:00 (如果你固定週二發版)</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>不要把 maintenance window 開太寬</strong>
+          見過團隊因為怕被吵，把 window 設成 24/7 結果服務真的掛了也沒人知道。Maintenance window 是「我預期會吵」，不是「我不想被吵」。前者是工程，後者是逃避。
+        </div>
+      </div>
+    </section>
+
+    <section id="production-ops">
+      <span class="section-eyebrow">08 — Production 維運</span>
+      <h2>真實環境的疑難雜症處理</h2>
+
+      <h3>「日誌都沒出來」三步排錯</h3>
+      <p>新手 95% 會遇到的問題：「我 deploy 了、應用程式有 print 啊，可是 Kibana 一片空。」依下面三步順序檢查，5 分鐘內能定位：</p>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Fluent Bit pod 是不是 Running？</div>
+            <div class="timeline-desc">90% 的「沒 log」都死在這層。CrashLoopBackOff 通常是 ConfigMap YAML 有錯。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">ES 那邊有 index 嗎？</div>
+            <div class="timeline-desc">Fluent Bit 健康，但 ES 裡沒 index，多半是 Fluent Bit 認證或網路出狀況。Dev Tools 直接 <code>GET _cat/indices</code> 確認。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Data View pattern + 時間範圍對嗎？</div>
+            <div class="timeline-desc">ES 有 index 但 Discover 空白？檢查 Data View pattern 是否真的 cover 那個 index，再把時間拉成 <em>Last 24 hours</em>，避免 5 分鐘內剛好沒事件。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash · 三步指令</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># Step 1 · Fluent Bit 健康嗎</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> <span class="tk-op">-n</span> logging get pods <span class="tk-op">-l</span> app=fluent-bit
+<span class="tk-cm"># 期望: 每個 node 一個 pod，全部 Running</span>
+
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> <span class="tk-op">-n</span> logging logs <span class="tk-op">-l</span> app=fluent-bit <span class="tk-op">--tail</span>=100
+<span class="tk-cm"># 期望: 看到 [info] [output] elasticsearch ... ok 之類</span>
+
+<span class="tk-cm"># Step 2 · 在 Kibana Dev Tools 確認 index 存在 (下節介紹)</span>
+GET _cat/indices/&lt;app&gt;-*?v&amp;s=index
+
+<span class="tk-cm"># Step 3 · 回 Discover，時間拉寬 + 確認 Data View 抓得到</span></code></pre>
+      </div>
+
+      <h3>Index 容量管理</h3>
+      <p>Stack Management → <strong>Index Management</strong> 看每個 index 的 size。常見治理動作：</p>
+
+      <ol>
+        <li><strong>找出佔用最大的 top-N index</strong>，按 Storage size 倒序排</li>
+        <li>確認熱門 index 都掛了 ILM policy（Settings → Index lifecycle management policy）</li>
+        <li>沒 ILM 的就<strong>立刻補</strong>，否則磁碟很快爆</li>
+      </ol>
+
+      <p>典型 ILM policy：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">ilm policy</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>Phase: hot
+  rollover when:
+    - max primary size: 50 GB
+    - max age:          1 day
+
+Phase: warm  (after 2 days)
+  - replicas: 1   (從 hot 的 2 降下來)
+  - force merge: max segments = 1
+  - shrink (optional)
+
+Phase: delete (after 30 days)
+  - delete index</code></pre>
+      </div>
+
+      <h3>Dev Tools：直接打 ES API</h3>
+      <p>Management → <strong>Dev Tools</strong> 是 Kibana 內建的 ES REST API console，左邊寫 request，<kbd>Ctrl</kbd> + <kbd>Enter</kbd> 送出，右邊看 JSON 回應：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">dev tools · es api</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 1. 集群健康（red 就準備痛苦）</span>
+GET _cluster/health
+
+<span class="tk-cm"># 2. 看你關心的 index 列表 + 大小 + doc 數</span>
+GET _cat/indices/&lt;app&gt;-*?v&amp;s=index
+
+<span class="tk-cm"># 3. 直接搜尋 (跟 Discover 等價，但能直接看 raw response)</span>
+POST &lt;app&gt;-*/_search
+{
+  <span class="tk-st">"size"</span>: 5,
+  <span class="tk-st">"query"</span>: {
+    <span class="tk-st">"match"</span>: { <span class="tk-st">"status"</span>: 500 }
+  },
+  <span class="tk-st">"sort"</span>: [{ <span class="tk-st">"@timestamp"</span>: <span class="tk-st">"desc"</span> }]
+}
+
+<span class="tk-cm"># 4. 看單一 index 的 mapping（欄位型別對不對）</span>
+GET &lt;app&gt;-2026.04.28/_mapping
+
+<span class="tk-cm"># 5. 緊急：手動刪一個爆掉的測試 index</span>
+DELETE &lt;app&gt;-test-2026.04.28</code></pre>
+      </div>
+
+      <details class="collapse">
+        <summary>常用 ES API cheat sheet <span class="collapse-tag">深入</span></summary>
+        <div class="collapse-body">
+<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># 看 node / shard 分佈</span>
+GET _cat/nodes?v
+GET _cat/shards/&lt;app&gt;-*?v
+
+<span class="tk-cm"># 看哪個 index 沒掛 ILM</span>
+GET *<span class="tk-op">/</span>_settings/index.lifecycle.name?flat_settings=true
+
+<span class="tk-cm"># 看 ILM 跑到哪一步、有沒有失敗</span>
+GET &lt;app&gt;-*/_ilm/explain
+
+<span class="tk-cm"># aggregation 範例：每個 status 多少筆</span>
+POST &lt;app&gt;-*/_search
+{
+  <span class="tk-st">"size"</span>: 0,
+  <span class="tk-st">"aggs"</span>: {
+    <span class="tk-st">"by_status"</span>: {
+      <span class="tk-st">"terms"</span>: { <span class="tk-st">"field"</span>: <span class="tk-st">"status"</span>, <span class="tk-st">"size"</span>: 10 }
+    }
+  }
+}
+
+<span class="tk-cm"># 改一個 index 的 number_of_replicas (省成本)</span>
+PUT &lt;app&gt;-2026.04.27/_settings
+{ <span class="tk-st">"index.number_of_replicas"</span>: 0 }</code></pre>
+        </div>
+      </details>
+
+      <h3>系列完結語</h3>
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>5 堂課跑下來，你手上已經有完整的閉環</strong>
+          Lesson 01 寫了 CI/CD pipeline 把 code 變成 build；Lesson 02 用容器化把 build 變成 image；Lesson 03 用 IaC / GitOps 把 image 變成 cluster 上的 service；Lesson 04 用 Prometheus + Grafana 知道 service 健康狀態；今天 Lesson 05 用 ELK 把每一條 log 串起來，補上「為什麼出狀況」的最後一塊。<br><br>
+          <strong>下一步建議</strong>：把這 5 堂的工具放進你自己的 side project，從一個小服務開始實作 <em>commit → CI → image → 部署 → metric → log</em> 的全流程。出 incident 時你會第一次體會到「監控告訴你『現在不對勁』，log 告訴你『發生什麼事』」這兩件事如何協作。<br><br>
+          DevOps 不是工具堆疊，是 feedback loop。<strong>願你之後每次 push code，都有信心。</strong>
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "為什麼建議應用程式輸出 <strong>JSON 格式</strong>的 log，而不是純文字？",
+    "options": [
+      "JSON 比較好看",
+      "JSON 寫進 ES 後欄位會有型別，能做 range 查詢、聚合與 p95 之類的指標計算",
+      "JSON 比純文字檔案小",
+      "Fluent Bit 不支援純文字"
+    ],
+    "answer": 1,
+    "explain": "純文字 log 在 ES 裡只是一坨 <code>message</code> 字串。JSON 讓 ES 自動建 mapping，<code>status</code> 變 int、<code>latency_ms</code> 變 float，於是可以下 <code>status &gt;= 500</code>、可以對 <code>latency_ms</code> 算 percentile 95。Fluent Bit 純文字也能收，只是收完 ES 那邊看不出結構。"
+  },
+  {
+    "question": "想用 KQL 找所有 5xx，下列哪一個寫法<strong>正確</strong>？",
+    "options": [
+      "<code>status:5*</code>",
+      "<code>status >= 500</code>",
+      "<code>status:\"5xx\"</code>",
+      "<code>http.status:500*</code>"
+    ],
+    "answer": 1,
+    "explain": "<code>status</code> 在 mapping 裡是數字 (long / integer)，<strong>wildcard 只能用在 keyword/text 欄位</strong>。要找 500 - 599，只能寫 range：<code>status &gt;= 500</code>。或是 <code>status:(500 OR 502 OR 503 OR 504)</code> 列舉常見幾個。"
+  },
+  {
+    "question": "「日誌都沒出來」的標準三步排錯，<strong>第一步</strong>該檢查什麼？",
+    "options": [
+      "Kibana Data View 是不是 refresh field list 過了",
+      "ES 集群 cluster health 是不是 green",
+      "Fluent Bit DaemonSet 的 pod 是不是 Running，常見 CrashLoopBackOff 是 ConfigMap 寫錯",
+      "Slack connector 設定對不對"
+    ],
+    "answer": 2,
+    "explain": "管線最上游的搬運工是 Fluent Bit。Fluent Bit 死了，後面再怎麼配置都沒 log。九成「沒 log」死在這層；用 <code>kubectl -n logging get pods -l app=fluent-bit</code> 一秒看清楚。CrashLoopBackOff 多半是 ConfigMap YAML 縮排錯或 output endpoint 錯。"
+  },
+  {
+    "question": "ILM 三個典型階段中，下列哪些動作是<strong>可以</strong>做的？(多選)",
+    "options": [
+      "hot 階段：當 index 達到 50GB 或 1 天就 rollover 切新 index",
+      "warm 階段：降 replica 數量、force merge、移到便宜的 storage",
+      "delete 階段：把超過 30/60/90 天的老 index 刪掉",
+      "ILM 不能控制 replica 數量，只能 rollover"
+    ],
+    "answer": [0, 1, 2],
+    "explain": "ILM 把 index 的生命分成 hot / warm / cold / delete 四個階段。<strong>hot 階段做 rollover</strong>（達到大小或天數就切新 index）、<strong>warm 階段做降級</strong>（replica 從 2 降到 1、force merge 成一個 segment、搬到便宜 node）、<strong>delete 階段</strong>就是刪除。第四個選項錯：ILM 完全可以控制 replica。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://www.elastic.co/guide/en/kibana/current/introduction.html" target="_blank" rel="noopener">Kibana · Introduction</a><span class="ref-meta">入門總覽</span></li>
+        <li><a href="https://www.elastic.co/guide/en/kibana/current/data-views.html" target="_blank" rel="noopener">Kibana · Data Views</a><span class="ref-meta">Data View 完整指引</span></li>
+        <li><a href="https://www.elastic.co/guide/en/kibana/current/kuery-query.html" target="_blank" rel="noopener">Kibana · KQL Reference</a><span class="ref-meta">KQL 語法</span></li>
+        <li><a href="https://www.elastic.co/docs/explore-analyze/discover/discover-get-started" target="_blank" rel="noopener">Elastic · Discover Get Started</a><span class="ref-meta">Discover 教學</span></li>
+        <li><a href="https://www.elastic.co/docs/explore-analyze/visualize/lens" target="_blank" rel="noopener">Elastic · Lens</a><span class="ref-meta">視覺化建立</span></li>
+        <li><a href="https://www.elastic.co/guide/en/kibana/current/dashboard.html" target="_blank" rel="noopener">Kibana · Dashboards</a><span class="ref-meta">Dashboard</span></li>
+        <li><a href="https://www.elastic.co/guide/en/kibana/current/add-controls.html" target="_blank" rel="noopener">Kibana · Add Controls</a><span class="ref-meta">Dashboard Controls</span></li>
+        <li><a href="https://www.elastic.co/docs/explore-analyze/alerting/alerts/create-manage-rules" target="_blank" rel="noopener">Elastic · Create &amp; Manage Rules</a><span class="ref-meta">Alerting Rules</span></li>
+        <li><a href="https://www.elastic.co/guide/en/kibana/current/action-types.html" target="_blank" rel="noopener">Kibana · Connector Action Types</a><span class="ref-meta">Slack / Webhook 等</span></li>
+        <li><a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/index-lifecycle-management.html" target="_blank" rel="noopener">Elasticsearch · Index Lifecycle Management</a><span class="ref-meta">ILM</span></li>
+        <li><a href="https://docs.fluentbit.io/manual/pipeline/filters/kubernetes" target="_blank" rel="noopener">Fluent Bit · Kubernetes Filter</a><span class="ref-meta">k8s metadata enrich</span></li>
+        <li><a href="https://docs.fluentbit.io/manual/pipeline/parsers/json" target="_blank" rel="noopener">Fluent Bit · JSON Parser</a><span class="ref-meta">解 JSON log</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="04_prometheus_grafana.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 04 · Prometheus + Grafana</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next disabled" aria-disabled="true">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">DevOps 系列已完結 · 預告：故障演練</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">5 堂 DevOps 系列 <span class="progress-pill">5 / 5</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="01_azure_devops.html"><span class="course-nav-num">01</span><span>Azure DevOps</span></a></li>
+        <li><a class="course-nav-item" href="02_kubernetes_practical.html"><span class="course-nav-num">02</span><span>Kubernetes</span></a></li>
+        <li><a class="course-nav-item" href="03_argocd_gitops.html"><span class="course-nav-num">03</span><span>Argo CD</span></a></li>
+        <li><a class="course-nav-item" href="04_prometheus_grafana.html"><span class="course-nav-num">04</span><span>Prometheus + Grafana</span></a></li>
+        <li><a class="course-nav-item current" href="05_elk_log_analysis.html"><span class="course-nav-num">05</span><span>ELK</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 DevOps 實務課程系列 · Lesson 05（系列完結）
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

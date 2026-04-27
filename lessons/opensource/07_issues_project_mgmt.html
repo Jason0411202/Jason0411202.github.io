@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 07｜Issue 撰寫與專案管理 — 開源貢獻課程</title>
+<meta name="description" content="Bug report / Feature request 模板、Issue / PR templates、標籤系統、Milestone、GitHub Projects、Issue triage — 大型專案怎麼維持秩序。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 07 · 規範與品質篇</div>
+    <h1 class="hero-title">Issue 撰寫<span> 與專案管理</span></h1>
+    <p class="hero-desc">Issue 不是抱怨區，是<strong>協作的最小單位</strong>。這堂教你寫出工程師願意處理的 issue，並看懂大型專案的標籤、Milestone、Triage 系統。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 7 / 12 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 11 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>中階</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#types">Issue 三大類</a></li>
+      <li><a class="toc-link" href="#bug-report">Bug Report</a></li>
+      <li><a class="toc-link" href="#feature">Feature Request</a></li>
+      <li><a class="toc-link" href="#examples">好/壞 Issue</a></li>
+      <li><a class="toc-link" href="#templates">Issue Template</a></li>
+      <li><a class="toc-link" href="#labels">標籤系統</a></li>
+      <li><a class="toc-link" href="#milestone">Milestone</a></li>
+      <li><a class="toc-link" href="#projects">GitHub Projects</a></li>
+      <li><a class="toc-link" href="#triage">Triage 流程</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="types">
+      <span class="section-eyebrow">01 — Issue 三大類</span>
+      <h2>Issue 不只是「報 bug」</h2>
+
+      <p>大型專案的 issue 通常分三大類，各有不同目的與寫法：</p>
+
+      <table>
+        <thead>
+          <tr><th>類型</th><th>用途</th><th>標籤</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Bug Report</strong></td><td>回報軟體錯誤行為</td><td><code>type: bug</code></td></tr>
+          <tr><td><strong>Feature Request</strong></td><td>提議新功能 / 改善</td><td><code>type: feature</code> / <code>enhancement</code></td></tr>
+          <tr><td><strong>Question / Discussion</strong></td><td>使用問題、設計討論</td><td><code>type: question</code> (許多專案會引導到 GitHub Discussions)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>Question 該去 issue 還是 Discussions？</strong>
+          GitHub Discussions 是 2020 推出的論壇式功能，<strong>適合「使用方法」的提問</strong>。Issue 留給「需要 maintainer 採取行動」的事 — 改 code、改 docs、評估 feature。Stack Overflow 也是常見導向。看專案 CONTRIBUTING 怎麼說。
+        </div>
+      </div>
+    </section>
+
+    <section id="bug-report">
+      <span class="section-eyebrow">02 — Bug Report</span>
+      <h2>業界通用的 Bug Report 結構</h2>
+
+      <p>一個能被處理的 bug report，必須包含這幾個區塊：</p>
+
+      <div class="section-card">
+<pre style="background:var(--paper2);padding:0.9rem 1.1rem;border-radius:8px;font-size:13px;line-height:1.7;font-family:var(--mono);overflow-x:auto;"># 標題：[Bug] 一句話描述問題
+
+## Describe the bug
+登出後 token 沒清乾淨，下次登入別的帳號會看到上一個使用者的資料。
+
+## Steps to Reproduce
+1. 用 user A 登入
+2. 點右上角的「登出」
+3. 用 user B 登入
+4. 看到首頁顯示 user A 的 profile
+
+## Expected behavior
+登出後應該完全清掉所有 user 資料，登入新帳號應顯示新使用者資料。
+
+## Actual behavior
+頁面短暫閃過 user A 的 avatar / name，再 refresh 才正常。
+
+## Environment
+- OS: macOS 14.5
+- Browser: Chrome 124.0.6367
+- App version: 1.4.2
+- Node: 18.19.0
+
+## Screenshots / Video
+(附錄影或截圖)
+
+## Additional context
+我猜可能是 React Query cache 沒清。第一次發現是 2026-04-25 上線後。</pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>沒有重現步驟 = 無解</strong>
+          Maintainer 不能重現的 bug 就無法 debug。「<em>有時候會壞</em>」是最差的 bug report。<strong>提供確切步驟、影片、log、版本資訊，才能進入 triage 流程。</strong>
+        </div>
+      </div>
+    </section>
+
+    <section id="feature">
+      <span class="section-eyebrow">03 — Feature Request</span>
+      <h2>Feature Request 結構</h2>
+
+      <p>新功能要求要說<strong>痛點</strong>而不是<strong>解法</strong>。直接寫「請加 X 功能」很容易被拒，因為 maintainer 看不到使用情境。</p>
+
+      <div class="section-card">
+<pre style="background:var(--paper2);padding:0.9rem 1.1rem;border-radius:8px;font-size:13px;line-height:1.7;font-family:var(--mono);overflow-x:auto;"># 標題：[Feature] Allow custom date format in &lt;DatePicker&gt;
+
+## Is your feature request related to a problem?
+我們的應用要顯示中文日期格式 (民國年)，目前 DatePicker 只支援
+ISO 格式，需要在 component 外面額外做轉換。
+
+## Describe the solution you'd like
+新增一個 `format` prop 讓使用者傳入 day.js / date-fns 的格式字串：
+```tsx
+&lt;DatePicker format="民國 YYY 年 M 月 D 日" /&gt;
+```
+
+## Describe alternatives you've considered
+- 用 wrapper component 自己做轉換 (現在的做法，但 onChange 處理麻煩)
+- 用 i18n library 整合 (太重)
+
+## Additional context
+看到隔壁的 react-aria/Calendar 有類似功能，可以參考。</pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>「我願意動手做」會大幅提升被接受機率</strong>
+          在 issue 結尾加一句「我願意送 PR」，maintainer 心中的成本馬上降一半。
+        </div>
+      </div>
+    </section>
+
+    <section id="examples">
+      <span class="section-eyebrow">04 — 對照</span>
+      <h2>好/壞 Issue 對照</h2>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>糟糕</div>
+          <div class="compare-body">
+            <code>不能用</code><br><br>
+            <p style="font-size:13px;">無標題、無重現、無環境。Maintainer 只能回「請補充資訊」。</p>
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>好的</div>
+          <div class="compare-body">
+            <code>[Bug] Logout doesn't clear React Query cache (v1.4.2)</code><br><br>
+            <p style="font-size:13px;">標題告訴你「什麼壞了 + 哪個版本」，maintainer 不用點進去就能初步分類。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="templates">
+      <span class="section-eyebrow">05 — Issue Template</span>
+      <h2>Issue / PR 模板：把好習慣自動化</h2>
+
+      <p>專案根目錄放 <code>.github/ISSUE_TEMPLATE/</code> 後，使用者按「New Issue」會跳出選單，引導他們填好結構：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># .github/ISSUE_TEMPLATE/bug_report.yml</span>
+<span class="tk-kw">name</span>: 🐞 Bug Report
+<span class="tk-kw">description</span>: 回報軟體錯誤行為
+<span class="tk-kw">labels</span>: [<span class="tk-st">"type: bug"</span>, <span class="tk-st">"status: triage"</span>]
+<span class="tk-kw">body</span>:
+  - <span class="tk-kw">type</span>: textarea
+    <span class="tk-kw">id</span>: describe
+    <span class="tk-kw">attributes</span>:
+      <span class="tk-kw">label</span>: Describe the bug
+      <span class="tk-kw">description</span>: 簡短描述問題現象
+    <span class="tk-kw">validations</span>: { <span class="tk-kw">required</span>: <span class="tk-st">true</span> }
+  - <span class="tk-kw">type</span>: textarea
+    <span class="tk-kw">id</span>: steps
+    <span class="tk-kw">attributes</span>:
+      <span class="tk-kw">label</span>: Steps to Reproduce
+      <span class="tk-kw">value</span>: |
+        1.
+        2.
+        3.
+    <span class="tk-kw">validations</span>: { <span class="tk-kw">required</span>: <span class="tk-st">true</span> }
+  - <span class="tk-kw">type</span>: input
+    <span class="tk-kw">id</span>: version
+    <span class="tk-kw">attributes</span>:
+      <span class="tk-kw">label</span>: App Version
+    <span class="tk-kw">validations</span>: { <span class="tk-kw">required</span>: <span class="tk-st">true</span> }</code></pre>
+      </div>
+
+      <p>PR 模板也類似 — 在 <code>.github/PULL_REQUEST_TEMPLATE.md</code> 寫好結構，使用者開 PR 時會自動帶入。</p>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>模板省下 80% 的「請補資訊」往返</strong>
+          有了模板，必填欄位空著就不能送出。Maintainer 收到的 issue 質量會大幅提升。
+        </div>
+      </div>
+    </section>
+
+    <section id="labels">
+      <span class="section-eyebrow">06 — 標籤系統</span>
+      <h2>大型專案的標籤 (Label) 分類法</h2>
+
+      <p>看一下 Kubernetes 或 VS Code 的 issue 列表，會發現標籤被分成幾個維度，<strong>透過 prefix 區隔</strong>：</p>
+
+      <table>
+        <thead>
+          <tr><th>維度</th><th>常見 prefix</th><th>範例</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>類型</td><td><code>type:</code></td><td><code>type: bug</code> <code>type: feature</code> <code>type: docs</code></td></tr>
+          <tr><td>優先級</td><td><code>priority:</code></td><td><code>priority: critical</code> <code>priority: high</code></td></tr>
+          <tr><td>狀態</td><td><code>status:</code></td><td><code>status: triage</code> <code>status: in-progress</code> <code>status: needs-review</code></td></tr>
+          <tr><td>區域</td><td><code>area:</code> 或 <code>scope:</code></td><td><code>area: frontend</code> <code>area: api</code></td></tr>
+          <tr><td>邀請貢獻</td><td>(無 prefix)</td><td><code>good first issue</code> <code>help wanted</code></td></tr>
+          <tr><td>難度</td><td><code>difficulty:</code></td><td><code>difficulty: easy</code></td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong><code>good first issue</code> 與 <code>help wanted</code> 是 GitHub 官方推薦標籤</strong>
+          GitHub 會主動把帶有這兩個標籤的 issue 推到「explore」或「first contributions」入口。新人想找專案貢獻時，這是最好的入口。
+        </div>
+      </div>
+    </section>
+
+    <section id="milestone">
+      <span class="section-eyebrow">07 — Milestone</span>
+      <h2>Milestone：把 issue 綁定到 release</h2>
+
+      <p>Milestone 是 GitHub 內建的「一組 issue/PR 屬於同一個 release」機制。例如建一個 <code>v1.5.0</code> milestone，把要進這版的 issue 全部 assign 過去，可以一目瞭然進度。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" aria-label="Milestone 進度示意">
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <text x="40" y="40" font-weight="700" fill="#0a0a0f" font-size="14">Milestone v1.5.0</text>
+            <text x="40" y="60" fill="#6b6b7e">截止日 2026-05-15 ｜ 進度 7/10 (70%)</text>
+
+            <!-- 進度條背景 -->
+            <rect x="40" y="80" width="640" height="14" rx="7" fill="#eeede8" stroke="#d4d3cc"/>
+            <!-- 進度條前景 -->
+            <rect x="40" y="80" width="448" height="14" rx="7" fill="url(#mlGrad)"/>
+            <defs>
+              <linearGradient id="mlGrad" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0%" stop-color="#ff3d1f"/>
+                <stop offset="100%" stop-color="#7c3aed"/>
+              </linearGradient>
+            </defs>
+
+            <!-- 任務列表 -->
+            <g transform="translate(40, 120)">
+              <text fill="#15803d" font-size="11">✓ #421 新增 user profile 頁面</text>
+              <text y="20" fill="#15803d" font-size="11">✓ #430 API 支援 GraphQL queries</text>
+              <text y="40" fill="#92400e" font-size="11">○ #441 修正手機 navbar overflow (進行中)</text>
+              <text y="60" fill="#6b6b7e" font-size="11">□ #445 升級 React 19 (尚未開始)</text>
+            </g>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 7.1 — Milestone 進度視覺化</div>
+      </div>
+    </section>
+
+    <section id="projects">
+      <span class="section-eyebrow">08 — GitHub Projects</span>
+      <h2>GitHub Projects (Projects v2)</h2>
+
+      <p>2022 年推出的新版 Projects 已成為 GitHub 自家 issue 跨 repo 管理的主力工具。可以用三種視圖看同一份資料：</p>
+
+      <table>
+        <thead>
+          <tr><th>視圖</th><th>適用場景</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Table</strong></td><td>看全貌、批次編輯欄位 (像 Notion / Airtable)</td></tr>
+          <tr><td><strong>Board (Kanban)</strong></td><td>看流程：Backlog → Todo → In Progress → Done</td></tr>
+          <tr><td><strong>Roadmap</strong></td><td>看時間軸：哪些工作壓在哪幾週</td></tr>
+        </tbody>
+      </table>
+
+      <p>Projects 可以加自訂欄位 (Status / Priority / Sprint / Estimate / Assignee)，並且<strong>跨 repo</strong>聚合 issue。一個 Project 可以同時管 frontend repo + backend repo + docs repo 的 issue。</p>
+
+      <details class="collapse">
+        <summary>Linear / Jira 跟 GitHub Projects 的取捨 <span class="collapse-tag">產品比較</span></summary>
+        <div class="collapse-body">
+          <ul style="margin-left:1rem;font-size:13px;">
+            <li><strong>GitHub Projects</strong>：完全整合 GitHub issue / PR；簡單、免費、不需切換工具；但 sprint planning / 報表能力較弱。</li>
+            <li><strong>Linear</strong>：UI / 速度業界標竿，cycle (sprint) 概念內建好，適合產品團隊。需付費。</li>
+            <li><strong>Jira</strong>：企業老牌，自訂能力極強但設定複雜，常被工程師討厭。多在大企業 / 受監管產業。</li>
+          </ul>
+          <p style="margin-top:0.6rem;font-size:13px;">小到中型團隊用 GitHub Projects 通常就夠了。</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="triage">
+      <span class="section-eyebrow">09 — Triage</span>
+      <h2>Issue Triage 流程</h2>
+
+      <p>大型專案每天可能收到幾十個 issue，靠 maintainer 一個個處理會炸。<strong>Triage (分流)</strong> 是把進來的 issue 快速分類處理的流程：</p>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">標 <code>status: triage</code></div>
+            <div class="timeline-desc">所有新 issue 預設這個狀態，等人來看。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">驗證重現性</div>
+            <div class="timeline-desc">能重現 → 標 <code>status: confirmed</code>；不能 → 留言請 reporter 補資訊，標 <code>needs-info</code>。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">指派優先級 / 區域 / Milestone</div>
+            <div class="timeline-desc"><code>priority: high</code> / <code>area: frontend</code> / 綁到 v1.5.0 milestone</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">如果適合外部貢獻，標 good first issue</div>
+            <div class="timeline-desc">明確、範圍小、有重現步驟 → 邀請社群來修。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">5</div>
+          <div class="timeline-content">
+            <div class="timeline-title">不打算做的 issue 直接 close + 解釋</div>
+            <div class="timeline-desc">超過範圍 / 重複 / 設計上不收 → 給明確理由然後 close。讓 backlog 不要爆炸。</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Stale bot：自動關閉沒人理的 issue</h3>
+      <p>很多大型專案 (如 React、TypeScript) 用 <a class="inline-link" href="https://github.com/actions/stale" target="_blank" rel="noopener">actions/stale</a>：超過 N 天沒回應的 issue 自動標 <code>stale</code>，再過 M 天自動 close。讓「永遠在那但沒人在乎」的 issue 不會堆積。</p>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>Stale bot 也有副作用</strong>
+          有些 issue 是真的重要但 maintainer 沒空看，被自動 close 後社群會生氣。所以 stale bot 通常配合白名單 — 標了 <code>pinned</code> / <code>priority: high</code> 的 issue 不會被自動關。
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "下列哪個是<strong>最不</strong>重要的 bug report 內容？",
+    "options": [
+      "重現步驟",
+      "預期行為 vs 實際行為",
+      "你的猜測 (可能是哪段 code 的問題)",
+      "環境資訊 (OS / 瀏覽器版本 / app 版本)"
+    ],
+    "answer": 2,
+    "explain": "猜測是「nice to have」但不是必要 — 而且 reporter 的猜測常常是錯的。重現步驟、預期/實際、環境資訊才是 maintainer 真正必要的東西。"
+  },
+  {
+    "question": "你想找開源專案開始貢獻，下列哪個標籤<strong>最適合</strong>新手起步？",
+    "options": [
+      "<code>priority: critical</code>",
+      "<code>good first issue</code>",
+      "<code>status: needs-info</code>",
+      "<code>type: discussion</code>"
+    ],
+    "answer": 1,
+    "explain": "<code>good first issue</code> 是 GitHub 官方推薦的「邀請新貢獻者」標籤 — maintainer 已經評估過範圍適合新手、有清楚說明、不需要深入熟悉 codebase。"
+  },
+  {
+    "question": "下列哪些是 Stale bot 的合理使用方式？(多選)",
+    "options": [
+      "30 天沒回應的 issue 自動標 stale",
+      "標了 stale 後再 7 天還沒回應自動 close",
+      "重要 issue (priority: high / pinned) 加白名單避免被自動關",
+      "所有 issue 不分情況一週後自動 close"
+    ],
+    "answer": [0, 1, 2],
+    "explain": "Stale bot 設計是「自動處理被遺忘的 issue」，但要有白名單機制保護真正重要的 issue。一週統殺所有 issue 會傷害社群信任。"
+  },
+  {
+    "question": "Feature Request 應該優先描述什麼？",
+    "options": [
+      "詳細的實作細節",
+      "你遇到的痛點 / 使用情境 (然後才提建議解法)",
+      "罵舊版本不好",
+      "競品有這個功能所以要做"
+    ],
+    "answer": 1,
+    "explain": "Maintainer 要評估 feature 的價值與成本，需要先知道「有誰、為什麼、什麼情境」需要這個功能。只丟解法 (「請加 X」) 沒有上下文，很容易被拒。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://docs.github.com/en/issues" target="_blank" rel="noopener">GitHub Docs: About Issues</a><span class="ref-meta">官方說明</span></li>
+        <li><a href="https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests" target="_blank" rel="noopener">GitHub Docs: Issue / PR Templates</a><span class="ref-meta">YAML 模板教學</span></li>
+        <li><a href="https://www.kubernetes.dev/docs/" target="_blank" rel="noopener">Kubernetes Contributor Guide</a><span class="ref-meta">大型專案 triage 實例</span></li>
+        <li><a href="https://github.com/actions/stale" target="_blank" rel="noopener">actions/stale</a><span class="ref-meta">自動 stale 工具</span></li>
+        <li><a href="https://docs.github.com/en/issues/planning-and-tracking-with-projects" target="_blank" rel="noopener">GitHub Projects Docs</a><span class="ref-meta">Projects v2 完整指南</span></li>
+        <li><a href="https://opensource.guide/best-practices/" target="_blank" rel="noopener">Open Source Guides: Best Practices for Maintainers</a><span class="ref-meta">維護者視角</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="06_commits_versioning.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 06 · Commit、SemVer、Changelog</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="08_testing_tdd.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 08 · 測試金字塔與 TDD</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">12 堂課程系列 <span class="progress-pill">7 / 12</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
+        <li><a class="course-nav-item" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
+        <li><a class="course-nav-item" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇</span></a></li>
+        <li><a class="course-nav-item" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
+        <li><a class="course-nav-item" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
+        <li><a class="course-nav-item" href="06_commits_versioning.html"><span class="course-nav-num">06</span><span>Commit、SemVer、Changelog</span></a></li>
+        <li><a class="course-nav-item current" href="07_issues_project_mgmt.html"><span class="course-nav-num">07</span><span>Issue 與專案管理</span></a></li>
+        <li><a class="course-nav-item" href="08_testing_tdd.html"><span class="course-nav-num">08</span><span>測試金字塔與 TDD</span></a></li>
+        <li><a class="course-nav-item" href="09_ci_cd_hooks.html"><span class="course-nav-num">09</span><span>CI/CD、Hooks、Lint</span></a></li>
+        <li><a class="course-nav-item" href="10_rfc_adr_release.html"><span class="course-nav-num">10</span><span>RFC、ADR、Release</span></a></li>
+        <li><a class="course-nav-item" href="11_dependencies_supply_chain.html"><span class="course-nav-num">11</span><span>依賴管理與供應鏈安全</span></a></li>
+        <li><a class="course-nav-item" href="12_first_contribution.html"><span class="course-nav-num">12</span><span>第一次貢獻實戰</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的開源協作課程系列 · Lesson 07
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

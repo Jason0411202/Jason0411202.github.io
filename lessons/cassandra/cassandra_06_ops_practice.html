@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cassandra 06｜運維實務與上工 Checklist — Cassandra 課程</title>
+<meta name="description" content="nodetool 必背、關鍵 metrics、備份與還原、rolling upgrade、容量規劃、常見地雷,以及 production 多用什麼工具(k8ssandra-operator、Astra DB)的延伸閱讀。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Cassandra 06 · 上工 Checklist</div>
+    <h1 class="hero-title">運維實務與<span>上工 Checklist</span></h1>
+    <p class="hero-desc">把前 5 堂收成一份「拿來上工就能用」的清單:nodetool 必背、關鍵 metrics、備份還原、容量規劃、常見地雷、production 工具帶過。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 6 / 6 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 13 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>上工級</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#nodetool">nodetool 速查</a></li>
+      <li><a class="toc-link" href="#metrics">關鍵 Metrics</a></li>
+      <li><a class="toc-link" href="#backup">備份還原</a></li>
+      <li><a class="toc-link" href="#upgrade">Rolling Upgrade</a></li>
+      <li><a class="toc-link" href="#capacity">容量規劃</a></li>
+      <li><a class="toc-link" href="#pitfall">常見地雷</a></li>
+      <li><a class="toc-link" href="#prod">Production 工具</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="nodetool">
+      <span class="section-eyebrow">01 — nodetool</span>
+      <h2>nodetool 必背 12 個指令</h2>
+
+      <table>
+        <thead>
+          <tr><th>指令</th><th>看什麼</th><th>什麼時候用</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>nodetool status [keyspace]</code></td><td>叢集所有節點 UN/DN 狀態、ownership</td><td><strong>每天看</strong>、scale 後</td></tr>
+          <tr><td><code>nodetool info</code></td><td>本節點 heap、cache、uptime、token 數</td><td>排查單節點</td></tr>
+          <tr><td><code>nodetool ring [keyspace]</code></td><td>所有 vnode token 的對應</td><td>scale / 重平衡前</td></tr>
+          <tr><td><code>nodetool tablestats &lt;ks.tbl&gt;</code></td><td>表的 SSTable 數、size、tombstone、bloom filter</td><td>慢查排查</td></tr>
+          <tr><td><code>nodetool tpstats</code></td><td>所有 thread pool 狀態(active/pending/blocked)</td><td>看是否有 backup</td></tr>
+          <tr><td><code>nodetool compactionstats</code></td><td>進行中與排隊的 compaction</td><td>觀察 compaction debt</td></tr>
+          <tr><td><code>nodetool gossipinfo</code></td><td>每個節點的 gossip 狀態與版本</td><td>叢集分裂排查</td></tr>
+          <tr><td><code>nodetool getendpoints &lt;ks&gt; &lt;tbl&gt; &lt;pk&gt;</code></td><td>某 partition key 在哪些 replica</td><td>debug 路由</td></tr>
+          <tr><td><code>nodetool flush &lt;ks&gt;</code></td><td>把 memtable flush 成 SSTable</td><td>備份前/觀察</td></tr>
+          <tr><td><code>nodetool repair -pr &lt;ks&gt;</code></td><td>修復本節點負責的 token range</td><td><strong>排程每週跑</strong></td></tr>
+          <tr><td><code>nodetool drain</code></td><td>停止接受新請求,flush memtable</td><td>關機前</td></tr>
+          <tr><td><code>nodetool snapshot &lt;ks&gt;</code></td><td>建立 SSTable 硬連結快照</td><td>備份</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>「健康檢查腳本」三條黃金指令</strong>
+          <ol>
+            <li><code>nodetool status</code> — 看有沒有 DN 節點</li>
+            <li><code>nodetool tpstats | grep -E '(Pending|Blocked)'</code> — 看 thread pool 是否塞車</li>
+            <li><code>nodetool compactionstats</code> — 看 compaction debt 是否爆炸</li>
+          </ol>
+          排成 cron 每分鐘跑、結果丟 Prometheus / Slack。
+        </div>
+      </div>
+    </section>
+
+    <section id="metrics">
+      <span class="section-eyebrow">02 — Metrics</span>
+      <h2>關鍵 Metrics（JMX / Prometheus）</h2>
+      <p>Cassandra 透過 JMX 暴露幾百個 metrics。這幾個是「無論什麼場景都該監控」：</p>
+
+      <table>
+        <thead>
+          <tr><th>類別</th><th>Metric</th><th>警戒值</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>讀延遲</td><td><code>ClientRequest.Read.Latency</code> p99</td><td>&gt; 100ms 警告</td></tr>
+          <tr><td>寫延遲</td><td><code>ClientRequest.Write.Latency</code> p99</td><td>&gt; 50ms 警告</td></tr>
+          <tr><td>逾時</td><td><code>ClientRequest.{Read|Write}.Timeouts</code></td><td><strong>任何非零都要查</strong></td></tr>
+          <tr><td>compaction</td><td><code>Compaction.PendingTasks</code></td><td>&gt; 100 持續飆 → I/O 跟不上</td></tr>
+          <tr><td>dropped</td><td><code>DroppedMessage.{MUTATION|READ}</code></td><td><strong>任何非零都要查</strong></td></tr>
+          <tr><td>JVM</td><td><code>jvm_gc_pause_seconds</code> p99</td><td>&gt; 1s 警告</td></tr>
+          <tr><td>JVM</td><td><code>jvm_memory_heap_used / max</code></td><td>&gt; 75% 警告</td></tr>
+          <tr><td>磁碟</td><td>per-node data dir 使用率</td><td>&gt; 70% 警告 (compact 需要空間)</td></tr>
+          <tr><td>repair</td><td>上次成功 repair 距今</td><td>&gt; gc_grace_seconds 紅燈</td></tr>
+        </tbody>
+      </table>
+
+      <p>用 <a href="https://github.com/criteo/cassandra_exporter" target="_blank" rel="noopener" class="inline-link">cassandra_exporter</a> 把 JMX 轉成 Prometheus、配 Grafana 儀表板（社群有現成的 dashboard 1287）。</p>
+    </section>
+
+    <section id="backup">
+      <span class="section-eyebrow">03 — 備份</span>
+      <h2>Snapshot + sstableloader 是基本盤</h2>
+      <p>Cassandra 的「備份」其實是<strong>建立 SSTable 的硬連結快照</strong>（因為 SSTable 是 immutable，建立硬連結不佔額外空間，直到壓縮後檔案被刪）。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 1. 建快照</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 nodetool snapshot stockbot -t backup-$(date +%F)
+Requested creating snapshot(s) for [stockbot] with snapshot name [backup-2026-04-27]
+
+<span class="tk-cm"># 快照位置:每個 SSTable 目錄下的 snapshots/ 子目錄</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 ls /var/lib/cassandra/data/stockbot/price_by_symbol-*/snapshots/
+
+<span class="tk-cm"># 2. 把快照 rsync / s3 sync 到別處</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 tar czf /tmp/backup.tar.gz \
+    /var/lib/cassandra/data/stockbot/*/snapshots/backup-2026-04-27
+
+<span class="tk-cm"># 3. 還原:把備份回的 SSTable 用 sstableloader 灌進來</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 \
+    sstableloader -d 127.0.0.1 \
+    /var/lib/cassandra/data/stockbot/price_by_symbol-xxx</code></pre>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>Production 用 Medusa 自動化</strong>
+          <a href="https://github.com/thelastpickle/cassandra-medusa" target="_blank" rel="noopener" class="inline-link">Medusa</a> 是 The Last Pickle 開發的備份工具，做了 snapshot + S3/GCS 上傳 + 還原 schema 重建一條龍。production 別自己手刻 backup。
+        </div>
+      </div>
+    </section>
+
+    <section id="upgrade">
+      <span class="section-eyebrow">04 — 升級</span>
+      <h2>Rolling Upgrade：一台一台來</h2>
+      <p>Cassandra 同時支援「混合版本叢集」(N 與 N+1 minor version 共存) 給你 rolling upgrade 的機會。SOP：</p>
+
+      <ol>
+        <li><strong>看升級路徑</strong>：跨 major version 不能直接升（4.x → 5.x 可，3.x → 5.x 要先過 4.x）。看官方 <em>upgrading</em> 文件。</li>
+        <li><strong>備份</strong>：先 snapshot，最壞情況可還原。</li>
+        <li><strong>跑一次完整 repair</strong>：升級期間混版本、出 bug 的話資料才不會更亂。</li>
+        <li><strong>挑一台</strong>：<code>nodetool drain</code> → 關 cassandra → 升級包 → 啟動。</li>
+        <li><strong>驗證</strong>：<code>nodetool status</code> 確認 UN，<code>nodetool tpstats</code> 看正常運作後再做下一台。</li>
+        <li><strong>不要在升級期間做 schema 變更</strong>：混版本期間 schema migration 可能出怪事。</li>
+        <li><strong>升完所有節點再做 <code>nodetool upgradesstables</code></strong>：把舊版 SSTable 改寫成新格式。</li>
+      </ol>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>不要硬跨版本</strong>
+          看到「我從 3.11 直接升 5.0」這種需求，正確做法是 <em>3.11 → 4.1 → 5.0</em>。每次 minor 都該完整測過再做下一跳。Cassandra 不像 Redis 升級那麼寬容。
+        </div>
+      </div>
+    </section>
+
+    <section id="capacity">
+      <span class="section-eyebrow">05 — 容量</span>
+      <h2>容量規劃 4 條黃金法則</h2>
+
+      <ol>
+        <li><strong>per-node 資料量</strong>：5.0 之前 ≤ 4 TB；5.0 起可推到 10 TB+，但實務折衷 4~6 TB。</li>
+        <li><strong>partition size</strong>：&lt; 100 MB / partition、&lt; 100 萬 cell / partition。超過要切 bucket。</li>
+        <li><strong>磁碟空間</strong>：disk used &lt; 70%，<em>compaction 需要空間</em>（worst case 寫一份新檔再刪舊檔，需要 50%+ 空檔）。</li>
+        <li><strong>JVM heap</strong>：4~16 GB（heap &gt; 32 GB 反而低效因為 compressed oops）。物理機剩下的 RAM 給 page cache。</li>
+      </ol>
+
+      <h3>怎麼估「我需要幾個節點」</h3>
+      <p>假設你估自己每天進 100 GB raw 資料、保留 30 天 → 3 TB raw。</p>
+      <ul>
+        <li>RF=3 → 9 TB total。</li>
+        <li>+ tombstone / overhead × 1.3 → ~12 TB。</li>
+        <li>單節點 4 TB → 至少 3 節點，但這樣 disk 會 100% 滿。</li>
+        <li><strong>實務開 6 節點，每台占 50% disk，留 50% 給 compaction 與成長</strong>。</li>
+      </ul>
+    </section>
+
+    <section id="pitfall">
+      <span class="section-eyebrow">06 — 地雷</span>
+      <h2>讓你變生產事故的 5 個地雷</h2>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>LWT 過量</div>
+          <div class="compare-body">
+            Lightweight Transactions（<code>IF NOT EXISTS</code>）依靠 Paxos，每筆寫入要 4 次 round-trip。<strong>偶爾用沒問題，當主流程用會死</strong>。
+          </div>
+        </div>
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>SELECT *</div>
+          <div class="compare-body">
+            把整個 partition 拉回來,當 partition 變 wide 後變慢。<strong>明確指定欄位</strong>。
+          </div>
+        </div>
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>跨 partition IN</div>
+          <div class="compare-body">
+            <code>WHERE pk IN (?, ?, ..., 1000)</code> 等於 fan-out。應用層自己拆並行 query。
+          </div>
+        </div>
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>把 Cassandra 當 Queue</div>
+          <div class="compare-body">
+            不斷 enqueue + delete → tombstone 暴增,讀取超慢。請用 Kafka / Redis Streams。
+          </div>
+        </div>
+      </div>
+
+      <p>第五個：<strong>沒設 prepared statement</strong>。每筆 query 用字串拼接 → server 每次都要 re-parse。一律用 driver 的 prepared statement API。</p>
+    </section>
+
+    <section id="prod">
+      <span class="section-eyebrow">07 — Production</span>
+      <h2>實際 production 都用什麼工具</h2>
+      <p>本系列為了上手簡單只跑單節點、純 nodetool。實際上線的話，<em>沒人手動 SSH 管 100 個 Cassandra 節點</em>。常見組合：</p>
+
+      <ul>
+        <li><strong>k8ssandra-operator</strong> v1.31+（2026/03 出）：在 Kubernetes 上以 CRD 描述「我要 5 節點 RF=3 的 Cassandra」，operator 處理部署、升級、scale、repair 排程。底層包 cass-operator。</li>
+        <li><strong>Cassandra Reaper</strong>：自動排程 incremental repair，避免你忘記跑。</li>
+        <li><strong>Medusa</strong>：自動化備份 / 還原。</li>
+        <li><strong>cassandra_exporter + Prometheus + Grafana</strong>：監控標配。</li>
+        <li><strong>DataStax Astra DB</strong>：完全託管 SaaS（serverless Cassandra）— 不想管基礎設施直接用。</li>
+        <li><strong>AxonOps</strong>：Cassandra 商業監控與運維平台。</li>
+      </ul>
+
+      <h3>推薦進階學習</h3>
+      <ul>
+        <li><strong>《Cassandra: The Definitive Guide》3rd ed</strong>（Carpenter / Hewitt，O'Reilly）— 仍是最完整的 5.0 對應書籍。</li>
+        <li><strong>DataStax Academy</strong> — 免費線上課，含資料建模、運維、driver。</li>
+        <li><strong>The Last Pickle 部落格</strong>（已被 DataStax 收購但內容仍在）— 大量運維細節、compaction 深入、tombstone 案例。</li>
+        <li><strong>Apache Cassandra Slack / mailing list</strong> — 直接問。</li>
+      </ul>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>結業 ✓</strong>
+          走完這 6 堂後,你應該有能力:讀懂團隊的 Cassandra schema、看 nodetool 輸出排查、設計新 table 不踩 hot partition、知道何時用 SAI / Vector / UCS、討論 production 架構時聽得懂 RF、CL、repair、operator。<em>下一步是把它應用到 stockbot 的真實 workload</em>。
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "你巡檢時發現某節點 <code>nodetool tpstats</code> 顯示 <code>MutationStage Pending: 800, Blocked: 50</code>。最可能的問題是？",
+    "options": [
+      "節點 CPU 太空閒",
+      "寫入超過節點處理能力（I/O 或 CPU 跟不上）;持續下去會出現 dropped mutations 與資料不一致",
+      "正常現象,不用處理",
+      "需要立刻重啟節點"
+    ],
+    "answer": 1,
+    "explain": "<code>tpstats</code> 的 Pending/Blocked 是 thread pool 的等待數。MutationStage 是寫入處理,Pending 大、Blocked 出現代表寫入消化不過來 — I/O 不足、CPU 飽和、或某張表 SSTable 太多讓寫入變慢。持續會觸發 dropped mutations,造成 replica 之間不一致。要找出原因(查 compaction debt、磁碟 IOPS、慢查表)。重啟解決不了根本問題。"
+  },
+  {
+    "question": "你要在 production 跑備份。下列哪個流程<strong>正確</strong>？",
+    "options": [
+      "停掉 Cassandra → 直接複製 /var/lib/cassandra/data → 啟動",
+      "nodetool snapshot 建立 SSTable 硬連結快照 → 把 snapshots 目錄複製到外部儲存",
+      "用 SELECT * 把所有資料讀出來存成 CSV",
+      "只備份 commit log"
+    ],
+    "answer": 1,
+    "explain": "正確流程:<code>nodetool snapshot</code> 建立 SSTable 硬連結快照 (即時、不停機、不額外佔空間,因為 SSTable 是 immutable),再把那些檔案 rsync/s3 sync 到外部儲存。停機複製是大忌(若有複製延遲不一致)。SELECT * 不切實際也漏 schema。commit log 只保最近寫入。production 多用 Medusa 自動化這個流程。"
+  },
+  {
+    "question": "你估算自家 workload 是「每天 50 GB raw、保留 60 天」,RF=3。下列哪個節點數規劃<strong>較合適</strong>？(假設用 5.0 + 4 TB / node 上限)",
+    "options": [
+      "2 個節點 (50 × 60 × 3 = 9 TB,2 個節點各 4.5 TB)",
+      "3 個節點 (每台 ~3 TB,使用率 ~75%)",
+      "6 個節點 (每台 ~1.5 TB,使用率 ~38% 留空間 compaction + 成長)",
+      "1 個節點"
+    ],
+    "answer": 2,
+    "explain": "9 TB 資料 + 30% overhead ≈ 12 TB total。要留 50% 空檔給 compaction 與成長 → 12 / 0.5 = 24 TB → 6 節點各 4 TB 上限。實務剩 ~38% 使用率。(0)(1) 都太擠,compaction 會卡。(3) 沒擴展性、無 HA。記住「規劃時 disk 留一半」是 Cassandra 的常識。"
+  },
+  {
+    "question": "在 production 環境跑 Cassandra,下列哪些做法<strong>合理</strong>?(多選)",
+    "options": [
+      "用 k8ssandra-operator 在 K8s 上管理叢集",
+      "用 Reaper 排程每週 incremental repair",
+      "把 nodetool 健康指標接 Prometheus + Grafana 監控",
+      "用 LWT (IF NOT EXISTS) 當所有寫入的預設,確保資料正確"
+    ],
+    "answer": [0, 1, 2],
+    "explain": "(0)(1)(2) 都是業界常見且推薦做法。(3) 錯：LWT 用 Paxos,每筆要 4 次 RTT,效能極差。<strong>偶爾用</strong>(像帳號註冊唯一性)沒問題,當所有寫入的預設會把叢集寫垮。應用層在能容忍時用 last-write-wins,真的需要 CAS 才用 LWT。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/managing/tools/nodetool/nodetool.html" target="_blank" rel="noopener">nodetool 官方文件</a><span class="ref-meta">所有指令</span></li>
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/managing/operating/metrics.html" target="_blank" rel="noopener">Cassandra Metrics</a><span class="ref-meta">JMX 列表</span></li>
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/managing/operating/backups.html" target="_blank" rel="noopener">Backup &amp; Restore</a><span class="ref-meta">官方</span></li>
+        <li><a href="https://docs.k8ssandra.io/" target="_blank" rel="noopener">K8ssandra docs</a><span class="ref-meta">K8s operator</span></li>
+        <li><a href="https://github.com/k8ssandra/k8ssandra-operator/releases" target="_blank" rel="noopener">k8ssandra-operator releases</a><span class="ref-meta">v1.31 (2026/03)</span></li>
+        <li><a href="https://cassandra-reaper.io/" target="_blank" rel="noopener">Cassandra Reaper</a><span class="ref-meta">repair 排程</span></li>
+        <li><a href="https://github.com/thelastpickle/cassandra-medusa" target="_blank" rel="noopener">Cassandra Medusa</a><span class="ref-meta">備份工具</span></li>
+        <li><a href="https://www.datastax.com/products/datastax-astra" target="_blank" rel="noopener">DataStax Astra DB</a><span class="ref-meta">託管服務</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="cassandra_05_v5_features.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Cassandra 05 · 5.0 新特性</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next disabled" aria-disabled="true">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Cassandra 系列已完結 ✓</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">6 堂 Cassandra 系列 <span class="progress-pill">6 / 6</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="cassandra_01_intro.html"><span class="course-nav-num">01</span><span>Cassandra 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_02_architecture.html"><span class="course-nav-num">02</span><span>環狀架構與一致性</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_03_cql_modeling.html"><span class="course-nav-num">03</span><span>CQL 與資料建模</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_04_read_write_path.html"><span class="course-nav-num">04</span><span>讀寫路徑 / Compaction</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_05_v5_features.html"><span class="course-nav-num">05</span><span>5.0 新特性</span></a></li>
+        <li><a class="course-nav-item current" href="cassandra_06_ops_practice.html"><span class="course-nav-num">06</span><span>運維實務</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 Cassandra 課程系列 · Lesson 06
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

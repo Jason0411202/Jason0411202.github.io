@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redis 04｜Sentinel vs Cluster — Redis 課程</title>
+<meta name="description" content="Sentinel 解決可用性 (failover)、Cluster 解決水平擴展 (16384 hash slots)。本堂釐清何時用哪個、hash tag 為什麼存在、客戶端怎麼處理 MOVED/ASK redirect。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Redis 04 · 高可用與分片</div>
+    <h1 class="hero-title">Sentinel vs <span>Cluster</span>:解決什麼問題</h1>
+    <p class="hero-desc">兩個常被混為一談的東西：Sentinel 解決<em>可用性</em>(自動 failover)；Cluster 解決<em>容量/吞吐</em>(水平分片)。本堂讓你能正確選擇。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 4 / 6 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>核心</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#problem">兩個不同問題</a></li>
+      <li><a class="toc-link" href="#sentinel">Sentinel</a></li>
+      <li><a class="toc-link" href="#cluster">Cluster</a></li>
+      <li><a class="toc-link" href="#hash-tag">Hash Tag</a></li>
+      <li><a class="toc-link" href="#decision">決策樹</a></li>
+      <li><a class="toc-link" href="#hands-on">動手玩</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="problem">
+      <span class="section-eyebrow">01 — 切清楚</span>
+      <h2>兩個完全不同的問題</h2>
+      <p>新手最常搞混的：</p>
+      <ul>
+        <li><strong>「我的 master 掛了想要自動切到 replica」</strong> → Sentinel 的問題（HA / 高可用）</li>
+        <li><strong>「我的資料量超過一台機器的記憶體」</strong> → Cluster 的問題（水平擴展）</li>
+      </ul>
+
+      <table>
+        <thead>
+          <tr><th>面向</th><th>Sentinel</th><th>Cluster</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>解決</td><td>HA / 自動 failover</td><td>水平擴展</td></tr>
+          <tr><td>資料份數</td><td><strong>1 份</strong>（master + 多個 replica 都是同一份資料）</td><td><strong>分片</strong>（每個 shard 持有 1/N 資料）</td></tr>
+          <tr><td>擴展方式</td><td>垂直（更大機器）</td><td>水平（加 shard）</td></tr>
+          <tr><td>客戶端</td><td>一般 client（透過 Sentinel 找 master）</td><td>cluster-aware client（懂 MOVED/ASK）</td></tr>
+          <tr><td>運維複雜度</td><td>中</td><td>高</td></tr>
+          <tr><td>適合資料量</td><td>&lt; 一台機器記憶體</td><td>超過、或要分流</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>兩者其實可以組合</strong>
+          Cluster 模式內，每個 shard 自己就是「1 master + N replica」+ 內建 failover（自動 sentinel-like 行為）。所以實際上很少人「Sentinel + Cluster 一起用」 — 直接用 Cluster 就涵蓋了 HA。
+        </div>
+      </div>
+    </section>
+
+    <section id="sentinel">
+      <span class="section-eyebrow">02 — Sentinel</span>
+      <h2>Sentinel：監控 + 自動 failover</h2>
+
+      <p>Sentinel 是<strong>另一個獨立進程</strong>（不是 redis-server 模式），專門做三件事：</p>
+      <ul>
+        <li><strong>監控</strong>：每秒 ping master/replica，判斷是否 down。</li>
+        <li><strong>通知</strong>：發訊息給管理員（webhook / pub/sub）。</li>
+        <li><strong>自動 failover</strong>：master 掛了，從 replica 中選一個升 master，並通知 client 與其他 replica。</li>
+      </ul>
+
+      <h3>三個關鍵概念</h3>
+      <ol>
+        <li><strong>Quorum</strong>：「至少幾個 Sentinel 同意 master 已死，才真的 failover」。例如 3 個 Sentinel + quorum=2 = 半數以上才動手。</li>
+        <li><strong>Majority</strong>：除了 quorum，failover 還需要「Sentinel 群體中超過半數同意誰當新 master」 — 這是為了避免腦裂（split brain）。</li>
+        <li><strong>至少 3 個 Sentinel</strong>：2 個會在網路分區時無法達成 majority；1 個是單點。<em>業界標準是 3 個 Sentinel + 2 個 replica = 5 進程</em>。</li>
+      </ol>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" aria-label="sentinel topology">
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <text x="360" y="28" text-anchor="middle" font-family="Syne, sans-serif" font-size="15" font-weight="700" fill="#0a0a0f">Sentinel 經典 topology</text>
+
+            <!-- Sentinels at top -->
+            <circle cx="180" cy="80" r="30" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+            <text x="180" y="86" text-anchor="middle" font-weight="700" fill="#4c1d95">S1</text>
+            <circle cx="360" cy="80" r="30" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+            <text x="360" y="86" text-anchor="middle" font-weight="700" fill="#4c1d95">S2</text>
+            <circle cx="540" cy="80" r="30" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+            <text x="540" y="86" text-anchor="middle" font-weight="700" fill="#4c1d95">S3</text>
+
+            <!-- Master + replicas -->
+            <rect x="120" y="170" width="120" height="50" rx="8" fill="#0a0a0f" stroke="#0a0a0f"/>
+            <text x="180" y="200" text-anchor="middle" font-weight="700" fill="#fafaf8">Master</text>
+            <rect x="300" y="170" width="120" height="50" rx="8" fill="#fafaf8" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="360" y="200" text-anchor="middle" font-weight="700" fill="#15803d">Replica 1</text>
+            <rect x="480" y="170" width="120" height="50" rx="8" fill="#fafaf8" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="540" y="200" text-anchor="middle" font-weight="700" fill="#15803d">Replica 2</text>
+
+            <!-- Lines from sentinels to all redis nodes -->
+            <g stroke="#7c3aed" stroke-width="0.8" opacity="0.5">
+              <line x1="180" y1="110" x2="180" y2="170"/>
+              <line x1="180" y1="110" x2="360" y2="170"/>
+              <line x1="180" y1="110" x2="540" y2="170"/>
+              <line x1="360" y1="110" x2="180" y2="170"/>
+              <line x1="360" y1="110" x2="360" y2="170"/>
+              <line x1="360" y1="110" x2="540" y2="170"/>
+              <line x1="540" y1="110" x2="180" y2="170"/>
+              <line x1="540" y1="110" x2="360" y2="170"/>
+              <line x1="540" y1="110" x2="540" y2="170"/>
+            </g>
+            <text x="360" y="155" text-anchor="middle" fill="#6b6b7e" font-size="10">每個 Sentinel 監控所有 Redis 節點</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 R4.1 — 3 個 Sentinel + 1 master + 2 replica 是業界經典配置</div>
+      </div>
+
+      <h3>Client 怎麼用</h3>
+      <p>Client 不直接連 Redis master，而是先問 Sentinel「現在 master 是誰」，再連那個 IP。Master 換掉時 Sentinel 會 push 新 IP 給已連線的 client。</p>
+    </section>
+
+    <section id="cluster">
+      <span class="section-eyebrow">03 — Cluster</span>
+      <h2>Cluster：16384 個 hash slot 分片</h2>
+
+      <p>Redis Cluster 把 keyspace 切成 <strong>16384 個 hash slot</strong>，每個 master 負責其中一段。一個 key 用 <code>CRC16(key) mod 16384</code> 算出它屬於哪個 slot，再查表知道在哪個 master。</p>
+
+      <h3>為什麼是 16384？</h3>
+      <p>不是 16K 整數。原因是 Redis 用 <strong>bitmap</strong> 表示「我這個節點負責哪些 slot」 — 16384 bits = 2048 bytes。在叢集 gossip message 裡帶這個 bitmap 成本很低。如果用 65536 個 slot，bitmap 會變 8KB，gossip 流量翻倍且大多 slot bit 是 0 浪費。</p>
+
+      <h3>Resharding（重新分片）</h3>
+      <p>新增節點要把資料從現有節點移過去：</p>
+      <ol>
+        <li><code>redis-cli --cluster reshard</code> 指定要搬幾個 slot、來源、目的。</li>
+        <li>來源節點把那段 slot 的 key 一個個 <code>MIGRATE</code> 到目標。</li>
+        <li>過程中 client 收到 <code>ASK</code> redirect（「這個 key 暫時去問另一節點」）。</li>
+      </ol>
+
+      <h3>客戶端必須 cluster-aware</h3>
+      <p>Cluster 模式下，client 連任何一個節點，發指令時若 key 不在這個節點，會收到：</p>
+      <ul>
+        <li><code>MOVED</code> redirect：永久性 — 「這個 slot 在另一節點，以後 key 直接連那邊」。client 收到後更新自己的 slot map。</li>
+        <li><code>ASK</code> redirect：臨時性（resharding 中）— 「這個 key 正在搬，這次去別處問」。一次性，下次仍連原節點。</li>
+      </ul>
+
+      <p>所以 client lib 必須懂這兩個 redirect 並維護自己的 slot 映射表。常見 lib：<code>go-redis</code>, <code>jedis</code>, <code>ioredis</code>, <code>lettuce</code> 都支援。</p>
+    </section>
+
+    <section id="hash-tag">
+      <span class="section-eyebrow">04 — Hash Tag</span>
+      <h2>Hash Tag {} ：multi-key 操作的鑰匙</h2>
+      <p>Cluster 的硬規則：<strong>multi-key 指令的所有 key 必須在同一個 slot</strong>。例如：</p>
+      <ul>
+        <li><code>MSET k1 v1 k2 v2</code></li>
+        <li><code>SUNION s1 s2 s3</code></li>
+        <li><code>EVAL "..." 2 k1 k2 ...</code>（Lua 帶多 key）</li>
+      </ul>
+
+      <p>因為它們可能跨節點，違反了「指令在單一節點原子執行」的前提。預設不允許。</p>
+
+      <p>但有時你<em>就是要</em>把同一個用戶的多個 key 放一起做原子操作。Hash tag 解決這個：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis-cli</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># key 內第一對 {} 中的內容單獨拿來算 slot</span>
+
+<span class="tk-fn">SET</span> {user:123}.profile <span class="tk-st">"..."</span>     <span class="tk-cm"># slot = CRC16("user:123") % 16384</span>
+<span class="tk-fn">SET</span> {user:123}.cart    <span class="tk-st">"..."</span>     <span class="tk-cm"># 同上,所以兩 key 同 slot</span>
+<span class="tk-fn">SET</span> {user:123}.session <span class="tk-st">"..."</span>     <span class="tk-cm"># 同上</span>
+
+<span class="tk-cm"># 現在這個可以了</span>
+<span class="tk-fn">MSET</span> {user:123}.profile <span class="tk-st">"j"</span> {user:123}.cart <span class="tk-st">"[]"</span></code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>Hash tag 用過頭會破壞分片</strong>
+          如果所有 key 都用 <code>{global}.xxx</code>，所有資料就跑到同一個 slot、同一個 master — 等於沒分片。Hash tag 是「<em>精準綁定一小撮相關 key</em>」的工具，不是無腦套。
+        </div>
+      </div>
+    </section>
+
+    <section id="decision">
+      <span class="section-eyebrow">05 — 決策</span>
+      <h2>該選哪個？</h2>
+
+      <table>
+        <thead>
+          <tr><th>場景</th><th>建議</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>資料量 &lt; 32 GB（一台機器塞得下）+ 要 HA</td>
+            <td><strong>Master + 2 replica + 3 Sentinel</strong></td>
+          </tr>
+          <tr>
+            <td>資料量 &gt; 32 GB / 寫入 QPS &gt; 5 萬 / 要水平擴展</td>
+            <td><strong>Cluster</strong>（每 shard 自帶 replica，免另設 Sentinel）</td>
+          </tr>
+          <tr>
+            <td>純 cache，可接受重啟資料丟失</td>
+            <td>單機就好（或 client-side sharding）</td>
+          </tr>
+          <tr>
+            <td>使用雲端 managed Redis</td>
+            <td>看雲廠商提供的選項（多半 Sentinel 與 Cluster 都有）</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>「先 Sentinel，未來再 Cluster」可行嗎？</strong>
+          可行但要規劃 — 從 master/replica 模式改 cluster 需要資料重灌或用 <code>redis-cli --cluster import</code>。建議：<em>能預估到「未來 1~2 年資料量會超過單機」就直接上 cluster</em>，避免日後痛苦遷移。
+        </div>
+      </div>
+    </section>
+
+    <section id="hands-on">
+      <span class="section-eyebrow">06 — 動手玩</span>
+      <h2>用 docker-compose 起 3-master + 3-replica cluster</h2>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml — docker-compose.yml</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code>x-redis: &amp;redis-base
+  image: redis:8.6
+  command: [
+    redis-server,
+    --cluster-enabled, yes,
+    --cluster-config-file, nodes.conf,
+    --cluster-node-timeout, <span class="tk-st">"5000"</span>,
+    --appendonly, yes,
+    --port, <span class="tk-st">"6379"</span>
+  ]
+
+services:
+  r1: { &lt;&lt;: *redis-base, ports: [<span class="tk-st">"7001:6379"</span>] }
+  r2: { &lt;&lt;: *redis-base, ports: [<span class="tk-st">"7002:6379"</span>] }
+  r3: { &lt;&lt;: *redis-base, ports: [<span class="tk-st">"7003:6379"</span>] }
+  r4: { &lt;&lt;: *redis-base, ports: [<span class="tk-st">"7004:6379"</span>] }
+  r5: { &lt;&lt;: *redis-base, ports: [<span class="tk-st">"7005:6379"</span>] }
+  r6: { &lt;&lt;: *redis-base, ports: [<span class="tk-st">"7006:6379"</span>] }</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">docker</span> compose up -d
+
+<span class="tk-cm"># 把 6 個節點組成 cluster (3 master + 1 replica each)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it $(docker compose ps -q r1) \
+    redis-cli --cluster create \
+      r1:6379 r2:6379 r3:6379 r4:6379 r5:6379 r6:6379 \
+      --cluster-replicas 1 --cluster-yes
+
+<span class="tk-cm"># 觀察狀態</span>
+<span class="tk-pn">$</span> <span class="tk-fn">redis-cli</span> -p 7001 -c CLUSTER INFO
+<span class="tk-cm"># cluster_state:ok
+# cluster_slots_assigned:16384
+# cluster_slots_ok:16384</span>
+
+<span class="tk-cm"># -c 是 cluster mode flag,自動 follow MOVED redirect</span>
+<span class="tk-pn">$</span> <span class="tk-fn">redis-cli</span> -p 7001 -c SET hello world
+-&gt; Redirected to slot [866] located at r2:6379
+OK
+
+<span class="tk-cm"># 看一個 key 屬於哪個 slot/node</span>
+<span class="tk-pn">$</span> <span class="tk-fn">redis-cli</span> -p 7001 -c CLUSTER KEYSLOT user:123
+<span class="tk-num">5798</span>
+
+<span class="tk-cm"># 用 hash tag 把多個 key 綁同 slot</span>
+<span class="tk-pn">$</span> <span class="tk-fn">redis-cli</span> -p 7001 -c MSET <span class="tk-op">{u:123}</span>:a <span class="tk-num">1</span> <span class="tk-op">{u:123}</span>:b <span class="tk-num">2</span></code></pre>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "你的 Redis 有 8 GB 資料，每秒 5000 寫入。需求是「master 掛掉時能自動切換、不要人工介入」。下列哪個方案<strong>最適合</strong>？",
+    "options": [
+      "1 master + 2 replica + 3 Sentinel",
+      "Redis Cluster 6 節點 (3 master + 3 replica)",
+      "Sentinel + Cluster 同時用",
+      "單機 + 開 AOF"
+    ],
+    "answer": 0,
+    "explain": "8 GB 一台機器塞得下，需求只是 HA 而非容量擴展 — 用 Sentinel 經典 topology (1 master + 2 replica + 3 Sentinel) 最簡單。Cluster 雖然也能用但複雜度高、不必要。Cluster + Sentinel 同時用是冗餘（Cluster 自帶 failover）。單機沒 HA。"
+  },
+  {
+    "question": "下列哪些<strong>正確</strong>描述 Redis Cluster 的 hash slot？(多選)",
+    "options": [
+      "用 CRC16(key) mod 16384 決定 key 在哪個 slot",
+      "16384 是因為 bitmap 表示節點責任範圍時 = 2 KB,gossip 流量小",
+      "slot 數量可以由使用者調整",
+      "單一指令的所有 key 必須在同一個 slot"
+    ],
+    "answer": [0, 1, 3],
+    "explain": "(0)(1)(3) 正確。(2) 錯：16384 是 Redis 寫死的常數，不能調整。Hash tag <code>{}</code> 是讓你「人為控制 key 落到同 slot」的機制，但 slot 總數固定。"
+  },
+  {
+    "question": "為什麼 Redis Cluster 要區分 <code>MOVED</code> 與 <code>ASK</code> redirect？",
+    "options": [
+      "MOVED 是「永久搬到新節點」(client 應更新自己的 slot map);ASK 是「resharding 中暫時去那邊問」(下次仍連原節點)",
+      "MOVED 是寫指令、ASK 是讀指令",
+      "只是同義詞，沒有區別",
+      "MOVED 只在 master 故障時出現"
+    ],
+    "answer": 0,
+    "explain": "兩個 redirect 解決不同問題。穩定狀態下，slot 移動完畢 → MOVED；resharding 進行中、key 正在被搬 → ASK（一次性，下次仍連原節點，因為其他 key 仍在原節點）。client lib 要正確處理才能在 resharding 期間穩定服務。"
+  },
+  {
+    "question": "下列關於 Hash Tag 的敘述，哪一項<strong>錯誤</strong>？",
+    "options": [
+      "Hash tag <code>{}</code> 內的內容會被單獨拿來算 slot",
+      "Hash tag 可讓多個相關 key 落同 slot,使 multi-key 指令可行",
+      "把所有 key 都用 {global}.xxx 加 hash tag 是好做法,確保所有 key 同 slot",
+      "Hash tag 是「綁定一小撮相關 key」的工具,不該濫用"
+    ],
+    "answer": 2,
+    "explain": "(2) 錯。如果所有 key 都用 <code>{global}.xxx</code>,所有資料會塞在同一個 slot、同一個 master,等於完全沒分片。其他三項都正確。Hash tag 應該只用於「真的需要原子操作」的相關 key 群（例如 user:123 的多個欄位）。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://redis.io/docs/latest/operate/oss_and_stack/management/sentinel/" target="_blank" rel="noopener">High availability with Redis Sentinel</a><span class="ref-meta">官方</span></li>
+        <li><a href="https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/" target="_blank" rel="noopener">Redis Cluster Specification</a><span class="ref-meta">完整規格</span></li>
+        <li><a href="https://redis.io/docs/latest/operate/oss_and_stack/management/scaling/" target="_blank" rel="noopener">Scaling with Redis Cluster</a><span class="ref-meta">運維指南</span></li>
+        <li><a href="https://redis.io/docs/latest/develop/reference/cluster-spec/#hash-tags" target="_blank" rel="noopener">Hash Tags</a><span class="ref-meta">multi-key</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="redis_03_persistence_replication.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Redis 03 · 持久化與複製</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="redis_05_v8_modules.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Redis 05 · 8.x 新特性</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">6 堂 Redis 系列 <span class="progress-pill">4 / 6</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="redis_01_intro.html"><span class="course-nav-num">01</span><span>Redis 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="redis_02_advanced_ds.html"><span class="course-nav-num">02</span><span>進階資料結構</span></a></li>
+        <li><a class="course-nav-item" href="redis_03_persistence_replication.html"><span class="course-nav-num">03</span><span>持久化與複製</span></a></li>
+        <li><a class="course-nav-item current" href="redis_04_ha_cluster.html"><span class="course-nav-num">04</span><span>Sentinel vs Cluster</span></a></li>
+        <li><a class="course-nav-item" href="redis_05_v8_modules.html"><span class="course-nav-num">05</span><span>Redis 8 新特性</span></a></li>
+        <li><a class="course-nav-item" href="redis_06_patterns_antipatterns.html"><span class="course-nav-num">06</span><span>實戰模式與反模式</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 Redis 課程系列 · Lesson 04
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

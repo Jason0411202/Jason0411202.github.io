@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 06｜Context、Metadata、Deadline、Cancellation — gRPC 課程</title>
+<meta name="description" content="深入理解 context.Context 在 gRPC 中扮演的角色:傳 metadata、設 deadline、傳遞 cancellation。掌握 deadline propagation 與 server 端如何及時退出。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 06 · 運行期核心</div>
+    <h1 class="hero-title">Context、Metadata、<span>Deadline、Cancellation</span></h1>
+    <p class="hero-desc"><code>ctx</code> 是 gRPC 每支 RPC 的中樞神經 — 它帶 deadline、metadata、cancellation 訊號。<strong>學完這堂能正確控制超時、做認證 token 傳遞、處理 client 取消。</strong></p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 6 / 10 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>中階</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#ctx-role">ctx 的角色</a></li>
+      <li><a class="toc-link" href="#metadata-send">送 metadata</a></li>
+      <li><a class="toc-link" href="#metadata-recv">收 metadata</a></li>
+      <li><a class="toc-link" href="#header-trailer">Header / Trailer</a></li>
+      <li><a class="toc-link" href="#deadline">Deadline</a></li>
+      <li><a class="toc-link" href="#cancel">Cancellation</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="ctx-role">
+      <span class="section-eyebrow">01 — ctx 的角色</span>
+      <h2><code>context.Context</code> 在 gRPC 裡裝了什麼</h2>
+      <p>每支 gRPC handler 第一個參數都是 <code>ctx context.Context</code>。它帶三件你必須會用的東西:</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" aria-label="ctx 內容物">
+          <g font-family="JetBrains Mono, monospace" font-size="13">
+            <text x="360" y="30" text-anchor="middle" font-family="Syne, sans-serif" font-size="16" font-weight="700" fill="#0a0a0f">每支 gRPC handler 拿到的 ctx 帶著</text>
+
+            <rect x="40"  y="60" width="200" height="100" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="140" y="90"  text-anchor="middle" font-weight="700" fill="#4c1d95">Metadata</text>
+            <text x="140" y="115" text-anchor="middle" fill="#4c1d95" font-size="11">key-value pairs</text>
+            <text x="140" y="135" text-anchor="middle" fill="#6b6b7e" font-size="10">(auth token、trace id…)</text>
+
+            <rect x="260" y="60" width="200" height="100" rx="10" fill="#fee2e2" stroke="#b91c1c" stroke-width="1.5"/>
+            <text x="360" y="90"  text-anchor="middle" font-weight="700" fill="#7f1d1d">Deadline</text>
+            <text x="360" y="115" text-anchor="middle" fill="#7f1d1d" font-size="11">絕對時間戳</text>
+            <text x="360" y="135" text-anchor="middle" fill="#6b6b7e" font-size="10">(超過會自動 cancel)</text>
+
+            <rect x="480" y="60" width="200" height="100" rx="10" fill="#dcfce7" stroke="#15803d" stroke-width="1.5"/>
+            <text x="580" y="90"  text-anchor="middle" font-weight="700" fill="#14532d">Cancellation</text>
+            <text x="580" y="115" text-anchor="middle" fill="#14532d" font-size="11">Done() channel</text>
+            <text x="580" y="135" text-anchor="middle" fill="#6b6b7e" font-size="10">(client 主動取消、斷線)</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 18.1 — ctx 三件事</div>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>不要把資料偷偷塞 <code>ctx</code></strong>
+          <code>ctx.Value()</code> 設計上只用來傳 request-scoped 控制資料(authn 結果、trace id)。<strong>業務資料應該走 request struct,不要塞 ctx</strong>。Go community 的共識:<em>「ctx is not your bag」</em>。
+        </div>
+      </div>
+    </section>
+
+    <section id="metadata-send">
+      <span class="section-eyebrow">02 — 送 metadata</span>
+      <h2>Client 端:把 metadata 塞進 outgoing ctx</h2>
+      <p>Metadata 是 RPC 的 header,結構是 <code>map[string][]string</code>(同一 key 可以有多值)。最常見的用法:傳認證 token、trace id、locale。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (client)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">import</span> <span class="tk-st">"google.golang.org/grpc/metadata"</span>
+
+<span class="tk-cm">// 方法 1:AppendToOutgoingContext(最常用)</span>
+ctx = metadata.AppendToOutgoingContext(ctx,
+    <span class="tk-st">"authorization"</span>, <span class="tk-st">"Bearer "</span>+token,
+    <span class="tk-st">"x-trace-id"</span>,    traceID,
+)
+
+<span class="tk-cm">// 方法 2:NewOutgoingContext + 完整 MD(會覆蓋之前 append 的)</span>
+md := metadata.New(<span class="tk-kw">map</span>[<span class="tk-kw">string</span>]<span class="tk-kw">string</span>{
+    <span class="tk-st">"authorization"</span>: <span class="tk-st">"Bearer "</span> + token,
+})
+ctx = metadata.NewOutgoingContext(ctx, md)
+
+<span class="tk-cm">// 然後正常呼叫 RPC,metadata 會自動隨 RPC 送出去</span>
+resp, err := client.SayHello(ctx, &amp;pb.HelloRequest{Name: <span class="tk-st">"Jason"</span>})</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>Metadata 鍵的規則</strong>
+          <ul style="margin:0.4rem 0 0 1rem;">
+            <li>大小寫不敏感(server 收到都會變小寫)</li>
+            <li><strong>不能以 <code>grpc-</code> 開頭</strong> — 那個前綴是 gRPC 自己保留</li>
+            <li>傳二進位資料時 key 必須以 <code>-bin</code> 結尾(如 <code>session-token-bin</code>),value 是 byte slice</li>
+            <li>非二進位 value 必須是 ASCII 可印字元</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="metadata-recv">
+      <span class="section-eyebrow">03 — 收 metadata</span>
+      <h2>Server 端:從 incoming ctx 取出 metadata</h2>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (server)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">func</span> (s *server) SayHello(ctx context.Context, req *pb.HelloRequest) (*pb.HelloReply, <span class="tk-kw">error</span>) {
+    md, ok := metadata.FromIncomingContext(ctx)
+    <span class="tk-kw">if</span> !ok {
+        <span class="tk-kw">return</span> <span class="tk-kw">nil</span>, status.Error(codes.Internal, <span class="tk-st">"no metadata"</span>)
+    }
+
+    <span class="tk-cm">// 同 key 多值,所以 Get 回傳 []string</span>
+    auth := md.Get(<span class="tk-st">"authorization"</span>)
+    <span class="tk-kw">if</span> len(auth) == <span class="tk-num">0</span> {
+        <span class="tk-kw">return</span> <span class="tk-kw">nil</span>, status.Error(codes.Unauthenticated, <span class="tk-st">"missing authorization"</span>)
+    }
+    token := strings.TrimPrefix(auth[<span class="tk-num">0</span>], <span class="tk-st">"Bearer "</span>)
+
+    <span class="tk-cm">// ... 驗 token ...</span>
+    <span class="tk-kw">return</span> &amp;pb.HelloReply{Message: <span class="tk-st">"Hello, "</span> + req.GetName()}, <span class="tk-kw">nil</span>
+}</code></pre>
+      </div>
+    </section>
+
+    <section id="header-trailer">
+      <span class="section-eyebrow">04 — Header / Trailer</span>
+      <h2>Server 也能送 metadata 回 client</h2>
+      <p>Server → Client 方向有<strong>兩種</strong>:</p>
+
+      <table>
+        <thead>
+          <tr><th>類型</th><th>送出時機</th><th>典型用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Header</strong></td><td>RPC 一開始(回應 body 之前)</td><td>server 版本、quota 餘額、rate limit 提示</td></tr>
+          <tr><td><strong>Trailer</strong></td><td>RPC 結束(回應 body 之後)</td><td>處理時長、debug info</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Server 送</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (server)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm">// 設(可多次)</span>
+grpc.SetHeader(ctx, metadata.Pairs(<span class="tk-st">"x-server-version"</span>, <span class="tk-st">"v1.2.3"</span>))
+grpc.SetTrailer(ctx, metadata.Pairs(<span class="tk-st">"x-elapsed-ms"</span>, fmt.Sprint(elapsed)))
+
+<span class="tk-cm">// 主動立刻送 header(不等到 response,常用於 streaming)</span>
+grpc.SendHeader(ctx, metadata.Pairs(<span class="tk-st">"x-stream-id"</span>, sid))</code></pre>
+      </div>
+
+      <h3>Client 收</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (client)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">var</span> header, trailer metadata.MD
+resp, err := client.SayHello(
+    ctx,
+    &amp;pb.HelloRequest{Name: <span class="tk-st">"Jason"</span>},
+    grpc.Header(&amp;header),    <span class="tk-cm">// CallOption,RPC 完成後 header 會被填值</span>
+    grpc.Trailer(&amp;trailer),
+)
+<span class="tk-kw">if</span> err == <span class="tk-kw">nil</span> {
+    log.Printf(<span class="tk-st">"server version: %v"</span>, header.Get(<span class="tk-st">"x-server-version"</span>))
+    log.Printf(<span class="tk-st">"elapsed: %v"</span>, trailer.Get(<span class="tk-st">"x-elapsed-ms"</span>))
+}</code></pre>
+      </div>
+    </section>
+
+    <section id="deadline">
+      <span class="section-eyebrow">05 — Deadline</span>
+      <h2>Deadline:gRPC 的「最遲完成時間」</h2>
+      <p>gRPC 文件原話:</p>
+      <div class="callout callout-tip">
+        <div class="callout-icon">"</div>
+        <div class="callout-body">
+          gRPC allows clients to specify how long they are willing to wait for an RPC to complete before the RPC is terminated with a <code>DEADLINE_EXCEEDED</code> error.
+        </div>
+      </div>
+
+      <h3>Client 設 deadline</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (client)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm">// 從現在起 2 秒後 deadline</span>
+ctx, cancel := context.WithTimeout(context.Background(), <span class="tk-num">2</span>*time.Second)
+<span class="tk-kw">defer</span> cancel()  <span class="tk-cm">// 一定要 defer cancel,否則資源洩漏</span>
+
+resp, err := client.SayHello(ctx, &amp;pb.HelloRequest{Name: <span class="tk-st">"Jason"</span>})
+<span class="tk-kw">if</span> status.Code(err) == codes.DeadlineExceeded {
+    log.Println(<span class="tk-st">"too slow"</span>)
+}</code></pre>
+      </div>
+
+      <h3>Deadline 會自動 propagate</h3>
+      <p>這是 gRPC 最重要的設計之一:<strong>deadline 跟 ctx 一起跨服務傳遞</strong>。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 180" xmlns="http://www.w3.org/2000/svg" aria-label="deadline propagation">
+          <defs>
+            <marker id="arrD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <text x="360" y="28" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">Deadline 自動 propagate</text>
+
+            <rect x="20"  y="60" width="160" height="60" rx="8" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="100" y="85" text-anchor="middle" font-weight="700">Client</text>
+            <text x="100" y="105" text-anchor="middle" fill="#6b6b7e" font-size="10">deadline=2s</text>
+
+            <rect x="220" y="60" width="160" height="60" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="300" y="85" text-anchor="middle" font-weight="700" fill="#4c1d95">Service A</text>
+            <text x="300" y="105" text-anchor="middle" fill="#4c1d95" font-size="10">收 ctx,剩 1.8s</text>
+
+            <rect x="420" y="60" width="160" height="60" rx="8" fill="#dcfce7" stroke="#15803d" stroke-width="1.5"/>
+            <text x="500" y="85" text-anchor="middle" font-weight="700" fill="#14532d">Service B</text>
+            <text x="500" y="105" text-anchor="middle" fill="#14532d" font-size="10">收 ctx,剩 1.5s</text>
+
+            <line x1="180" y1="90" x2="220" y2="90" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arrD)"/>
+            <line x1="380" y1="90" x2="420" y2="90" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arrD)"/>
+
+            <text x="360" y="155" text-anchor="middle" fill="#6b6b7e" font-size="11">Service A 把 ctx 傳給 B 時,B 拿到的是「剩餘時間」,不是新的 2 秒</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 18.2 — deadline 是「絕對時間」,跨服務不會 reset</div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (Service A)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">func</span> (a *serviceA) Handle(ctx context.Context, req *pb.Req) (*pb.Resp, <span class="tk-kw">error</span>) {
+    <span class="tk-cm">// ✓ 對:把 ctx 直接傳下去,deadline 自動 propagate</span>
+    res, err := a.bClient.Process(ctx, &amp;pb.BReq{...})
+
+    <span class="tk-cm">// ✗ 錯:context.Background() 會丟掉上游的 deadline</span>
+    <span class="tk-cm">// res, err := a.bClient.Process(context.Background(), ...)</span>
+
+    <span class="tk-kw">return</span> wrap(res), err
+}</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>不要用 <code>context.Background()</code> 呼叫下游</strong>
+          這會丟掉 deadline 與 cancellation,變成「上游已經放棄等了,下游還在傻傻 query」 — 浪費資源、難 debug、破壞 trace。<strong>handler 拿到的 ctx 應該原封不動傳給下游</strong>(除非你<strong>明確</strong>要縮短 deadline)。
+        </div>
+      </div>
+    </section>
+
+    <section id="cancel">
+      <span class="section-eyebrow">06 — Cancellation</span>
+      <h2>Cancellation:client 不等了,server 該停下</h2>
+      <p>無論 client 主動 <code>cancel()</code>、deadline 到、或網路斷,server handler 拿到的 <code>ctx</code> 都會 cancel。<strong>handler 必須主動關注</strong>,否則只是繼續燒 CPU。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (server)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">func</span> (s *server) BigQuery(ctx context.Context, req *pb.Req) (*pb.Resp, <span class="tk-kw">error</span>) {
+    <span class="tk-cm">// 模式 1:每個迭代檢查</span>
+    <span class="tk-kw">for</span> _, item := <span class="tk-kw">range</span> hugeList {
+        <span class="tk-kw">if</span> err := ctx.Err(); err != <span class="tk-kw">nil</span> {
+            <span class="tk-kw">return</span> <span class="tk-kw">nil</span>, status.FromContextError(err).Err()
+        }
+        process(item)
+    }
+
+    <span class="tk-cm">// 模式 2:select(streaming / 等 channel)</span>
+    <span class="tk-kw">select</span> {
+    <span class="tk-kw">case</span> result := &lt;-resultCh:
+        <span class="tk-kw">return</span> result, <span class="tk-kw">nil</span>
+    <span class="tk-kw">case</span> &lt;-ctx.Done():
+        <span class="tk-kw">return</span> <span class="tk-kw">nil</span>, status.FromContextError(ctx.Err()).Err()
+    }
+}</code></pre>
+      </div>
+
+      <p><code>ctx.Err()</code> 可能是兩種:</p>
+      <ul>
+        <li><code>context.Canceled</code> — client 主動 cancel</li>
+        <li><code>context.DeadlineExceeded</code> — deadline 到了</li>
+      </ul>
+      <p><code>status.FromContextError</code> 會把它對應到正確的 gRPC status code(<code>Canceled</code> / <code>DeadlineExceeded</code>),server 端永遠用這個 helper,不要自己手寫。</p>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>關於「changes are not rolled back」</strong>
+          官方文件直白警告:<em>「Changes made before a cancellation are not rolled back.」</em> Cancellation 只代表「不再做新事」,已經寫進 DB 的東西<strong>不會自動回滾</strong>。如果你的 handler 中途寫了 DB 才被 cancel,要嘛用 transaction、要嘛接受可能有部分變更。
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "Service A 收到 ctx (deadline 還剩 1.8 秒),要呼叫下游 Service B。下列做法<strong>正確</strong>的是?",
+    "options": [
+      "用 <code>context.Background()</code> 呼叫,讓 B 重新計算自己的 deadline",
+      "把上游 ctx 直接傳給 B,deadline 會自動 propagate(B 拿到的是剩餘時間)",
+      "重新 <code>WithTimeout(ctx, 5*time.Second)</code> 把 deadline 拉長一點",
+      "用 <code>ctx.Value()</code> 把 deadline 包成新的 ctx 傳"
+    ],
+    "answer": 1,
+    "explain": "<strong>把 ctx 原封不動傳下去</strong>是 gRPC 設計上的最佳實踐。Background 會丟失 deadline+cancellation;<code>WithTimeout(ctx, 5s)</code> 在 ctx 剩 1.8s 時也只剩 1.8s(WithTimeout 取較小者),但這樣寫毫無意義且容易誤導讀者。"
+  },
+  {
+    "question": "下列關於 metadata key 的描述,哪一項<strong>錯誤</strong>?",
+    "options": [
+      "key 大小寫不敏感",
+      "key 不能以 <code>grpc-</code> 開頭(該前綴 gRPC 自用)",
+      "傳二進位 value 時 key 必須以 <code>-bin</code> 結尾",
+      "同一個 key 只能對應一個 value"
+    ],
+    "answer": 3,
+    "explain": "metadata 是 <code>map[string][]string</code>,<strong>同 key 可有多 value</strong>。<code>md.Get(\"k\")</code> 回傳 <code>[]string</code>。其他三項描述都正確。"
+  },
+  {
+    "question": "Server 端在長時間 handler 裡,用什麼模式檢查 client 是否已取消?",
+    "options": [
+      "定期 <code>time.Sleep</code> 然後查 <code>ctx.Done()</code>",
+      "<code>if err := ctx.Err(); err != nil { return status.FromContextError(err).Err() }</code> 或 <code>select { case &lt;-ctx.Done(): ... }</code>",
+      "<code>if ctx == nil { ... }</code>",
+      "用全域變數 atomic 標記 cancellation"
+    ],
+    "answer": 1,
+    "explain": "正確模式是檢查 <code>ctx.Err()</code> 或 select <code>ctx.Done()</code>。<code>status.FromContextError</code> 把 <code>context.Canceled</code> / <code>context.DeadlineExceeded</code> 自動對應到正確的 gRPC status code。"
+  },
+  {
+    "question": "Client streaming 中,client 想送 authorization header,正確做法是?",
+    "options": [
+      "把 token 塞到 request message 的某個欄位",
+      "<code>ctx = metadata.AppendToOutgoingContext(ctx, \"authorization\", \"Bearer \"+token)</code>,再用這個 ctx 呼叫 RPC",
+      "用 <code>ctx.Value(\"token\", token)</code>",
+      "在 request message 加一個 <code>repeated string headers</code> 欄位"
+    ],
+    "answer": 1,
+    "explain": "認證 token、trace id 等橫切性資料應透過 metadata 傳遞,而非污染 message schema。用 <code>metadata.AppendToOutgoingContext</code> 是慣用做法,server 用 <code>metadata.FromIncomingContext</code> 取出。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://grpc.io/docs/guides/metadata/" target="_blank" rel="noopener">grpc.io — Metadata</a><span class="ref-meta">概念 + 規範</span></li>
+        <li><a href="https://github.com/grpc/grpc-go/blob/master/Documentation/grpc-metadata.md" target="_blank" rel="noopener">grpc-go/Documentation/grpc-metadata.md</a><span class="ref-meta">Go 詳細 API</span></li>
+        <li><a href="https://grpc.io/docs/guides/deadlines/" target="_blank" rel="noopener">grpc.io — Deadlines</a><span class="ref-meta">deadline 與 propagation</span></li>
+        <li><a href="https://grpc.io/docs/guides/cancellation/" target="_blank" rel="noopener">grpc.io — Cancellation</a><span class="ref-meta">cancellation 行為</span></li>
+        <li><a href="https://pkg.go.dev/google.golang.org/grpc/metadata" target="_blank" rel="noopener">pkg.go.dev — grpc/metadata</a><span class="ref-meta">Go metadata API</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="grpc_05_streaming_rpc.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 05 · 三種 Streaming RPC</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="grpc_07_error_handling.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 07 · 錯誤處理與 Status Codes</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">10 堂 gRPC 系列 <span class="progress-pill">6 / 10</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="grpc_01_intro.html"><span class="course-nav-num">01</span><span>gRPC 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="grpc_02_setup.html"><span class="course-nav-num">02</span><span>環境安裝與工具鏈</span></a></li>
+        <li><a class="course-nav-item" href="grpc_03_protobuf_syntax.html"><span class="course-nav-num">03</span><span>Protobuf 語法</span></a></li>
+        <li><a class="course-nav-item" href="grpc_04_unary_rpc.html"><span class="course-nav-num">04</span><span>Unary RPC 實戰</span></a></li>
+        <li><a class="course-nav-item" href="grpc_05_streaming_rpc.html"><span class="course-nav-num">05</span><span>三種 Streaming</span></a></li>
+        <li><a class="course-nav-item current" href="grpc_06_context_metadata.html"><span class="course-nav-num">06</span><span>Context / Metadata</span></a></li>
+        <li><a class="course-nav-item" href="grpc_07_error_handling.html"><span class="course-nav-num">07</span><span>錯誤處理</span></a></li>
+        <li><a class="course-nav-item" href="grpc_08_interceptors.html"><span class="course-nav-num">08</span><span>Interceptors</span></a></li>
+        <li><a class="course-nav-item" href="grpc_09_tls_auth.html"><span class="course-nav-num">09</span><span>TLS / Auth</span></a></li>
+        <li><a class="course-nav-item" href="grpc_10_connection_lifecycle.html"><span class="course-nav-num">10</span><span>連線生命週期</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 gRPC 課程系列 · Lesson 06
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

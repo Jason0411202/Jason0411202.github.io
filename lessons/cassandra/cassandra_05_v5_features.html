@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cassandra 05｜5.0 新特性 — Cassandra 課程</title>
+<meta name="description" content="Storage-Attached Indexes (SAI)、Vector Search (HNSW + ANN)、Trie Memtable / SSTable、Dynamic Data Masking、Unified Compaction Strategy (UCS)、單節點 10TB+。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Cassandra 05 · 5.0 新特性</div>
+    <h1 class="hero-title">Cassandra 5.0 的<span>六個重點升級</span></h1>
+    <p class="hero-desc">SAI 把索引玩法翻新；Vector Search 讓 Cassandra 直接能跑 RAG / 語意搜尋；Trie 結構大幅省 RAM/磁碟；Dynamic Data Masking 處理 PII；UCS 統一 compaction；單節點容量 4TB → 10TB+。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 5 / 6 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>進階</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#sai">SAI</a></li>
+      <li><a class="toc-link" href="#vector">Vector Search</a></li>
+      <li><a class="toc-link" href="#trie">Trie Memtable</a></li>
+      <li><a class="toc-link" href="#mask">Dynamic Data Masking</a></li>
+      <li><a class="toc-link" href="#ucs">UCS</a></li>
+      <li><a class="toc-link" href="#capacity">10TB / Node</a></li>
+      <li><a class="toc-link" href="#hands-on">動手玩</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="sai">
+      <span class="section-eyebrow">01 — SAI</span>
+      <h2>Storage-Attached Indexes (SAI)：索引終於好用了</h2>
+      <p>C-03 提過：傳統 secondary index (2i) 在大叢集要 scatter-gather，效能差。SAI 是 5.0 最受矚目的新索引機制：</p>
+
+      <ul>
+        <li><strong>與儲存引擎深度整合</strong>：每個 SSTable 自帶對應的 SAI 檔案，跟資料一起 flush / compact / 刪除。</li>
+        <li><strong>支援多種型態</strong>：text（含 case-insensitive）、numeric range、boolean、geo、UUID、collection（list/set/map）— 一個機制全包。</li>
+        <li><strong>查詢時可組合多 SAI</strong>：<code>WHERE a=? AND b&gt;? AND c IN (...)</code> 可同時用多個 SAI。</li>
+        <li><strong>記憶體效率高</strong>：每個 SAI 約 1% 表 size 的開銷，遠優於 2i。</li>
+      </ul>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">cql</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm">-- 建立 SAI (注意 USING 'sai')</span>
+<span class="tk-kw">CREATE INDEX</span> price_idx
+  <span class="tk-kw">ON</span> stockbot.price_by_symbol (price)
+  <span class="tk-kw">USING</span> <span class="tk-st">'sai'</span>;
+
+<span class="tk-cm">-- 現在這個 query 可行了 (沒 SAI 之前要 ALLOW FILTERING)</span>
+<span class="tk-kw">SELECT</span> * <span class="tk-kw">FROM</span> stockbot.price_by_symbol
+  <span class="tk-kw">WHERE</span> symbol = <span class="tk-st">'TSLA'</span>
+    <span class="tk-kw">AND</span> price &gt; <span class="tk-num">280</span>
+    <span class="tk-kw">AND</span> ts &gt;= <span class="tk-st">'2026-04-01'</span>;
+<span class="tk-cm">-- 要在 partition 內過濾 price 範圍 → SAI 會幫忙</span>
+
+<span class="tk-cm">-- 跨 partition 的 SAI 查詢也可用 (不過是 scatter-gather)</span>
+<span class="tk-kw">SELECT</span> * <span class="tk-kw">FROM</span> stockbot.price_by_symbol
+  <span class="tk-kw">WHERE</span> price &gt; <span class="tk-num">500</span>;</code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>SAI 是 5.0 的「預設 secondary index」</strong>
+          官方文件已經把 SAI 列為主要索引。新 schema 一律用 <code>USING 'sai'</code>；舊的 2i 可逐步遷移（先建 SAI，等驗證後 drop 舊的）。
+        </div>
+      </div>
+    </section>
+
+    <section id="vector">
+      <span class="section-eyebrow">02 — Vector Search</span>
+      <h2>Vector Search：Cassandra 直接做 RAG</h2>
+      <p>5.0 引入 <code>vector&lt;float, N&gt;</code> CQL 型態 + ANN 查詢。底層用 Lucene 的 HNSW（Hierarchical Navigable Small World）演算法 — 跟 Pinecone / Weaviate / pgvector 用的是相似的家族。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">cql</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm">-- 建一張帶 embedding 的表 (例如 OpenAI text-embedding-3-small 是 1536 維)</span>
+<span class="tk-kw">CREATE TABLE</span> stockbot.docs (
+  doc_id    <span class="tk-kw">uuid PRIMARY KEY</span>,
+  title     <span class="tk-kw">text</span>,
+  body      <span class="tk-kw">text</span>,
+  embedding <span class="tk-kw">vector</span>&lt;<span class="tk-kw">float</span>, <span class="tk-num">1536</span>&gt;
+);
+
+<span class="tk-cm">-- 建 SAI on the vector column (HNSW index)</span>
+<span class="tk-kw">CREATE INDEX</span> docs_emb_idx
+  <span class="tk-kw">ON</span> stockbot.docs (embedding)
+  <span class="tk-kw">USING</span> <span class="tk-st">'sai'</span>
+  <span class="tk-kw">WITH OPTIONS</span> = {<span class="tk-st">'similarity_function'</span>: <span class="tk-st">'COSINE'</span>};
+
+<span class="tk-cm">-- 灌幾筆 (應用層算好 embedding 後寫進來)</span>
+<span class="tk-kw">INSERT INTO</span> stockbot.docs (doc_id, title, body, embedding)
+<span class="tk-kw">VALUES</span> (uuid(), <span class="tk-st">'Q1 earnings'</span>, <span class="tk-st">'...'</span>, [<span class="tk-num">0.012</span>, <span class="tk-num">-0.034</span>, ...]);
+
+<span class="tk-cm">-- 查詢:取「最像 query embedding」的前 5 筆</span>
+<span class="tk-kw">SELECT</span> doc_id, title
+  <span class="tk-kw">FROM</span> stockbot.docs
+  <span class="tk-kw">ORDER BY</span> embedding <span class="tk-kw">ANN OF</span> [<span class="tk-num">0.022</span>, <span class="tk-num">-0.018</span>, ...]
+  <span class="tk-kw">LIMIT</span> <span class="tk-num">5</span>;</code></pre>
+      </div>
+
+      <h3>關鍵語法重點</h3>
+      <ul>
+        <li><strong><code>ORDER BY ... ANN OF [...]</code></strong>：注意，是 <code>ORDER BY</code> 不是 <code>WHERE</code>。因為這是「給我最相似的」、不是「給我等於某值的」。</li>
+        <li><strong>必須加 <code>LIMIT N</code></strong>：ANN 是「取前 N 個近似最近鄰」，不是「找全部相似的」。</li>
+        <li><strong>similarity_function</strong>：<code>COSINE</code>（語意相似最常用）、<code>DOT_PRODUCT</code>（已 normalize 的向量）、<code>EUCLIDEAN</code>。</li>
+        <li><strong>結果是近似</strong>，不是精確。HNSW 用犧牲一點召回率換速度。</li>
+      </ul>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>Cassandra Vector vs 專業向量庫</strong>
+          專業 vector DB（Pinecone、Weaviate）有更多索引調參、混合搜尋、metadata 過濾的進階功能。但 Cassandra Vector 的優勢是<em>已經跟你既有的 transactional 資料同庫</em> — 不用再多一個元件、不用 ETL。中等規模的 RAG / 推薦系統很適合。
+        </div>
+      </div>
+    </section>
+
+    <section id="trie">
+      <span class="section-eyebrow">03 — Trie Memtable</span>
+      <h2>Trie Memtable / SSTable：省 RAM 與磁碟</h2>
+      <p>5.0 把記憶體中 memtable 與部分 SSTable 結構從 B-tree 改成 <strong>Trie（前綴樹）</strong>。對 Cassandra 常見的 key 模式（partition key + clustering key 字串）有顯著好處：</p>
+
+      <ul>
+        <li><strong>記憶體用量降 1/3 ~ 1/2</strong>（看 key 共同前綴比例）。</li>
+        <li>讀寫效能持平或略升（CPU cache 更友善）。</li>
+        <li>對「同一 partition 內大量 clustering key」場景特別有效（因為它們共用同一 partition key 前綴）。</li>
+      </ul>
+
+      <p>使用者通常不用做什麼 — Cassandra 5.0 預設啟用。可在 <code>cassandra.yaml</code> 用 <code>memtable.configurations</code> 進階調，但預設值已合理。</p>
+    </section>
+
+    <section id="mask">
+      <span class="section-eyebrow">04 — Dynamic Data Masking</span>
+      <h2>Dynamic Data Masking：欄位級 PII 保護</h2>
+      <p>5.0 新增的功能：在 schema 上指定某欄位「給沒有解密權限的角色看時，自動遮罩」。<strong>原始資料不變</strong>，只是查詢時依據角色決定回什麼。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">cql</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm">-- 建表時對欄位指定 mask</span>
+<span class="tk-kw">CREATE TABLE</span> users (
+  id    <span class="tk-kw">uuid PRIMARY KEY</span>,
+  name  <span class="tk-kw">text</span>,
+  email <span class="tk-kw">text MASKED WITH</span> mask_inner(<span class="tk-num">2</span>, <span class="tk-num">2</span>),
+  ssn   <span class="tk-kw">text MASKED WITH</span> mask_default()
+);
+
+<span class="tk-cm">-- 賦予 admin 解碼權限</span>
+<span class="tk-kw">GRANT UNMASK</span> <span class="tk-kw">ON</span> users <span class="tk-kw">TO</span> admin_role;
+
+<span class="tk-cm">-- 沒 UNMASK 權限的 role 看到:</span>
+<span class="tk-cm">-- email: ja****on@gmail.com</span>
+<span class="tk-cm">-- ssn:   ****</span>
+
+<span class="tk-cm">-- 有 UNMASK 權限的 role 看到原始值</span></code></pre>
+      </div>
+
+      <h3>內建 mask 函式</h3>
+      <ul>
+        <li><code>mask_default()</code>：全部變星號</li>
+        <li><code>mask_inner(prefix, suffix)</code>：保留前/後幾字</li>
+        <li><code>mask_outer(start, end)</code>：保留中間</li>
+        <li><code>mask_hash(algo)</code>：hash 後輸出</li>
+        <li><code>mask_replace(value)</code>：替換成固定字串</li>
+      </ul>
+
+      <p>這個功能本來只能在 application 層做、容易漏，現在能在 schema 層強制 — GDPR / HIPAA 場景非常有用。</p>
+    </section>
+
+    <section id="ucs">
+      <span class="section-eyebrow">05 — UCS</span>
+      <h2>Unified Compaction Strategy：一個策略統一全部</h2>
+      <p>C-04 提過：以前要在 STCS / LCS / TWCS 之間挑，每種有自己甜蜜點，運維痛點是「workload 一變就要換」。</p>
+
+      <p>UCS（5.0 新增）的目標是<strong>一個策略動態適應</strong>：</p>
+      <ul>
+        <li>內部用 <em>scaling parameter (T)</em> 控制行為 — 高 T → 接近 STCS；低 T → 接近 LCS。</li>
+        <li>支援 <em>sharded compaction</em>：把一個 SSTable 切成多 shard 並行 compact，加速大檔處理。</li>
+        <li>原生支援 TTL hints（取代 TWCS 的功能）。</li>
+      </ul>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">cql</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-kw">CREATE TABLE</span> events (...)
+  <span class="tk-kw">WITH compaction</span> = {
+    <span class="tk-st">'class'</span>: <span class="tk-st">'UnifiedCompactionStrategy'</span>,
+    <span class="tk-st">'scaling_parameters'</span>: <span class="tk-st">'T4'</span>   <span class="tk-cm">-- 預設,中庸</span>
+  };</code></pre>
+      </div>
+
+      <p>如果你升級舊叢集到 5.0，<em>舊表沿用原 strategy，新建表才預設 UCS</em>。可以用 <code>ALTER TABLE ... WITH compaction = {...}</code> 切換。</p>
+    </section>
+
+    <section id="capacity">
+      <span class="section-eyebrow">06 — 10TB</span>
+      <h2>單節點容量：4TB → 10TB+</h2>
+      <p>5.0 之前社群多半建議單節點資料量 &lt;= 4TB（超過後 streaming repair 與 compaction 變慢、節點重建太久）。5.0 透過：</p>
+      <ul>
+        <li>UCS sharded compaction → 大表 compact 變並行</li>
+        <li>Trie memtable → 同記憶體可裝更多 key</li>
+        <li>Streaming 改進（zerocopy）</li>
+      </ul>
+
+      <p>讓單節點推上 10TB+ 仍可健康運作。<strong>對叢集規模規劃影響很大</strong> — 同樣 100TB 資料以前可能要 25+ 節點，現在 10 節點就夠。</p>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>不過更大不見得更好</strong>
+          雖然 10TB 可行，但節點越大失敗時的「重建時間」越長、blast radius 越大。建議實測自家 workload 並採折衷（例如 4~6TB / node）。<em>「推上 10TB」是 5.0 提供的選項，不是強制的目標</em>。
+        </div>
+      </div>
+    </section>
+
+    <section id="hands-on">
+      <span class="section-eyebrow">07 — 動手玩</span>
+      <h2>跑一次 SAI + 假 vector</h2>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">cql</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 cqlsh
+cqlsh&gt; <span class="tk-fn">USE</span> stockbot;
+
+<span class="tk-cm">-- 1. 在現有 price_by_symbol 加 SAI</span>
+cqlsh:stockbot&gt; <span class="tk-kw">CREATE INDEX</span> price_sai
+  <span class="tk-kw">ON</span> price_by_symbol (price) <span class="tk-kw">USING</span> <span class="tk-st">'sai'</span>;
+
+cqlsh:stockbot&gt; <span class="tk-kw">SELECT</span> * <span class="tk-kw">FROM</span> price_by_symbol
+  <span class="tk-kw">WHERE</span> symbol=<span class="tk-st">'TSLA'</span> <span class="tk-kw">AND</span> price &gt; <span class="tk-num">285</span>;
+
+<span class="tk-cm">-- 2. 建 vector 表 + 填假資料</span>
+cqlsh:stockbot&gt; <span class="tk-kw">CREATE TABLE</span> news (
+  id <span class="tk-kw">uuid PRIMARY KEY</span>,
+  title <span class="tk-kw">text</span>,
+  emb <span class="tk-kw">vector</span>&lt;<span class="tk-kw">float</span>, <span class="tk-num">3</span>&gt;   <span class="tk-cm">-- 3 維方便手寫</span>
+);
+
+cqlsh:stockbot&gt; <span class="tk-kw">CREATE INDEX</span> ann_idx <span class="tk-kw">ON</span> news (emb)
+  <span class="tk-kw">USING</span> <span class="tk-st">'sai'</span>
+  <span class="tk-kw">WITH OPTIONS</span> = {<span class="tk-st">'similarity_function'</span>: <span class="tk-st">'COSINE'</span>};
+
+cqlsh:stockbot&gt; <span class="tk-kw">INSERT INTO</span> news <span class="tk-kw">VALUES</span> (uuid(), <span class="tk-st">'TSLA up'</span>, [<span class="tk-num">0.9</span>, <span class="tk-num">0.1</span>, <span class="tk-num">0.0</span>]);
+cqlsh:stockbot&gt; <span class="tk-kw">INSERT INTO</span> news <span class="tk-kw">VALUES</span> (uuid(), <span class="tk-st">'AAPL up'</span>, [<span class="tk-num">0.85</span>, <span class="tk-num">0.05</span>, <span class="tk-num">0.1</span>]);
+cqlsh:stockbot&gt; <span class="tk-kw">INSERT INTO</span> news <span class="tk-kw">VALUES</span> (uuid(), <span class="tk-st">'Macro inflation'</span>, [<span class="tk-num">0.1</span>, <span class="tk-num">0.9</span>, <span class="tk-num">0.0</span>]);
+
+<span class="tk-cm">-- 3. ANN 查詢:接近「股票漲」(0.88, 0.08, 0.05)</span>
+cqlsh:stockbot&gt; <span class="tk-kw">SELECT</span> title <span class="tk-kw">FROM</span> news
+  <span class="tk-kw">ORDER BY</span> emb <span class="tk-kw">ANN OF</span> [<span class="tk-num">0.88</span>, <span class="tk-num">0.08</span>, <span class="tk-num">0.05</span>]
+  <span class="tk-kw">LIMIT</span> <span class="tk-num">2</span>;
+<span class="tk-cm">-- 預期:TSLA up, AAPL up 排前面</span>
+
+<span class="tk-cm">-- 4. 試 Dynamic Data Masking (5.0 預設要打開 mask_inner、mask_default 等函式)</span>
+cqlsh:stockbot&gt; <span class="tk-kw">CREATE TABLE</span> users_pii (
+  id    <span class="tk-kw">uuid PRIMARY KEY</span>,
+  email <span class="tk-kw">text MASKED WITH</span> mask_inner(<span class="tk-num">2</span>, <span class="tk-num">2</span>)
+);
+cqlsh:stockbot&gt; <span class="tk-kw">INSERT INTO</span> users_pii (id, email)
+  <span class="tk-kw">VALUES</span> (uuid(), <span class="tk-st">'jason@example.com'</span>);
+cqlsh:stockbot&gt; <span class="tk-kw">SELECT</span> email <span class="tk-kw">FROM</span> users_pii;
+<span class="tk-cm">-- ja*************om   (除非 GRANT UNMASK)</span></code></pre>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "為什麼 Vector Search 用 <code>ORDER BY ... ANN OF [...]</code> 而不是 <code>WHERE embedding = [...]</code>？",
+    "options": [
+      "WHERE 子句不能用 vector 型態",
+      "ANN 查的是「最相似的前 N 個」是排序問題,不是相等問題",
+      "ANN 是 SQL 標準語法",
+      "因為 vector 型態太大,不能放在 WHERE"
+    ],
+    "answer": 1,
+    "explain": "ANN (Approximate Nearest Neighbor) 本質是「給我跟這個 query vector 最相似的前 N 個」 — 這是排序需求，不是「找等於某值」。所以放在 ORDER BY 並搭配 LIMIT N。寫成 WHERE 在語意上也說不通（沒有兩個 vector 會剛好相等）。"
+  },
+  {
+    "question": "下列哪些是 SAI 相對於傳統 secondary index (2i) 的優勢？(多選)",
+    "options": [
+      "與 SSTable 一起 flush / compact / drop,運維更乾淨",
+      "支援多種型態 (text/numeric range/collection/vector) 一個機制全包",
+      "查詢時可組合多個 SAI",
+      "SAI 完全沒有跨節點 scatter-gather 的成本"
+    ],
+    "answer": [0, 1, 2],
+    "explain": "(0)(1)(2) 都是 SAI 的真實優勢。(4) 錯：跨 partition 的 SAI 查詢仍是 scatter-gather (要問每個節點),這是分散式索引的本質。SAI 的優勢在於<em>單 SSTable 內</em>的索引效率高 + 機制統一，但要避免「無 partition key 又用 SAI 大量查詢」這種反模式。"
+  },
+  {
+    "question": "你升級了一個 4.x 叢集到 5.0，下列哪一項<strong>正確</strong>？",
+    "options": [
+      "原有的表會自動切到 UCS 並啟用 SAI",
+      "舊表的 compaction 策略不變,新建表預設 UCS;SAI 要明確 CREATE INDEX",
+      "所有 secondary index 自動升級為 SAI",
+      "升級後資料會被 re-encode"
+    ],
+    "answer": 1,
+    "explain": "Cassandra 升級<strong>不自動改既有表的設定</strong> — 設計上很保守。你升完版本後，舊表 compaction 仍是原來的策略；要切 UCS 要手動 ALTER。SAI 也是要明確 CREATE INDEX，不會自動把舊 2i 升級。這是為了避免升級造成預期外的行為改變。"
+  },
+  {
+    "question": "下列關於 Dynamic Data Masking 的敘述，哪一項<strong>錯誤</strong>？",
+    "options": [
+      "原始資料仍是明文儲存,只是查詢時依角色決定回傳是否遮罩",
+      "可以用 GRANT UNMASK 授予特定 role 看原始值",
+      "可避免 application 層忘記做 PII 遮罩",
+      "DDM 同時加密了磁碟資料,即使有人偷檔案也看不到原始值"
+    ],
+    "answer": 3,
+    "explain": "(3) 錯。DDM 是 <em>查詢時遮罩</em>，原始資料仍以明文儲存於 SSTable 與 commit log。要做 at-rest 加密請另用 Transparent Data Encryption (TDE)。DDM 解決的是「應用層或 BI 工具 join 時不該看到的人別看到」，不是儲存層加密。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/developing/cql/indexing/sai/sai-concepts.html" target="_blank" rel="noopener">SAI Concepts</a><span class="ref-meta">官方</span></li>
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/vector-search/concepts.html" target="_blank" rel="noopener">Vector Search Concepts</a><span class="ref-meta">官方</span></li>
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/getting-started/vector-search-quickstart.html" target="_blank" rel="noopener">Vector Search Quickstart</a><span class="ref-meta">完整範例</span></li>
+        <li><a href="https://cwiki.apache.org/confluence/display/CASSANDRA/CEP-30%3A+Approximate+Nearest+Neighbor%28ANN%29+Vector+Search+via+Storage-Attached+Indexes" target="_blank" rel="noopener">CEP-30: ANN Vector Search</a><span class="ref-meta">設計提案</span></li>
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/developing/cql/dynamic-data-masking.html" target="_blank" rel="noopener">Dynamic Data Masking</a><span class="ref-meta">官方</span></li>
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/managing/operating/compaction/ucs.html" target="_blank" rel="noopener">Unified Compaction Strategy</a><span class="ref-meta">UCS 官方</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="cassandra_04_read_write_path.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Cassandra 04 · 讀寫路徑與 Compaction</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="cassandra_06_ops_practice.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Cassandra 06 · 運維實務</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">6 堂 Cassandra 系列 <span class="progress-pill">5 / 6</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="cassandra_01_intro.html"><span class="course-nav-num">01</span><span>Cassandra 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_02_architecture.html"><span class="course-nav-num">02</span><span>環狀架構與一致性</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_03_cql_modeling.html"><span class="course-nav-num">03</span><span>CQL 與資料建模</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_04_read_write_path.html"><span class="course-nav-num">04</span><span>讀寫路徑 / Compaction</span></a></li>
+        <li><a class="course-nav-item current" href="cassandra_05_v5_features.html"><span class="course-nav-num">05</span><span>5.0 新特性</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_06_ops_practice.html"><span class="course-nav-num">06</span><span>運維實務</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 Cassandra 課程系列 · Lesson 05
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

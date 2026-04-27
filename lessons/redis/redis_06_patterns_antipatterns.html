@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redis 06｜實戰模式與反模式 — Redis 課程</title>
+<meta name="description" content="Cache 三大災難 / 分散式 lock 真相(Redlock 爭議)/ Sliding window rate limiter / KEYS *、big key、hot key 反模式 / 關鍵指標 / production 工具帶過。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Redis 06 · 上工 Checklist</div>
+    <h1 class="hero-title">把 Redis 真正<span>用對</span>的最後一堂</h1>
+    <p class="hero-desc">Cache 三大災難、Distributed Lock 的爭議真相(Redlock vs SET NX)、Sliding window rate limiter、production 反模式、關鍵指標 — 這 6 堂的收尾。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 6 / 6 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 15 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>上工級</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#cache-patterns">Cache Patterns</a></li>
+      <li><a class="toc-link" href="#three-disaster">三大災難</a></li>
+      <li><a class="toc-link" href="#lock">分散式 Lock</a></li>
+      <li><a class="toc-link" href="#rate-limit">Rate Limiter</a></li>
+      <li><a class="toc-link" href="#anti">反模式</a></li>
+      <li><a class="toc-link" href="#metrics">關鍵指標</a></li>
+      <li><a class="toc-link" href="#prod">Production 工具</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="cache-patterns">
+      <span class="section-eyebrow">01 — Cache 模式</span>
+      <h2>四種 Cache 模式怎麼選</h2>
+
+      <table>
+        <thead>
+          <tr><th>模式</th><th>讀</th><th>寫</th><th>取捨</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Cache-Aside</strong> (look-aside)</td>
+            <td>app 先查 cache,miss 再查 DB,回填</td>
+            <td>app 寫 DB → 主動 invalidate cache</td>
+            <td><strong>最常見</strong>;app 邏輯包,簡單可控</td>
+          </tr>
+          <tr>
+            <td>Read-Through</td>
+            <td>app 只查 cache,cache miss 時自動回 DB 取</td>
+            <td>同 Cache-Aside</td>
+            <td>cache 客戶端要支援(如 caffeine);邏輯收斂但綁框架</td>
+          </tr>
+          <tr>
+            <td>Write-Through</td>
+            <td>同 Read-Through</td>
+            <td>app 寫 cache → cache 同步寫 DB</td>
+            <td>強一致但寫慢</td>
+          </tr>
+          <tr>
+            <td>Write-Behind</td>
+            <td>同 Read-Through</td>
+            <td>app 寫 cache → cache 非同步刷到 DB</td>
+            <td>寫快;但若 cache 掛資料丟</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>業界 90% 場景是 <strong>Cache-Aside</strong>。Read-Through / Write-Through 多見於 application server 內的本地 cache（Caffeine、Guava cache）。Write-Behind 出現於高吞吐但能容忍少量資料丟失的場景（如計數器）。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go — cache-aside</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-kw">func</span> <span class="tk-fn">GetUser</span>(id <span class="tk-kw">string</span>) (*User, <span class="tk-kw">error</span>) {
+    <span class="tk-cm">// 1. 先查 cache</span>
+    <span class="tk-kw">if</span> raw, err := rdb.Get(ctx, <span class="tk-st">"user:"</span>+id).Bytes(); err == <span class="tk-kw">nil</span> {
+        <span class="tk-kw">return</span> deserialize(raw), <span class="tk-kw">nil</span>
+    }
+
+    <span class="tk-cm">// 2. miss → 查 DB</span>
+    user, err := db.QueryUser(id)
+    <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> { <span class="tk-kw">return</span> <span class="tk-kw">nil</span>, err }
+
+    <span class="tk-cm">// 3. 回填 cache (TTL 加隨機抖動,後面講)</span>
+    rdb.Set(ctx, <span class="tk-st">"user:"</span>+id, serialize(user), <span class="tk-num">300</span>*time.Second + jitter())
+
+    <span class="tk-kw">return</span> user, <span class="tk-kw">nil</span>
+}
+
+<span class="tk-kw">func</span> <span class="tk-fn">UpdateUser</span>(u *User) <span class="tk-kw">error</span> {
+    db.UpdateUser(u)              <span class="tk-cm">// 寫 DB</span>
+    rdb.Del(ctx, <span class="tk-st">"user:"</span>+u.ID)  <span class="tk-cm">// 刪 cache,讓下次讀重新回填</span>
+    <span class="tk-kw">return</span> <span class="tk-kw">nil</span>
+}</code></pre>
+      </div>
+    </section>
+
+    <section id="three-disaster">
+      <span class="section-eyebrow">02 — 三大災難</span>
+      <h2>Cache 三大經典事故與解法</h2>
+
+      <h3>Cache Penetration（快取穿透）</h3>
+      <p><strong>問題</strong>：query 一個「DB 也沒有」的 key（例如惡意爬蟲試 user:9999999999），cache 永遠 miss → 每次都打 DB。</p>
+      <p><strong>解法</strong>：</p>
+      <ul>
+        <li>把「不存在」這件事也 cache — set 一個短 TTL 的「null marker」（<code>SET user:99 "" EX 60</code>）。</li>
+        <li>或在 DB 前用 <strong>Bloom filter</strong>：先判斷「這個 key 是否可能存在」，明顯不存在的就直接拒。</li>
+      </ul>
+
+      <h3>Cache Breakdown（快取擊穿）</h3>
+      <p><strong>問題</strong>：一個熱 key 的 TTL 到期了，瞬間幾千個 request 同時 miss、同時打 DB。</p>
+      <p><strong>解法</strong>：</p>
+      <ul>
+        <li>用 <strong>distributed lock</strong>（後面講）— 第一個 miss 的拿到 lock 才打 DB，其他 wait。</li>
+        <li>或用 <strong>logical expiration</strong>：cache 裡寫一個「邏輯過期時間」，到期後仍回舊資料但<em>非同步</em>更新。</li>
+      </ul>
+
+      <h3>Cache Avalanche（快取雪崩）</h3>
+      <p><strong>問題</strong>：大量 cache 在同一秒同時過期（例如服務重啟後同時寫入），瞬間 DB 壓力倍增。</p>
+      <p><strong>解法</strong>：</p>
+      <ul>
+        <li><strong>TTL 加隨機抖動</strong>：原本 5 分鐘 TTL，改成 5 分鐘 ± 30 秒 random。</li>
+        <li>多級 cache：local (in-process) + Redis 兩層。</li>
+        <li>Redis 自己 HA（Sentinel / Cluster）— 避免 Redis 整個掛。</li>
+      </ul>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>三招組合拳</strong>
+          <ol>
+            <li>所有 cache TTL 帶 ±10% 隨機抖動 — 防雪崩</li>
+            <li>未命中時用 SET NX 做 mutex - 防擊穿</li>
+            <li>不存在也 cache 短期 null - 防穿透</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section id="lock">
+      <span class="section-eyebrow">03 — 分散式 Lock</span>
+      <h2>分散式 Lock 的真相（Redlock 爭議）</h2>
+
+      <h3>單機簡單版：SET NX PX 即可</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis-cli</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 拿 lock — NX 表示「只有不存在時才寫」,PX 30000 表示 30 秒過期</span>
+<span class="tk-fn">SET</span> lock:order:1 <span class="tk-st">"random-uuid-abc"</span> NX PX <span class="tk-num">30000</span>
+OK   <span class="tk-cm"># 拿到</span>
+(nil) <span class="tk-cm"># 沒拿到</span>
+
+<span class="tk-cm"># 釋放 lock - 一定要用 Lua 確認 value 才刪</span>
+<span class="tk-cm"># (避免別人 lock 過期重新拿,你刪到別人的)</span>
+<span class="tk-fn">EVAL</span> <span class="tk-st">"if redis.call('GET', KEYS[1]) == ARGV[1] then
+        return redis.call('DEL', KEYS[1])
+      else return 0 end"</span> <span class="tk-num">1</span> lock:order:1 <span class="tk-st">"random-uuid-abc"</span></code></pre>
+      </div>
+
+      <p>這個方案<strong>對 99% 場景夠用</strong>。重點：</p>
+      <ul>
+        <li><strong>value 必須隨機</strong> — 釋放時驗證才不會誤刪別人的 lock。</li>
+        <li><strong>必須有 PX 過期</strong> — 沒過期 + client 崩潰 = lock 永久卡住。</li>
+        <li><strong>釋放用 Lua 原子比對 + DEL</strong> — 兩步分開有 race。</li>
+      </ul>
+
+      <h3>多機 Redlock：Antirez vs Kleppmann</h3>
+      <p>Antirez（Redis 創造者）為了「單機 Redis 掛掉時仍能拿 lock」設計了 <strong>Redlock</strong>：用 N（建議 5）台<em>獨立</em>的 Redis instance，client 在多數派（3/5）拿到 lock 才算成功。</p>
+
+      <p>Martin Kleppmann（《DDIA》作者）2016 寫了著名的 <a href="https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html" target="_blank" rel="noopener" class="inline-link">「How to do distributed locking」</a>，論點：</p>
+      <ol>
+        <li>Redlock 依賴<strong>各機器時鐘同步</strong>，但時鐘漂移在實務上不可控。</li>
+        <li>長時間 GC pause / 網路分區可能讓 client A 以為自己還持有 lock，B 已經拿到 — 違反互斥。</li>
+        <li>解法是用 <strong>fencing token</strong>（單調遞增 ID），下游服務驗證 token 大小決定是否接受。</li>
+      </ol>
+
+      <p>Antirez 寫了 <a href="https://redis.antirez.com/fundamental/redlock.html" target="_blank" rel="noopener" class="inline-link">反駁文</a>：時鐘的擔憂被誇大、實務上 Redlock + 合理的 lock 持有時間夠用。</p>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>實務怎麼做</strong>
+          <ul>
+            <li>大部分場景：<em>單機 SET NX PX</em> 就夠。Redis 配 Sentinel/Cluster 已經有 HA。</li>
+            <li>真的需要強互斥（金融轉帳、絕不能重複扣款）：<em>用 fencing token + 後端驗證</em>，而不是依賴 Redlock。</li>
+            <li>選用 Redlock 前先看：你的下游服務有沒有辦法驗 token？沒辦法驗的話，多 Redis 也救不了。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="rate-limit">
+      <span class="section-eyebrow">04 — Rate Limiter</span>
+      <h2>三種 Rate Limiter 與 Sliding Window 實作</h2>
+
+      <table>
+        <thead>
+          <tr><th>策略</th><th>原理</th><th>取捨</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>固定窗 (Fixed Window)</strong></td>
+            <td><code>INCR rate:user:1:202604271500</code></td>
+            <td>實作簡單;邊界突刺(15:00:01 與 15:00:59 各 100 = 100 內 200)</td>
+          </tr>
+          <tr>
+            <td>Token Bucket</td>
+            <td>每秒補 N 個 token,超量拒</td>
+            <td>支援突發,計算稍複雜</td>
+          </tr>
+          <tr>
+            <td><strong>Sliding Window</strong>(用 Sorted Set)</td>
+            <td>記每筆 request 時間戳到 ZSET,查窗口內筆數</td>
+            <td>準確、無邊界突刺、用 ZSET</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Sliding Window 實作（最推薦）</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">Lua — 限制 user 1 分鐘內 100 次</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm">-- KEYS[1]: 該 user 的限流 key</span>
+<span class="tk-cm">-- ARGV[1]: 當下時間 (ms)</span>
+<span class="tk-cm">-- ARGV[2]: 窗口大小 (ms,如 60000)</span>
+<span class="tk-cm">-- ARGV[3]: 限制次數 (如 100)</span>
+<span class="tk-cm">-- ARGV[4]: 本次的 unique id</span>
+
+<span class="tk-kw">local</span> now    = tonumber(ARGV[1])
+<span class="tk-kw">local</span> window = tonumber(ARGV[2])
+<span class="tk-kw">local</span> limit  = tonumber(ARGV[3])
+
+<span class="tk-cm">-- 1. 移除窗口外的舊紀錄</span>
+redis.call(<span class="tk-st">'ZREMRANGEBYSCORE'</span>, KEYS[1], <span class="tk-num">0</span>, now - window)
+
+<span class="tk-cm">-- 2. 算窗口內幾筆</span>
+<span class="tk-kw">local</span> count = redis.call(<span class="tk-st">'ZCARD'</span>, KEYS[1])
+<span class="tk-kw">if</span> count &gt;= limit <span class="tk-kw">then</span>
+  <span class="tk-kw">return</span> <span class="tk-num">0</span>   <span class="tk-cm">-- 拒</span>
+<span class="tk-kw">end</span>
+
+<span class="tk-cm">-- 3. 加入這次紀錄</span>
+redis.call(<span class="tk-st">'ZADD'</span>, KEYS[1], now, ARGV[4])
+redis.call(<span class="tk-st">'PEXPIRE'</span>, KEYS[1], window)
+<span class="tk-kw">return</span> <span class="tk-num">1</span></code></pre>
+      </div>
+
+      <p>這段 Lua 在 Redis 裡是<strong>單緒原子</strong>，沒有 race。一條 EVAL 完成「清舊 + 計算 + 寫入」三件事。</p>
+    </section>
+
+    <section id="anti">
+      <span class="section-eyebrow">05 — 反模式</span>
+      <h2>四個生產上保證踩坑的反模式</h2>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>KEYS *</div>
+          <div class="compare-body">
+            掃整庫、O(N) 阻塞單緒。1 千萬 key 跑 10 秒 → <strong>所有 client 卡 10 秒</strong>。<br>
+            <strong>替代:</strong> <code>SCAN 0 MATCH pattern COUNT 100</code> 分批游標掃。
+          </div>
+        </div>
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>Big Key</div>
+          <div class="compare-body">
+            單一 hash 上 GB,LIST 上百萬筆。讀寫 / 複寫一次都吃光網路與 CPU。<br>
+            <strong>檢測:</strong> <code>redis-cli --bigkeys</code><br>
+            <strong>替代:</strong> 拆成多 key (例如 hash by hash tag),或用 sorted set + 分頁。
+          </div>
+        </div>
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>Hot Key</div>
+          <div class="compare-body">
+            單一 key (如 <code>config:global</code>) 被一台 client 每秒查 100 萬次。<br>
+            <strong>檢測:</strong> <code>redis-cli --hotkeys</code><br>
+            <strong>替代:</strong> 應用層 in-process cache、或拆 N 個 replica 加 read scaling、或 key shard 成 N 份隨機讀。
+          </div>
+        </div>
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>當主資料庫</div>
+          <div class="compare-body">
+            把 Redis 當 PostgreSQL 替代。<br>
+            <strong>記憶體成本貴、強一致弱、ad-hoc 查能力差</strong>。Redis 是 <em>cache + 資料結構服務</em>,不是 source of truth。
+          </div>
+        </div>
+      </div>
+
+      <p>第五個常見地雷：<strong>用 Redis 當訊息佇列但用 Pub/Sub</strong>。Pub/Sub 沒持久化、subscriber 離線即丟訊息。需要可靠佇列請用 Streams（R-02）。</p>
+    </section>
+
+    <section id="metrics">
+      <span class="section-eyebrow">06 — 關鍵指標</span>
+      <h2>必看的 9 個指標</h2>
+
+      <table>
+        <thead>
+          <tr><th>類別</th><th>Metric</th><th>警戒值</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>命中率</td><td><code>keyspace_hits / (hits + misses)</code></td><td>&lt; 80% 要查（cache 設計問題）</td></tr>
+          <tr><td>記憶體</td><td><code>used_memory</code> / <code>maxmemory</code></td><td>&gt; 80% 警告</td></tr>
+          <tr><td>記憶體碎片</td><td><code>used_memory_rss / used_memory</code></td><td>&gt; 1.5 → 碎片高,考慮 ACTIVE DEFRAG</td></tr>
+          <tr><td>淘汰</td><td><code>evicted_keys/sec</code></td><td>持續 &gt; 0 → cache 滿了在淘汰</td></tr>
+          <tr><td>連線</td><td><code>connected_clients</code></td><td>接近 maxclients 警告</td></tr>
+          <tr><td>阻塞</td><td><code>blocked_clients</code></td><td>持續 &gt; 0 → BLPOP/WAIT 在等</td></tr>
+          <tr><td>延遲</td><td><code>redis-cli --latency</code></td><td>p99 &gt; 5ms 要查</td></tr>
+          <tr><td>慢查詢</td><td><code>slowlog get</code> 過去幾分鐘</td><td>有就查</td></tr>
+          <tr><td>複寫延遲</td><td><code>master_repl_offset - slave_repl_offset</code></td><td>持續飆升 → replica 跟不上</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Slowlog</strong> 是排查地雷的金鑰：</p>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis-cli</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 查最近 10 條慢查 (預設超過 10ms 即記錄)</span>
+<span class="tk-fn">SLOWLOG</span> GET <span class="tk-num">10</span>
+
+<span class="tk-cm"># 看誰在連</span>
+<span class="tk-fn">CLIENT</span> LIST
+
+<span class="tk-cm"># 看「哪些 client 在做啥」(production 千萬不要長開,會慢死)</span>
+<span class="tk-fn">MONITOR</span></code></pre>
+      </div>
+    </section>
+
+    <section id="prod">
+      <span class="section-eyebrow">07 — Production</span>
+      <h2>實際 production 都用什麼工具</h2>
+      <p>本系列為了上手簡單只跑單機 / docker-compose。實際上線常見組合：</p>
+
+      <ul>
+        <li><strong>Redis Operator (OT-CONTAINER-KIT)</strong>：開源、活躍維護的 K8s operator，CRD 描述 standalone / cluster / sentinel / replication 模式，含 redis-exporter for Prometheus。</li>
+        <li><strong>Redis Enterprise for Kubernetes</strong>：Redis 公司商業版 K8s operator，多 DC + active-active + 模組管理。</li>
+        <li><strong>redis_exporter + Prometheus + Grafana</strong>：監控標配。社群 dashboard 763 / 11835 都好用。</li>
+        <li><strong>RedisInsight</strong>：官方 GUI，看資料、查 slowlog、profiling。</li>
+        <li><strong>Cloud managed</strong>：AWS ElastiCache、GCP Memorystore、Azure Cache for Redis、Upstash、Redis Cloud — 不想管基礎設施直接用。</li>
+        <li><strong>Valkey</strong>：Linux Foundation fork，BSD 授權。雲端 OSS 替代選項。</li>
+      </ul>
+
+      <h3>推薦進階學習</h3>
+      <ul>
+        <li><strong>《Redis in Action》</strong>（Josiah L. Carlson，Manning）— 雖為 Redis 2.x 寫，但模式部分仍經典。</li>
+        <li><strong>Antirez 部落格</strong>（<a href="http://antirez.com/" target="_blank" rel="noopener" class="inline-link">antirez.com</a>）— Redis 創造者親寫的設計理由。</li>
+        <li><strong>《Designing Data-Intensive Applications》Kleppmann</strong> — 分散式系統聖經，第 8、9 章與 Redlock 爭議直接相關。</li>
+        <li><strong>Redis 官方 docs</strong> — 持續更新、品質高。</li>
+      </ul>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>結業 ✓</strong>
+          走完這 6 堂後，你應該能：用 redis-cli 操作所有常見資料結構、看著 INFO 排查問題、選擇正確的 cache 模式、避開 KEYS *・big key・hot key、知道何時該選 Sentinel / Cluster、判斷向量場景該用 Redis Vector Set 還是 ES/Pinecone。<em>把這套放進 stockbot 的真實服務,Redis 該幫忙的地方就會清楚浮現。</em>
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "你的 cache 在每天凌晨 3 點(服務每天的 batch 重啟時)會出現 DB QPS 暴衝。最可能的原因與最直接解法是？",
+    "options": [
+      "Cache penetration ↔ 用 Bloom filter",
+      "Cache breakdown ↔ 用 distributed lock",
+      "Cache avalanche(大量 key 同時 TTL 過期) ↔ TTL 加隨機抖動 ±10%",
+      "Big key ↔ 把 key 拆小"
+    ],
+    "answer": 2,
+    "explain": "「服務重啟後同時寫入 → TTL 同時到期」是經典 Cache Avalanche 場景。最直接的解法是 TTL 加隨機抖動,讓過期分散在一段時間內。配合多級 cache、Redis HA 是進階防線。其他三個選項對應不同問題:penetration 是查不存在的 key、breakdown 是單一熱 key 過期、big key 是單 value 太大。"
+  },
+  {
+    "question": "下列關於分散式 lock 的敘述,哪些<strong>正確</strong>?(多選)",
+    "options": [
+      "單機 SET key value NX PX 30000 對 99% 場景已經夠用",
+      "釋放 lock 必須用 Lua 原子比對 value 後再 DEL,否則可能誤刪別人的 lock",
+      "Redlock 跨多機 Redis,Kleppmann 認為它對時鐘同步的依賴不可靠;實務真強互斥場景應改用 fencing token",
+      "value 可以是固定字串 (如 'locked')"
+    ],
+    "answer": [0, 1, 2],
+    "explain": "(0)(1)(2) 正確。(3) 錯：value 必須是<strong>隨機 unique value</strong>（如 UUID）— 否則釋放時無法分辨「這個 lock 是不是我拿的」,可能誤刪別人 lock 過期後重拿的同名 key。"
+  },
+  {
+    "question": "你發現 production Redis 的 <code>used_memory_rss / used_memory</code> 是 2.3,持續一段時間。這代表？",
+    "options": [
+      "資料佔用的記憶體比 OS 看到的多",
+      "記憶體碎片率高(物理記憶體用了 2.3 倍邏輯資料量),建議啟用 ACTIVE DEFRAG",
+      "Redis 已經 OOM",
+      "正常現象不用處理"
+    ],
+    "answer": 1,
+    "explain": "<code>mem_fragmentation_ratio</code> = used_memory_rss / used_memory。&gt; 1.5 表示碎片率高 — 物理 RAM 比邏輯資料量多很多。原因常是大量 key 寫入、刪除後留下無法被新分配利用的 holes。Redis 4.0+ 內建 ACTIVE DEFRAG (CONFIG SET activedefrag yes) 可線上整理。 &gt; 2.5 是緊急訊號。"
+  },
+  {
+    "question": "你接到緊急電話「production Redis 卡住了,所有 client timeout」。下列哪些是合理的<strong>第一步排查</strong>動作？(多選)",
+    "options": [
+      "看 slowlog (SLOWLOG GET 50) - 找正在跑的或剛跑過的長指令",
+      "立即 KEYS * 看資料量",
+      "看 INFO clients - 看是否有 blocked_clients 飆升",
+      "看 redis-cli --bigkeys - 找 big key"
+    ],
+    "answer": [0, 2],
+    "explain": "(0)(2) 是現場排查首要動作:slowlog 抓正在/剛跑的長指令(可能就是 KEYS、SUNIONSTORE 等);blocked_clients 飆升代表很多 client 在等(可能是 BLPOP / WAIT)。(1) 大忌:KEYS * 在 production 卡住時下,只會讓情況更慘 — 它本身就是經典反模式。(4) --bigkeys 會掃整個 keyspace,production 卡住時會雪上加霜,等危機過後再做。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/" target="_blank" rel="noopener">Distributed Locks with Redis</a><span class="ref-meta">官方 + Redlock</span></li>
+        <li><a href="https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html" target="_blank" rel="noopener">How to do distributed locking — Kleppmann</a><span class="ref-meta">爭議論文</span></li>
+        <li><a href="https://redis.antirez.com/fundamental/redlock.html" target="_blank" rel="noopener">Antirez 反駁 Kleppmann</a><span class="ref-meta">作者觀點</span></li>
+        <li><a href="https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/benchmarks/" target="_blank" rel="noopener">Redis benchmarks</a><span class="ref-meta">效能基準</span></li>
+        <li><a href="https://redis.io/docs/latest/develop/use/keyspace-notifications/" target="_blank" rel="noopener">Keyspace Notifications</a><span class="ref-meta">事件機制</span></li>
+        <li><a href="https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/memory-optimization/" target="_blank" rel="noopener">Memory optimization</a><span class="ref-meta">省記憶體</span></li>
+        <li><a href="https://github.com/OT-CONTAINER-KIT/redis-operator" target="_blank" rel="noopener">Redis Operator (OT-CONTAINER-KIT)</a><span class="ref-meta">K8s operator</span></li>
+        <li><a href="https://redis.io/insight/" target="_blank" rel="noopener">RedisInsight</a><span class="ref-meta">官方 GUI</span></li>
+        <li><a href="https://valkey.io/" target="_blank" rel="noopener">valkey.io</a><span class="ref-meta">BSD fork</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="redis_05_v8_modules.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Redis 05 · 8.x 新特性</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next disabled" aria-disabled="true">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Redis 系列已完結 ✓</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">6 堂 Redis 系列 <span class="progress-pill">6 / 6</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="redis_01_intro.html"><span class="course-nav-num">01</span><span>Redis 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="redis_02_advanced_ds.html"><span class="course-nav-num">02</span><span>進階資料結構</span></a></li>
+        <li><a class="course-nav-item" href="redis_03_persistence_replication.html"><span class="course-nav-num">03</span><span>持久化與複製</span></a></li>
+        <li><a class="course-nav-item" href="redis_04_ha_cluster.html"><span class="course-nav-num">04</span><span>Sentinel vs Cluster</span></a></li>
+        <li><a class="course-nav-item" href="redis_05_v8_modules.html"><span class="course-nav-num">05</span><span>Redis 8 新特性</span></a></li>
+        <li><a class="course-nav-item current" href="redis_06_patterns_antipatterns.html"><span class="course-nav-num">06</span><span>實戰模式與反模式</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 Redis 課程系列 · Lesson 06
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

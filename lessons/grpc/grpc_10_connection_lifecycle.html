@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 10｜連線生命週期:Channel、Keepalive、LB、Health Check — gRPC 課程</title>
+<meta name="description" content="完結篇:理解 ClientConn 的狀態機、用 keepalive 偵測死連線、客戶端 round_robin 負載均衡、health check 與 retry policy(via service config)— 學完能把服務上線。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 10 · 完結篇</div>
+    <h1 class="hero-title">連線生命週期:<span>Channel · Keepalive · LB · Health</span></h1>
+    <p class="hero-desc">把 ClientConn 的狀態機、長連線維護、客戶端負載均衡、健康檢查、retry policy 一次補完。<strong>學完整套 10 堂 gRPC 系列就有能力把服務上線跑了。</strong></p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 10 / 10 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 18 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>進階 · 上線</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#channel">Channel 狀態機</a></li>
+      <li><a class="toc-link" href="#keepalive">Keepalive</a></li>
+      <li><a class="toc-link" href="#resolver">Name Resolver</a></li>
+      <li><a class="toc-link" href="#lb">Load Balancing</a></li>
+      <li><a class="toc-link" href="#health">Health Check</a></li>
+      <li><a class="toc-link" href="#retry">Retry Policy</a></li>
+      <li><a class="toc-link" href="#wrap">完賽總結</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="channel">
+      <span class="section-eyebrow">01 — Channel 狀態機</span>
+      <h2><code>ClientConn</code> 不是單條 TCP — 是一個狀態機</h2>
+      <p>我們在第 4 課用 <code>conn := grpc.NewClient(...)</code> 拿到的 <code>conn</code>(<code>*grpc.ClientConn</code>),官方文件叫它 <strong>channel</strong>。它對應到「一個邏輯連線」,內部可能是 0 條或多條 TCP(取決於 LB 策略)。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" aria-label="ClientConn 狀態機">
+          <defs>
+            <marker id="arrS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <text x="360" y="28" text-anchor="middle" font-family="Syne, sans-serif" font-size="15" font-weight="700" fill="#0a0a0f">ClientConn 狀態轉換</text>
+
+            <ellipse cx="100" cy="100" rx="60" ry="32" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="100" y="105" text-anchor="middle" font-weight="700">IDLE</text>
+
+            <ellipse cx="280" cy="100" rx="80" ry="32" fill="#fef3c7" stroke="#92400e" stroke-width="1.5"/>
+            <text x="280" y="105" text-anchor="middle" font-weight="700" fill="#78350f">CONNECTING</text>
+
+            <ellipse cx="480" cy="100" rx="60" ry="32" fill="#dcfce7" stroke="#15803d" stroke-width="1.5"/>
+            <text x="480" y="105" text-anchor="middle" font-weight="700" fill="#14532d">READY</text>
+
+            <ellipse cx="280" cy="190" rx="100" ry="28" fill="#fee2e2" stroke="#b91c1c" stroke-width="1.5"/>
+            <text x="280" y="195" text-anchor="middle" font-weight="700" fill="#7f1d1d">TRANSIENT_FAILURE</text>
+
+            <ellipse cx="640" cy="100" rx="58" ry="32" fill="#0a0a0f"/>
+            <text x="640" y="105" text-anchor="middle" font-weight="700" fill="#fafaf8">SHUTDOWN</text>
+
+            <line x1="160" y1="100" x2="200" y2="100" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#arrS)"/>
+            <text x="180" y="92" text-anchor="middle" font-size="9" fill="#7c3aed">first RPC</text>
+
+            <line x1="360" y1="100" x2="420" y2="100" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#arrS)"/>
+            <text x="390" y="92" text-anchor="middle" font-size="9" fill="#7c3aed">success</text>
+
+            <line x1="280" y1="132" x2="280" y2="160" stroke="#b91c1c" stroke-width="1.5" marker-end="url(#arrS)"/>
+            <text x="332" y="148" text-anchor="middle" font-size="9" fill="#b91c1c">fail</text>
+
+            <line x1="280" y1="218" x2="280" y2="245" stroke="none"/>
+            <path d="M180 200 Q 100 200 100 132" stroke="#7c3aed" stroke-width="1.5" fill="none" marker-end="url(#arrS)"/>
+            <text x="120" y="170" text-anchor="middle" font-size="9" fill="#7c3aed">backoff retry</text>
+
+            <line x1="540" y1="100" x2="582" y2="100" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#arrS)"/>
+            <text x="560" y="92" text-anchor="middle" font-size="9" fill="#7c3aed">Close()</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 22.1 — ClientConn 五種狀態</div>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>狀態</th><th>意思</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>IDLE</code></td><td>剛建好,還沒有人發 RPC,沒實際連線</td></tr>
+          <tr><td><code>CONNECTING</code></td><td>正在做 TCP + TLS handshake</td></tr>
+          <tr><td><code>READY</code></td><td>HTTP/2 connection 已就緒,可送 RPC</td></tr>
+          <tr><td><code>TRANSIENT_FAILURE</code></td><td>連線失敗,進指數退避重試中</td></tr>
+          <tr><td><code>SHUTDOWN</code></td><td>呼叫了 <code>conn.Close()</code>,不會再連</td></tr>
+        </tbody>
+      </table>
+
+      <p>取得當前狀態:</p>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">import</span> <span class="tk-st">"google.golang.org/grpc/connectivity"</span>
+
+state := conn.GetState()                 <span class="tk-cm">// connectivity.State</span>
+<span class="tk-kw">if</span> state == connectivity.Ready { ... }
+
+conn.Connect()                           <span class="tk-cm">// 主動觸發 idle → connecting(平常不必)</span>
+conn.WaitForStateChange(ctx, currentState)</code></pre>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>NewClient lazy 的延伸</strong>
+          第 4 課提過 <code>NewClient</code> 不立刻連線。具體就是把 channel 留在 <code>IDLE</code>,直到第一支 RPC 才轉 <code>CONNECTING</code>。所以「app 啟動成功」不代表「下游服務可達」 — 想預先驗證可呼叫 <code>conn.Connect()</code> 並等 <code>Ready</code>。
+        </div>
+      </div>
+    </section>
+
+    <section id="keepalive">
+      <span class="section-eyebrow">02 — Keepalive</span>
+      <h2>偵測「半開」死連線</h2>
+      <p>長連線最大的敵人是「半開」(half-open):雙方 TCP 看似還在,但中間 NAT/LB 已把連線狀態 GC 掉。沒 keepalive 你會在下一支 RPC 才發現「咦,這條死了」 — 而 RPC 已經失敗。</p>
+
+      <h3>Client 端</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (client)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">import</span> <span class="tk-st">"google.golang.org/grpc/keepalive"</span>
+
+conn, err := grpc.NewClient(addr,
+    grpc.WithTransportCredentials(creds),
+    grpc.WithKeepaliveParams(keepalive.ClientParameters{
+        Time:                <span class="tk-num">30</span> * time.Second,    <span class="tk-cm">// 多久 idle 後送 ping</span>
+        Timeout:             <span class="tk-num">10</span> * time.Second,    <span class="tk-cm">// ping 後多久沒回視為死</span>
+        PermitWithoutStream: <span class="tk-kw">true</span>,                 <span class="tk-cm">// 即使沒活躍 RPC 也送 ping</span>
+    }),
+)</code></pre>
+      </div>
+
+      <h3>Server 端 — 注意 EnforcementPolicy</h3>
+      <p>Server 預設會 enforce 「<strong>同一 client 不能太頻繁送 ping</strong>」(預設下限 5 分鐘),你 client 設 30 秒 ping 會被 server 視為「bad ping」累積到 <code>MaxPingStrikes</code> 後送 GOAWAY 斷你連線。<strong>兩邊要對齊設定</strong>:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (server)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>s := grpc.NewServer(
+    grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
+        MinTime:             <span class="tk-num">10</span> * time.Second,    <span class="tk-cm">// 允許 client ping 的最小間隔</span>
+        PermitWithoutStream: <span class="tk-kw">true</span>,                 <span class="tk-cm">// 允許沒 stream 時 ping</span>
+    }),
+    grpc.KeepaliveParams(keepalive.ServerParameters{
+        Time:    <span class="tk-num">30</span> * time.Second,
+        Timeout: <span class="tk-num">10</span> * time.Second,
+    }),
+)</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>常見坑:client 設 keepalive 後 server 把你斷線</strong>
+          症狀是 client log 一直出現 <code>connection error: too many pings</code>。原因就是 server EnforcementPolicy 的 MinTime 比 client Time 還大。<strong>改 server,或調 client 的 Time 大於 server MinTime</strong>。
+        </div>
+      </div>
+    </section>
+
+    <section id="resolver">
+      <span class="section-eyebrow">03 — Name Resolver</span>
+      <h2>Target string 怎麼被解析</h2>
+      <p>第 4 課提過 <code>grpc.NewClient(target, opts...)</code> 的 <code>target</code> 支援多種 scheme:</p>
+
+      <table>
+        <thead>
+          <tr><th>Target</th><th>意思</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>foo.example.com:443</code></td><td>預設 DNS 解析(NewClient 預設)</td></tr>
+          <tr><td><code>dns:///foo.example.com:443</code></td><td>顯式 DNS</td></tr>
+          <tr><td><code>dns://8.8.8.8/foo.example.com</code></td><td>指定 DNS server</td></tr>
+          <tr><td><code>unix:///var/run/x.sock</code></td><td>Unix socket(本機 IPC)</td></tr>
+          <tr><td><code>passthrough:///localhost:50051</code></td><td>不解析,直接連</td></tr>
+        </tbody>
+      </table>
+
+      <p>DNS 回傳多個 A record 時,<strong>每一個</strong>都會變成一個 backend address — 這是客戶端 LB 的基礎。</p>
+    </section>
+
+    <section id="lb">
+      <span class="section-eyebrow">04 — Load Balancing</span>
+      <h2>客戶端 round_robin 負載均衡</h2>
+      <p>gRPC 的 LB 設計上「<strong>客戶端 LB</strong>」是 first-class — 不需要 NLB / HAProxy 在中間。把 backend 拿到的所有 address 拆開,每個都建 sub-channel,RPC round-robin 分發。</p>
+
+      <h3>啟用 round_robin</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (client)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>conn, err := grpc.NewClient(
+    <span class="tk-st">"dns:///api.example.com:443"</span>,            <span class="tk-cm">// 必須是會回多個 address 的 target</span>
+    grpc.WithTransportCredentials(creds),
+    grpc.WithDefaultServiceConfig(<span class="tk-st">`{"loadBalancingConfig":[{"round_robin":{}}]}`</span>),
+)</code></pre>
+      </div>
+
+      <p>之後每支 RPC 會輪流送到不同 backend。新 backend 加入(DNS 多了一個 A record)、舊 backend 死掉(connection 失敗),內部 sub-channel pool 會自動更新。</p>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>k8s headless service + DNS</strong>
+          k8s 的 <code>ClusterIP: None</code> headless service 會讓 DNS 直接回所有 pod 的 IP。配合 <code>dns:///my-svc.my-ns.svc.cluster.local:50051</code>,client 會直接 round_robin 到所有 pod,不經過 kube-proxy NLB。是 gRPC + k8s 推薦做法。
+        </div>
+      </div>
+    </section>
+
+    <section id="health">
+      <span class="section-eyebrow">05 — Health Check</span>
+      <h2>標準健康檢查協定:<code>grpc.health.v1.Health</code></h2>
+      <p>gRPC 定義了標準 health checking service(<code>grpc.health.v1</code>),兩個 method:</p>
+      <ul>
+        <li><code>Check(HealthCheckRequest)</code> — unary,問「你健康嗎?」</li>
+        <li><code>Watch(HealthCheckRequest)</code> — server stream,持續推送健康狀態變化</li>
+      </ul>
+
+      <h3>Server 端啟用</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (server)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">import</span> (
+    <span class="tk-st">"google.golang.org/grpc/health"</span>
+    healthpb <span class="tk-st">"google.golang.org/grpc/health/grpc_health_v1"</span>
+)
+
+s := grpc.NewServer()
+hs := health.NewServer()
+healthpb.RegisterHealthServer(s, hs)
+
+<span class="tk-cm">// 設定整體狀態</span>
+hs.SetServingStatus(<span class="tk-st">""</span>, healthpb.HealthCheckResponse_SERVING)
+<span class="tk-cm">// 或 per-service 狀態</span>
+hs.SetServingStatus(<span class="tk-st">"greeter.v1.Greeter"</span>, healthpb.HealthCheckResponse_SERVING)
+
+<span class="tk-cm">// 收到 SIGTERM 時切 NOT_SERVING、等 in-flight RPC 完成</span>
+&lt;-shutdownCh
+hs.Shutdown()  <span class="tk-cm">// 把所有狀態改 NOT_SERVING</span>
+s.GracefulStop()</code></pre>
+      </div>
+
+      <h3>Client 啟用「不健康自動跳過」</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (client)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>conn, err := grpc.NewClient(<span class="tk-st">"dns:///svc:50051"</span>,
+    grpc.WithTransportCredentials(creds),
+    grpc.WithDefaultServiceConfig(<span class="tk-st">`{
+        "loadBalancingConfig": [{"round_robin": {}}],
+        "healthCheckConfig": {"serviceName": ""}
+    }`</span>),
+)</code></pre>
+      </div>
+
+      <p>啟用後 client 會對每個 sub-channel 自動 <code>Watch</code> server 健康狀態,<strong>NOT_SERVING 的 backend 自動被跳過</strong>(不會丟到那個 sub-channel)。健康狀態恢復後自動重新加入。</p>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>k8s liveness/readiness 也認得</strong>
+          k8s 1.24+ 內建 <a class="inline-link" href="https://github.com/grpc-ecosystem/grpc-health-probe" target="_blank" rel="noopener"><code>grpc-health-probe</code></a> 工具(後又被 kubelet 原生支援)— 你的 Pod 只要實作 <code>grpc.health.v1</code>,readiness probe 直接設 <code>grpc:</code> type 就能用,不必額外 sidecar。
+        </div>
+      </div>
+    </section>
+
+    <section id="retry">
+      <span class="section-eyebrow">06 — Retry Policy</span>
+      <h2>用 service config 自動 retry</h2>
+      <p>還記得第 7 課說 <code>UNAVAILABLE</code> 該 retry 嗎?grpc-go 內建可<strong>自動</strong>做這件事 — 透過 service config 設定 retry policy。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">json (service config)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>{
+  <span class="tk-st">"methodConfig"</span>: [{
+    <span class="tk-st">"name"</span>: [{ <span class="tk-st">"service"</span>: <span class="tk-st">"greeter.v1.Greeter"</span> }],
+    <span class="tk-st">"retryPolicy"</span>: {
+      <span class="tk-st">"maxAttempts"</span>: <span class="tk-num">4</span>,
+      <span class="tk-st">"initialBackoff"</span>: <span class="tk-st">"0.1s"</span>,
+      <span class="tk-st">"maxBackoff"</span>: <span class="tk-st">"2s"</span>,
+      <span class="tk-st">"backoffMultiplier"</span>: <span class="tk-num">2</span>,
+      <span class="tk-st">"retryableStatusCodes"</span>: [<span class="tk-st">"UNAVAILABLE"</span>]
+    }
+  }]
+}</code></pre>
+      </div>
+
+      <p>放進 client:</p>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (client)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">const</span> svcCfg = <span class="tk-st">`{
+  "methodConfig": [{
+    "name": [{"service": "greeter.v1.Greeter"}],
+    "retryPolicy": {
+      "maxAttempts": 4,
+      "initialBackoff": "0.1s",
+      "maxBackoff": "2s",
+      "backoffMultiplier": 2,
+      "retryableStatusCodes": ["UNAVAILABLE"]
+    }
+  }]
+}`</span>
+
+conn, err := grpc.NewClient(addr,
+    grpc.WithTransportCredentials(creds),
+    grpc.WithDefaultServiceConfig(svcCfg),
+)</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>retry 前確認 idempotency</strong>(再次強調)
+          自動 retry 對 read 操作(GetUser、ListItems)幾乎一定安全;對 write 操作(CreateUser、Charge)不一定 — 第 7 課提過,write 需要 idempotency-key 防重複。建議:retry policy <strong>per-method</strong> 設,write method 不要納入。
+        </div>
+      </div>
+    </section>
+
+    <section id="wrap">
+      <span class="section-eyebrow">07 — 完賽總結</span>
+      <h2>10 堂課,從零到上線</h2>
+      <p>恭喜跑完整套 gRPC 課程!回顧一下你學到的:</p>
+
+      <ol>
+        <li><strong>L01 概念</strong> — RPC 心智模型、HTTP/2、四種 RPC 模式、何時不該用</li>
+        <li><strong>L02 環境</strong> — Go + protoc + 兩個 plugin 全裝齊</li>
+        <li><strong>L03 Protobuf</strong> — message、欄位編號、scalar、enum、oneof、map、reserved</li>
+        <li><strong>L04 Unary</strong> — 第一支 server / client(用新版 <code>NewClient</code>)</li>
+        <li><strong>L05 Streaming</strong> — server / client / bidi 三種模式 + io.EOF</li>
+        <li><strong>L06 Context</strong> — metadata、deadline propagation、cancellation</li>
+        <li><strong>L07 Errors</strong> — 16 種 status codes + structured details</li>
+        <li><strong>L08 Interceptors</strong> — logging、recovery、auth、timing 四件組</li>
+        <li><strong>L09 Auth</strong> — TLS、mTLS、PerRPC token</li>
+        <li><strong>L10 連線</strong>(本堂)— channel 狀態、keepalive、LB、health、retry</li>
+      </ol>
+
+      <h3>下一步該往哪走</h3>
+      <ul>
+        <li><strong>觀測性</strong> — 串接 OpenTelemetry(otelgrpc),把 trace / metrics / logs 一次解決</li>
+        <li><strong>buf 工具鏈</strong> — 大型專案的 proto 管理、lint、breaking detection</li>
+        <li><strong>gRPC-Gateway</strong> — 自動把 gRPC 包成 REST(對外 API 場景)</li>
+        <li><strong>xDS</strong> — 跨服務的動態配置與 LB(Envoy / Istio 用的)</li>
+        <li><strong>Protobuf Editions</strong> — 等 gRPC 官方推薦升級時再切</li>
+      </ul>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>你已經有能力把一個 gRPC 服務上線了</strong>
+          剩下的差距只在「工程實踐」:CI/CD、observability、SRE。本系列教的是 gRPC 本身,把它銜接到你公司的基礎設施(<code>stockbot-long-backend-k8s-infra</code> 之類)就能直接派上用場。
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "<code>grpc.NewClient(target, ...)</code> 後立刻 <code>conn.GetState()</code>,最可能拿到哪個狀態?",
+    "options": [
+      "<code>READY</code> — 連線已建好",
+      "<code>IDLE</code> — NewClient 是 lazy,還沒實際連線",
+      "<code>CONNECTING</code> — 自動開始連",
+      "<code>SHUTDOWN</code>"
+    ],
+    "answer": 1,
+    "explain": "<code>NewClient</code> 是 lazy 的,不立刻連線。channel 留在 <code>IDLE</code>,直到第一支 RPC 才轉 <code>CONNECTING</code>。要主動觸發可呼叫 <code>conn.Connect()</code>。"
+  },
+  {
+    "question": "Client 設了 <code>keepalive.ClientParameters.Time = 30s</code>,但 server 一直把連線斷掉並回 <code>too many pings</code>。最可能原因?",
+    "options": [
+      "Server 沒裝 grpc-go",
+      "Server 的 <code>EnforcementPolicy.MinTime</code> 預設 5 分鐘,client 30 秒 ping 被視為 bad ping,累積到 <code>MaxPingStrikes</code>(預設 2)後送 GOAWAY 斷線",
+      "TLS 沒設好",
+      "DNS 解析失敗"
+    ],
+    "answer": 1,
+    "explain": "Server 端有 EnforcementPolicy 限制 client 不能太頻繁送 ping。<strong>兩邊要對齊</strong>:server 把 <code>MinTime</code> 設成 client <code>Time</code> 以下(例如 10s),或 client 把 <code>Time</code> 拉到 server <code>MinTime</code> 以上。"
+  },
+  {
+    "question": "在 k8s 內想讓 client 能 round_robin 到所有 backend pod,正確做法是?",
+    "options": [
+      "用普通 ClusterIP service,client 會自動發現所有 pod",
+      "建立 headless service(<code>ClusterIP: None</code>),用 <code>dns:///svc.ns.svc.cluster.local:port</code> + service config 啟用 round_robin",
+      "在 client 端寫死所有 pod IP",
+      "不可能,gRPC 不支援客戶端 LB"
+    ],
+    "answer": 1,
+    "explain": "k8s 的普通 ClusterIP 是單一 VIP,DNS 只會回一個 address,client 看到只有一個 backend。<strong>headless service</strong> 才會讓 DNS 回所有 pod IP,搭配 <code>dns:///</code> + round_robin service config 就能客戶端 LB 到所有 pod,還跳過 kube-proxy。"
+  },
+  {
+    "question": "Service config 裡設 <code>retryPolicy.retryableStatusCodes: [\"UNAVAILABLE\"]</code> 後,gRPC 會自動 retry。下列實務做法<strong>哪一項正確</strong>?",
+    "options": [
+      "全部 method 都應該開 retry,寫得越多越穩",
+      "Per-method 設定 retry,只對 idempotent method(GetUser、ListItems 等讀操作)開,寫操作要嘛不開、要嘛配合 idempotency-key",
+      "retryableStatusCodes 應該包含 <code>NOT_FOUND</code>",
+      "retry 次數設越多越好,網路不穩時保險"
+    ],
+    "answer": 1,
+    "explain": "自動 retry 對<strong>非等冪</strong>(non-idempotent)操作會造成重複扣款、重複建立資源等嚴重問題。實務做法:讀操作預設 retry、寫操作用 idempotency-key 防重複後再開 retry,或乾脆不開讓上層處理。retryableStatusCodes 不該包含 NOT_FOUND(retry 也不會找到)。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://github.com/grpc/grpc/blob/master/doc/keepalive.md" target="_blank" rel="noopener">grpc/grpc — keepalive doc</a><span class="ref-meta">keepalive 完整參數</span></li>
+        <li><a href="https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md" target="_blank" rel="noopener">grpc — connectivity semantics</a><span class="ref-meta">channel 狀態機</span></li>
+        <li><a href="https://github.com/grpc/grpc/blob/master/doc/load-balancing.md" target="_blank" rel="noopener">grpc — load balancing</a><span class="ref-meta">LB 設計</span></li>
+        <li><a href="https://grpc.io/docs/guides/health-checking/" target="_blank" rel="noopener">grpc.io — Health checking</a><span class="ref-meta">標準健康檢查協定</span></li>
+        <li><a href="https://github.com/grpc/proposal/blob/master/A6-client-retries.md" target="_blank" rel="noopener">grpc proposal A6 — Client Retries</a><span class="ref-meta">retry policy 規格</span></li>
+        <li><a href="https://github.com/grpc-ecosystem/grpc-health-probe" target="_blank" rel="noopener">grpc-health-probe</a><span class="ref-meta">k8s readiness probe 工具</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="grpc_09_tls_auth.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 09 · TLS / Auth</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next disabled" aria-disabled="true">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">系列完結 🎉</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">10 堂 gRPC 系列 <span class="progress-pill">10 / 10</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="grpc_01_intro.html"><span class="course-nav-num">01</span><span>gRPC 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="grpc_02_setup.html"><span class="course-nav-num">02</span><span>環境安裝與工具鏈</span></a></li>
+        <li><a class="course-nav-item" href="grpc_03_protobuf_syntax.html"><span class="course-nav-num">03</span><span>Protobuf 語法</span></a></li>
+        <li><a class="course-nav-item" href="grpc_04_unary_rpc.html"><span class="course-nav-num">04</span><span>Unary RPC 實戰</span></a></li>
+        <li><a class="course-nav-item" href="grpc_05_streaming_rpc.html"><span class="course-nav-num">05</span><span>三種 Streaming</span></a></li>
+        <li><a class="course-nav-item" href="grpc_06_context_metadata.html"><span class="course-nav-num">06</span><span>Context / Metadata</span></a></li>
+        <li><a class="course-nav-item" href="grpc_07_error_handling.html"><span class="course-nav-num">07</span><span>錯誤處理</span></a></li>
+        <li><a class="course-nav-item" href="grpc_08_interceptors.html"><span class="course-nav-num">08</span><span>Interceptors</span></a></li>
+        <li><a class="course-nav-item" href="grpc_09_tls_auth.html"><span class="course-nav-num">09</span><span>TLS / Auth</span></a></li>
+        <li><a class="course-nav-item current" href="grpc_10_connection_lifecycle.html"><span class="course-nav-num">10</span><span>連線生命週期</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 gRPC 課程系列 · Lesson 10 · 完結
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

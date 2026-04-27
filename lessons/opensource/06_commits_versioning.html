@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 06｜Commit Message、SemVer、Changelog — 開源貢獻課程</title>
+<meta name="description" content="Conventional Commits 1.0、Semantic Versioning 2.0、Keep a Changelog 1.1 — 業界三大規範一次學完，並用 commitlint / semantic-release 自動化。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 06 · 規範與品質篇</div>
+    <h1 class="hero-title">Commit、SemVer、<span>Changelog</span></h1>
+    <p class="hero-desc">三大業界規範一次到位 — Conventional Commits 怎麼寫 → SemVer 怎麼決定版號 → Changelog 怎麼產，最後串起完整的自動化發版鏈。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 6 / 12 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 13 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>中階</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#why">為什麼要規範</a></li>
+      <li><a class="toc-link" href="#conventional">Conventional Commits</a></li>
+      <li><a class="toc-link" href="#types">type 類型</a></li>
+      <li><a class="toc-link" href="#breaking">Breaking change</a></li>
+      <li><a class="toc-link" href="#examples">好/壞範例</a></li>
+      <li><a class="toc-link" href="#semver">Semantic Versioning</a></li>
+      <li><a class="toc-link" href="#changelog">Keep a Changelog</a></li>
+      <li><a class="toc-link" href="#tools">自動化工具</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="why">
+      <span class="section-eyebrow">01 — 為什麼要規範</span>
+      <h2>三個規範串成一條自動化鏈</h2>
+
+      <p>Conventional Commits、SemVer、Keep a Changelog 不是三個獨立的東西，而是<strong>一條工作鏈</strong>：</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" aria-label="commit → semver → changelog 自動化鏈">
+          <defs>
+            <marker id="cv-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <rect x="40" y="60" width="170" height="80" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+            <text x="125" y="90" text-anchor="middle" fill="#4c1d95" font-weight="700" font-size="13">Conventional</text>
+            <text x="125" y="105" text-anchor="middle" fill="#4c1d95" font-weight="700" font-size="13">Commits</text>
+            <text x="125" y="125" text-anchor="middle" fill="#6b6b7e" font-size="10">feat / fix / BREAKING</text>
+
+            <rect x="275" y="60" width="170" height="80" rx="10" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+            <text x="360" y="90" text-anchor="middle" fill="#78350f" font-weight="700" font-size="13">Semantic</text>
+            <text x="360" y="105" text-anchor="middle" fill="#78350f" font-weight="700" font-size="13">Versioning</text>
+            <text x="360" y="125" text-anchor="middle" fill="#6b6b7e" font-size="10">MAJOR.MINOR.PATCH</text>
+
+            <rect x="510" y="60" width="170" height="80" rx="10" fill="#dcfce7" stroke="#15803d" stroke-width="2"/>
+            <text x="595" y="90" text-anchor="middle" fill="#14532d" font-weight="700" font-size="13">Keep a</text>
+            <text x="595" y="105" text-anchor="middle" fill="#14532d" font-weight="700" font-size="13">Changelog</text>
+            <text x="595" y="125" text-anchor="middle" fill="#6b6b7e" font-size="10">CHANGELOG.md</text>
+
+            <line x1="210" y1="100" x2="275" y2="100" stroke="#7c3aed" stroke-width="2" marker-end="url(#cv-arr)"/>
+            <text x="242" y="92" text-anchor="middle" fill="#7c3aed" font-size="9">決定升版</text>
+
+            <line x1="445" y1="100" x2="510" y2="100" stroke="#7c3aed" stroke-width="2" marker-end="url(#cv-arr)"/>
+            <text x="477" y="92" text-anchor="middle" fill="#7c3aed" font-size="9">產生紀錄</text>
+
+            <text x="360" y="40" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">每個 commit 自動推算下一版號 + 生 changelog</text>
+            <text x="360" y="180" text-anchor="middle" fill="#6b6b7e" font-size="11">配合 semantic-release / changesets 全自動化</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 6.1 — 三大規範串成的自動化發版鏈</div>
+      </div>
+    </section>
+
+    <section id="conventional">
+      <span class="section-eyebrow">02 — Conventional Commits 1.0</span>
+      <h2>Conventional Commits 格式</h2>
+
+      <p>規格網址：<a class="inline-link" href="https://www.conventionalcommits.org/zh-hant/v1.0.0/" target="_blank" rel="noopener">conventionalcommits.org/zh-hant/v1.0.0</a>。基本格式：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">commit</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-fn">&lt;type&gt;</span>(<span class="tk-op">&lt;scope&gt;</span>)<span class="tk-kw">!</span>: <span class="tk-st">&lt;subject&gt;</span>
+
+<span class="tk-st">&lt;body 詳細說明，可省略&gt;</span>
+
+<span class="tk-cm">&lt;footer 例如 BREAKING CHANGE / Closes #123&gt;</span></code></pre>
+      </div>
+
+      <p>解構一個範例：</p>
+
+      <div class="section-card">
+<pre style="background:var(--paper2);padding:0.9rem;border-radius:8px;font-family:var(--mono);font-size:13px;line-height:1.7;">feat(auth)!: switch session storage to httpOnly cookies
+
+之前用 localStorage 存 token 容易被 XSS 偷走，
+改用 httpOnly cookie + CSRF token 機制。
+
+BREAKING CHANGE: 前端不再能讀取 token，需透過新的
+/api/me 端點取得當前使用者資訊。
+Closes #421</pre>
+
+        <ul style="margin-top:0.8rem;font-size:13px;">
+          <li><strong>type</strong>：<code>feat</code> = 新功能</li>
+          <li><strong>scope</strong>：<code>(auth)</code> = 影響範圍 (可選)</li>
+          <li><strong>!</strong>：標記 breaking change</li>
+          <li><strong>subject</strong>：<code>switch session storage to httpOnly cookies</code> — 50 字內、祈使句、首字小寫、結尾不加句點</li>
+          <li><strong>body</strong>：詳細說明 why (不是 what)</li>
+          <li><strong>footer</strong>：BREAKING CHANGE 完整描述 + 連結 issue</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="types">
+      <span class="section-eyebrow">03 — type 類型</span>
+      <h2>常用的 type</h2>
+
+      <p>Conventional Commits 規格只強制 <code>feat</code> 跟 <code>fix</code>，其他 type 是 Angular Commit Convention 的延伸，業界普遍採用：</p>
+
+      <table>
+        <thead>
+          <tr><th>type</th><th>用途</th><th>SemVer 對應</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>feat</code></td><td>新功能</td><td>MINOR (+0.1.0)</td></tr>
+          <tr><td><code>fix</code></td><td>修 bug</td><td>PATCH (+0.0.1)</td></tr>
+          <tr><td><code>docs</code></td><td>純文件改動</td><td>不升版</td></tr>
+          <tr><td><code>style</code></td><td>格式 / 縮排 / 分號 (不影響邏輯)</td><td>不升版</td></tr>
+          <tr><td><code>refactor</code></td><td>重構 (不增功能也不修 bug)</td><td>不升版</td></tr>
+          <tr><td><code>perf</code></td><td>效能改善</td><td>PATCH</td></tr>
+          <tr><td><code>test</code></td><td>新增 / 修改測試</td><td>不升版</td></tr>
+          <tr><td><code>build</code></td><td>建置系統 / 依賴改動</td><td>不升版</td></tr>
+          <tr><td><code>ci</code></td><td>CI 設定改動</td><td>不升版</td></tr>
+          <tr><td><code>chore</code></td><td>其他雜事 (升 dep、調 config)</td><td>不升版</td></tr>
+          <tr><td><code>revert</code></td><td>還原某個 commit</td><td>看還原什麼</td></tr>
+          <tr><td><strong>任何 + <code>!</code></strong></td><td><strong>BREAKING CHANGE</strong></td><td><strong>MAJOR (+1.0.0)</strong></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="breaking">
+      <span class="section-eyebrow">04 — Breaking change</span>
+      <h2>標記 BREAKING CHANGE 的兩種方式</h2>
+
+      <h3>方式 A：subject 後加 <code>!</code> (推薦，最顯眼)</h3>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">commit</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>feat<span class="tk-kw">(api)!</span>: drop support for Node 16
+
+Closes #999</code></pre>
+      </div>
+
+      <h3>方式 B：footer 寫 <code>BREAKING CHANGE:</code></h3>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">commit</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>feat(api): require Node 18+
+
+新版用了原生 fetch API。
+
+<span class="tk-kw">BREAKING CHANGE</span>: Node 16 不再支援，使用者需升級到 Node 18+。</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>建議兩種同時用</strong>
+          <code>!</code> 在 git log 一行式很顯眼；<code>BREAKING CHANGE:</code> footer 提供完整說明 + 給工具讀取。兩者組合最完整。
+        </div>
+      </div>
+    </section>
+
+    <section id="examples">
+      <span class="section-eyebrow">05 — 好/壞範例</span>
+      <h2>好/壞 commit message 對照</h2>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>糟糕</div>
+          <div class="compare-body">
+            <code>fix bug</code><br>
+            <code>update</code><br>
+            <code>WIP</code><br>
+            <code>asdfasdf</code><br>
+            <code>finally working</code>
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>好的</div>
+          <div class="compare-body">
+            <code>fix(profile): handle null avatar URL</code><br>
+            <code>refactor(api): extract pagination logic</code><br>
+            <code>perf(search): add result caching</code><br>
+            <code>docs(readme): update install steps</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>subject 寫法心法</strong>
+          ① 用<strong>祈使句</strong> (<code>add</code> 不是 <code>added</code>) — 像在給 git 下命令<br>
+          ② <strong>首字小寫</strong>、<strong>結尾不加句點</strong><br>
+          ③ <strong>50 字內</strong>，超過寫到 body<br>
+          ④ 想想看：在 changelog 裡讓使用者讀，看得懂嗎？
+        </div>
+      </div>
+    </section>
+
+    <section id="semver">
+      <span class="section-eyebrow">06 — SemVer</span>
+      <h2>Semantic Versioning 2.0.0</h2>
+
+      <p>規格：<a class="inline-link" href="https://semver.org/lang/zh-TW/" target="_blank" rel="noopener">semver.org/lang/zh-TW</a>。版號格式：</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 600 180" xmlns="http://www.w3.org/2000/svg" aria-label="SemVer 版號結構">
+          <g font-family="JetBrains Mono, monospace">
+            <text x="300" y="80" text-anchor="middle" font-size="44" font-weight="700" fill="#0a0a0f">
+              <tspan fill="#ff3d1f">2</tspan>.<tspan fill="#7c3aed">5</tspan>.<tspan fill="#0f766e">3</tspan>
+            </text>
+            <line x1="245" y1="95" x2="245" y2="115" stroke="#ff3d1f" stroke-width="2"/>
+            <line x1="298" y1="95" x2="298" y2="115" stroke="#7c3aed" stroke-width="2"/>
+            <line x1="355" y1="95" x2="355" y2="115" stroke="#0f766e" stroke-width="2"/>
+            <text x="245" y="135" text-anchor="middle" fill="#ff3d1f" font-size="12" font-weight="700">MAJOR</text>
+            <text x="298" y="135" text-anchor="middle" fill="#7c3aed" font-size="12" font-weight="700">MINOR</text>
+            <text x="355" y="135" text-anchor="middle" fill="#0f766e" font-size="12" font-weight="700">PATCH</text>
+            <text x="245" y="155" text-anchor="middle" fill="#6b6b7e" font-size="10">Breaking</text>
+            <text x="298" y="155" text-anchor="middle" fill="#6b6b7e" font-size="10">新功能</text>
+            <text x="355" y="155" text-anchor="middle" fill="#6b6b7e" font-size="10">修 bug</text>
+
+            <text x="300" y="175" text-anchor="middle" fill="#6b6b7e" font-size="10">範例：2.5.3-beta.1+exp.sha.5114f85 (含預發布 + build metadata)</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 6.2 — SemVer 版號三段式</div>
+      </div>
+
+      <h3>三段升版規則</h3>
+      <ul>
+        <li><strong>MAJOR (主版號)</strong>：有 Breaking Change 時 <code>+1</code>，MINOR 與 PATCH 重設為 0</li>
+        <li><strong>MINOR (次版號)</strong>：新增向下相容的功能時 <code>+1</code>，PATCH 重設為 0</li>
+        <li><strong>PATCH (修訂號)</strong>：修向下相容的 bug 時 <code>+1</code></li>
+      </ul>
+
+      <h3>初始版本與 0.x</h3>
+      <p><strong>0.x.y 版本表示「還在快速迭代、API 可能任何時候改」</strong>。一旦發 1.0.0 就要對 API 穩定性負責，所以發 1.0 是個重大決定 —— 很多開源專案故意不發 1.0 (例如 webpack 4 之前)。</p>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>為什麼要嚴格 SemVer？</strong>
+          因為使用者的 <code>package.json</code> 可能寫 <code>"^1.4.0"</code> 表示「自動更新到 1.x.y 都可以」。如果你違反 SemVer 在 1.4.5 偷塞 breaking change，全世界依賴你的人都會炸。
+        </div>
+      </div>
+
+      <details class="collapse">
+        <summary>預發布版本 + Build metadata <span class="collapse-tag">深入</span></summary>
+        <div class="collapse-body">
+<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;">2.0.0-alpha.1     ← 早期測試
+2.0.0-beta.3      ← 公測
+2.0.0-rc.1        ← release candidate (即將正式)
+2.0.0             ← 正式
+
+1.4.5+exp.sha.5114f85   ← + 後是 build metadata，<strong>不影響版本順序</strong></pre>
+          <p style="margin-top:0.6rem;font-size:13px;">預發布版本排序：alpha &lt; beta &lt; rc &lt; (正式)。</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="changelog">
+      <span class="section-eyebrow">07 — Keep a Changelog</span>
+      <h2>Keep a Changelog 1.1.0</h2>
+
+      <p>規格：<a class="inline-link" href="https://keepachangelog.com/zh-TW/1.1.0/" target="_blank" rel="noopener">keepachangelog.com/zh-TW/1.1.0</a>。它的主張是 <strong>changelog 是寫給<em>人類</em>看的，不是給機器解析的 git log</strong>。</p>
+
+      <h3>固定六種分類</h3>
+
+      <table>
+        <thead>
+          <tr><th>分類</th><th>意義</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Added</strong></td><td>新增的功能</td></tr>
+          <tr><td><strong>Changed</strong></td><td>變更既有功能</td></tr>
+          <tr><td><strong>Deprecated</strong></td><td>標記為即將移除</td></tr>
+          <tr><td><strong>Removed</strong></td><td>已移除的功能</td></tr>
+          <tr><td><strong>Fixed</strong></td><td>修正的 bug</td></tr>
+          <tr><td><strong>Security</strong></td><td>安全性修補</td></tr>
+        </tbody>
+      </table>
+
+      <h3>標準格式範例</h3>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">markdown</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># Changelog</span>
+
+All notable changes to this project will be documented in this file.
+
+## [Unreleased]
+
+## [1.4.0] - 2026-04-15
+
+### Added
+- 新增使用者 profile 頁面 (#421)
+- API 支援 GraphQL queries (#430)
+
+### Fixed
+- 修正登出後 token 殘留問題 (#418)
+
+### Security
+- 升級 axios 到 1.6.5 修補 CVE-2024-12345
+
+## [1.3.2] - 2026-03-20
+
+### Fixed
+- 修正手機版 navbar overflow
+
+[Unreleased]: https://github.com/owner/repo/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/owner/repo/compare/v1.3.2...v1.4.0
+[1.3.2]: https://github.com/owner/repo/compare/v1.3.1...v1.3.2</code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>頂端永遠有 [Unreleased] 區塊</strong>
+          開發中的改動先放這個區塊，正式 release 時再把它改成版號 + 日期，並建立新的 [Unreleased]。
+        </div>
+      </div>
+    </section>
+
+    <section id="tools">
+      <span class="section-eyebrow">08 — 自動化工具</span>
+      <h2>把整條鏈自動化的工具</h2>
+
+      <p>有了 Conventional Commits 的格式，工具可以幫你做剩下的事：</p>
+
+      <table>
+        <thead>
+          <tr><th>工具</th><th>做什麼</th><th>定位</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><a class="inline-link" href="https://commitlint.js.org" target="_blank" rel="noopener">commitlint</a></td>
+            <td>commit 時驗證 message 格式</td>
+            <td>守門員，配合 Husky 在 git commit 攔下不合格的</td>
+          </tr>
+          <tr>
+            <td><a class="inline-link" href="https://commitizen-tools.github.io/commitizen/" target="_blank" rel="noopener">Commitizen</a></td>
+            <td>互動式幫你寫 commit (<code>cz</code> 指令)</td>
+            <td>新人友善，不用記格式</td>
+          </tr>
+          <tr>
+            <td><a class="inline-link" href="https://semantic-release.gitbook.io/" target="_blank" rel="noopener">semantic-release</a></td>
+            <td>讀 commit 自動算下一版號 + 產 changelog + 發 release</td>
+            <td>JS 生態系最主流，CI 上跑</td>
+          </tr>
+          <tr>
+            <td><a class="inline-link" href="https://github.com/changesets/changesets" target="_blank" rel="noopener">changesets</a></td>
+            <td>類似 semantic-release，但 monorepo 友善</td>
+            <td>pnpm workspace / Turborepo 多套件用</td>
+          </tr>
+          <tr>
+            <td><a class="inline-link" href="https://release-please.dev/" target="_blank" rel="noopener">Release Please</a></td>
+            <td>Google 的自動 release PR 工具</td>
+            <td>多語言支援，產出 release PR 等人 approve</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>典型自動化鏈</strong>
+          <code>feat: ...</code> commit → 推上 main → CI 跑 semantic-release → 自動 bump 版號 → 產 CHANGELOG.md → 打 tag → 發 GitHub Release → publish 到 npm。整條<strong>不需手動介入</strong>。
+        </div>
+      </div>
+
+      <details class="collapse">
+        <summary>Gitmoji、Angular Convention 與其他變體 <span class="collapse-tag">歷史</span></summary>
+        <div class="collapse-body">
+          <p style="margin-bottom:0.5rem;"><strong>Angular Commit Convention</strong> (2014) 是 Conventional Commits 的祖先 — Angular 團隊內部規範，後來被抽出來成為通用標準。</p>
+          <p style="margin-bottom:0.5rem;"><strong>Gitmoji</strong> (gitmoji.dev) — 用 emoji 取代 type，例如 <code>:sparkles: 新功能</code> / <code>:bug: 修 bug</code>。視覺友善但機器不易解析，所以多數大型專案還是用文字 type。</p>
+          <p>實務上，<strong>Conventional Commits 是 2026 的事實標準</strong>，幾乎所有自動化工具都讀這個格式。</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 5</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "下列哪個 commit message 寫得<strong>最符合</strong> Conventional Commits？",
+    "options": [
+      "<code>fix bug</code>",
+      "<code>FIX: profile bug.</code>",
+      "<code>fix(profile): handle null avatar URL</code>",
+      "<code>修了 profile 的 bug</code>"
+    ],
+    "answer": 2,
+    "explain": "格式：<code>type(scope): subject</code>。type 小寫、有 scope 標明影響範圍、subject 用祈使句、結尾不加句點。"
+  },
+  {
+    "question": "你目前版號是 1.4.5，這次釋出含一個新功能 + 兩個 bug fix，下一版應該是？",
+    "options": [
+      "1.4.6",
+      "1.5.0",
+      "2.0.0",
+      "1.5.5"
+    ],
+    "answer": 1,
+    "explain": "新功能 = MINOR +1、bug fix = PATCH +1，但同一次 release 取最高的，所以 MINOR +1 = 1.5.0。注意 PATCH 要重設為 0。"
+  },
+  {
+    "question": "下列哪些是<strong>正確</strong>標記 BREAKING CHANGE 的方式？(多選)",
+    "options": [
+      "<code>feat(api)!: drop Node 16</code> (subject 後加驚嘆號)",
+      "在 footer 寫 <code>BREAKING CHANGE: ...</code>",
+      "在 commit message 開頭加 [BREAKING]",
+      "全部用大寫字母寫 message"
+    ],
+    "answer": [0, 1],
+    "explain": "Conventional Commits 規範只承認兩種：<code>!</code> 標記在 type/scope 後、或 footer 寫 <code>BREAKING CHANGE:</code>。其他寫法工具不認得。"
+  },
+  {
+    "question": "Keep a Changelog 規格固定的六種分類<strong>不</strong>包含？",
+    "options": [
+      "Added",
+      "Refactored",
+      "Deprecated",
+      "Security"
+    ],
+    "answer": 1,
+    "explain": "六種分類：Added / Changed / Deprecated / Removed / Fixed / Security。Refactored 不是其中之一 — 重構通常不寫進 changelog (對使用者沒有可見影響)。"
+  },
+  {
+    "question": "為什麼要嚴格遵守 Semantic Versioning？",
+    "options": [
+      "因為 Git 強制要求",
+      "因為使用者的 dependency 設定 (例如 <code>^1.4.0</code>) 假設你不會在小版本偷塞 breaking change，違反會炸到下游",
+      "為了讓版號好看",
+      "完全沒理由，只是慣例"
+    ],
+    "answer": 1,
+    "explain": "<code>^1.4.0</code> 表示「自動接受 1.x.y 任何更新」。如果作者在 1.4.5 偷塞 breaking change，所有下游 npm install 後都會炸。SemVer 是生態系運作的契約。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://www.conventionalcommits.org/zh-hant/v1.0.0/" target="_blank" rel="noopener">Conventional Commits 1.0.0 (繁中)</a><span class="ref-meta">commit message 規格</span></li>
+        <li><a href="https://semver.org/lang/zh-TW/" target="_blank" rel="noopener">Semantic Versioning 2.0.0 (繁中)</a><span class="ref-meta">版號規格</span></li>
+        <li><a href="https://keepachangelog.com/zh-TW/1.1.0/" target="_blank" rel="noopener">Keep a Changelog 1.1.0 (繁中)</a><span class="ref-meta">changelog 規格</span></li>
+        <li><a href="https://github.com/angular/angular/blob/main/contributing-docs/commit-message-guidelines.md" target="_blank" rel="noopener">Angular Commit Message Guidelines</a><span class="ref-meta">type 完整列表的源頭</span></li>
+        <li><a href="https://semantic-release.gitbook.io/" target="_blank" rel="noopener">semantic-release 文件</a><span class="ref-meta">JS 生態主流自動化</span></li>
+        <li><a href="https://github.com/changesets/changesets" target="_blank" rel="noopener">changesets</a><span class="ref-meta">monorepo 友善的方案</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="05_code_review.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 05 · Code Review</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="07_issues_project_mgmt.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 07 · Issue 與專案管理</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">12 堂課程系列 <span class="progress-pill">6 / 12</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
+        <li><a class="course-nav-item" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
+        <li><a class="course-nav-item" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇</span></a></li>
+        <li><a class="course-nav-item" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
+        <li><a class="course-nav-item" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
+        <li><a class="course-nav-item current" href="06_commits_versioning.html"><span class="course-nav-num">06</span><span>Commit、SemVer、Changelog</span></a></li>
+        <li><a class="course-nav-item" href="07_issues_project_mgmt.html"><span class="course-nav-num">07</span><span>Issue 與專案管理</span></a></li>
+        <li><a class="course-nav-item" href="08_testing_tdd.html"><span class="course-nav-num">08</span><span>測試金字塔與 TDD</span></a></li>
+        <li><a class="course-nav-item" href="09_ci_cd_hooks.html"><span class="course-nav-num">09</span><span>CI/CD、Hooks、Lint</span></a></li>
+        <li><a class="course-nav-item" href="10_rfc_adr_release.html"><span class="course-nav-num">10</span><span>RFC、ADR、Release</span></a></li>
+        <li><a class="course-nav-item" href="11_dependencies_supply_chain.html"><span class="course-nav-num">11</span><span>依賴管理與供應鏈安全</span></a></li>
+        <li><a class="course-nav-item" href="12_first_contribution.html"><span class="course-nav-num">12</span><span>第一次貢獻實戰</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的開源協作課程系列 · Lesson 06
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

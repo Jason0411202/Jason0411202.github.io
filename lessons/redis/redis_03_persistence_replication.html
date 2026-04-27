@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redis 03｜持久化與複製 — Redis 課程</title>
+<meta name="description" content="記憶體 ≠ 沒持久化。RDB snapshot、AOF append-only log、Hybrid 模式、主從複製 (replicaof)、為什麼非同步複製 failover 可能掉資料。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Redis 03 · 持久化與複製</div>
+    <h1 class="hero-title">記憶體 ≠ <span>沒持久化</span></h1>
+    <p class="hero-desc">RDB / AOF / Hybrid 三種持久化模式各自的取捨；主從複製怎麼追、為什麼非同步複製在 failover 可能掉資料。本堂結束你能正確設定一台「可重啟、有 replica」的 Redis。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 3 / 6 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 13 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>基礎</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#why">為何要持久化</a></li>
+      <li><a class="toc-link" href="#rdb">RDB</a></li>
+      <li><a class="toc-link" href="#aof">AOF</a></li>
+      <li><a class="toc-link" href="#hybrid">Hybrid</a></li>
+      <li><a class="toc-link" href="#replication">主從複製</a></li>
+      <li><a class="toc-link" href="#async-pitfall">非同步陷阱</a></li>
+      <li><a class="toc-link" href="#hands-on">動手玩</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="why">
+      <span class="section-eyebrow">01 — 為何</span>
+      <h2>記憶體型 ≠ 不能持久化</h2>
+      <p>很多人對 Redis 的第一印象是「資料放記憶體，重啟就沒了」。這只說對一半 — Redis 從第一天就支援把記憶體 snapshot 到磁碟，<strong>重啟後可從磁碟還原</strong>。但持久化策略要怎麼選，會直接影響「重啟可能掉幾秒資料」。</p>
+
+      <p>三個方案：</p>
+      <ul>
+        <li><strong>RDB</strong>（snapshot）：定期把整個 dataset dump 成二進位檔。</li>
+        <li><strong>AOF</strong>（append-only file）：記錄每一條寫入指令到 log。</li>
+        <li><strong>Hybrid</strong>（8.x 預設）：AOF 但 rewrite 時把現存資料寫成 RDB 格式 + 之後的指令繼續 append。</li>
+      </ul>
+    </section>
+
+    <section id="rdb">
+      <span class="section-eyebrow">02 — RDB</span>
+      <h2>RDB：定期拍照</h2>
+
+      <p>RDB 在指定條件下用 <code>fork()</code> 開子行程，子行程把整個 dataset 寫到 <code>dump.rdb</code>。父行程繼續服務。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis.conf</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 「N 秒內超過 M 次寫入就觸發 dump」</span>
+save 3600 1       <span class="tk-cm"># 1 小時內有任何寫</span>
+save 300 100      <span class="tk-cm"># 5 分鐘內 &gt;= 100 次寫</span>
+save 60 10000     <span class="tk-cm"># 1 分鐘內 &gt;= 10000 次寫</span>
+
+dbfilename dump.rdb
+dir /data</code></pre>
+      </div>
+
+      <h3>優點</h3>
+      <ul>
+        <li><strong>檔案小</strong>：是 binary snapshot，比 AOF log 小很多。</li>
+        <li><strong>還原快</strong>：重啟時直接 mmap 整檔。</li>
+        <li><strong>fork 子行程做事，不阻塞</strong>主行程指令處理。</li>
+      </ul>
+
+      <h3>缺點</h3>
+      <ul>
+        <li><strong>掉資料風險高</strong>：兩次 snapshot 之間的資料若崩潰會全失。預設配置最差可能掉幾分鐘。</li>
+        <li><strong>fork() 在大 dataset 時很慢</strong>：fork 要複製記憶體頁表（COW，copy-on-write）。Redis 用 50GB 時 fork 可能花 1~3 秒，在這期間 server 仍能服務但延遲毛刺。</li>
+      </ul>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>用 Linux Transparent Huge Pages (THP) 會放大 fork 痛點</strong>
+          THP 會把記憶體頁變成 2 MB 大頁，fork COW 觸發時複製成本暴增。Redis 啟動會警告 — production 一定要關 THP（<code>echo never &gt; /sys/kernel/mm/transparent_hugepage/enabled</code>）。
+        </div>
+      </div>
+    </section>
+
+    <section id="aof">
+      <span class="section-eyebrow">03 — AOF</span>
+      <h2>AOF：記下每條寫指令</h2>
+      <p>AOF（Append-Only File）在每條寫入指令執行後，把它附加到一個 log 檔。重啟時 replay 整個 log 就還原了。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis.conf</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code>appendonly yes
+appendfilename <span class="tk-st">"appendonly.aof"</span>
+
+<span class="tk-cm"># fsync 三選一</span>
+appendfsync always      <span class="tk-cm"># 每條寫都 fsync ← 最安全 / 慢</span>
+appendfsync everysec    <span class="tk-cm"># 每秒 fsync ← 預設 / 最差掉 1 秒</span>
+appendfsync no          <span class="tk-cm"># 由 OS 決定 ← 最快 / 不安全</span>
+
+auto-aof-rewrite-percentage 100
+auto-aof-rewrite-min-size 64mb</code></pre>
+      </div>
+
+      <h3>fsync 三檔位的真實意義</h3>
+      <table>
+        <thead>
+          <tr><th>策略</th><th>寫入吞吐</th><th>崩潰最多掉</th><th>建議</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>always</code></td><td>低（每條 syscall）</td><td>0 條</td><td>金融類交易</td></tr>
+          <tr><td><strong><code>everysec</code></strong></td><td>高</td><td>~ 1 秒</td><td><strong>業界 99% 場景</strong></td></tr>
+          <tr><td><code>no</code></td><td>最高</td><td>幾十秒（看 OS）</td><td>純 cache 不在意</td></tr>
+        </tbody>
+      </table>
+
+      <h3>AOF Rewrite</h3>
+      <p>AOF log 越積越大會變慢。Redis 會在 log 達到一定 size 時自動觸發 <strong>rewrite</strong>：fork 子行程，把當下記憶體狀態用「最少指令」重新寫成新的 AOF。例如 <code>INCR x</code> 100 次原本 100 行，rewrite 後變成 <code>SET x 100</code> 一行。</p>
+    </section>
+
+    <section id="hybrid">
+      <span class="section-eyebrow">04 — Hybrid</span>
+      <h2>Hybrid（RDB + AOF）：8.x 預設組合</h2>
+      <p>4.0 引入、5.0+ 預設打開：<code>aof-use-rdb-preamble yes</code>。意思是：</p>
+      <ul>
+        <li>AOF rewrite 時，<strong>把當下記憶體 dump 成 RDB 格式寫到 AOF 開頭</strong>。</li>
+        <li>之後新進的寫入指令仍以 AOF 文字格式 append 在後面。</li>
+      </ul>
+
+      <p>還原時，Redis 先讀 RDB 部分（快），再 replay 後段 AOF（覆蓋最近幾秒）。<strong>結合 RDB 的「載入快」和 AOF 的「掉資料少」</strong>。</p>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>業界推薦組合</strong>
+          <code>appendonly yes</code> + <code>appendfsync everysec</code> + <code>aof-use-rdb-preamble yes</code>（8.x 預設）。<em>另外</em>仍建議保留 RDB save 策略當二級備份（每天自動 snapshot 並備份到 S3 / NFS）。
+        </div>
+      </div>
+    </section>
+
+    <section id="replication">
+      <span class="section-eyebrow">05 — 複製</span>
+      <h2>主從複製：replicaof &amp; psync</h2>
+
+      <p>Redis 是<strong>主從非同步複製</strong>架構。replica 連到 master 後：</p>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">REPLICAOF master:port</div>
+            <div class="timeline-desc">replica 主動連到 master，告知自己的 replication ID 和 offset。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Full resync 或 Partial resync</div>
+            <div class="timeline-desc">如果 master 還記得 replica 之前的 offset（在 <code>repl_backlog</code> 環形 buffer 裡）→ partial 補差量。否則 master fork 出 RDB 整份送過去（耗網路）。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">持續串流寫入</div>
+            <div class="timeline-desc">之後 master 每寫一條，就 push 到所有 replica。replica 不必 ACK 即可繼續 — <em>非同步</em>。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">replica 可被讀</div>
+            <div class="timeline-desc">設 <code>replica-read-only yes</code>（預設）後，replica 可服務讀取，提供 read scaling。但讀的可能是舊資料（複製延遲）。</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>repl_backlog：partial resync 的關鍵</h3>
+      <p>master 維護一個環形 buffer（<code>repl-backlog-size</code> 預設 1 MB），記錄最近的寫入。replica 短暫斷線重連，只要它的 offset 還在這個 buffer 內，master 就只補差量、不 full resync。<strong>大流量場景請把這個值調大</strong>（例如 256 MB），免得每次 replica 重連都觸發 full resync。</p>
+    </section>
+
+    <section id="async-pitfall">
+      <span class="section-eyebrow">06 — 陷阱</span>
+      <h2>「非同步複製」= failover 可能掉資料</h2>
+      <p>因為複製是非同步的，這個情境完全可能：</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" aria-label="async replication failover 掉資料">
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <text x="360" y="25" text-anchor="middle" font-family="Syne, sans-serif" font-size="15" font-weight="700" fill="#0a0a0f">非同步複製的失敗劇本</text>
+
+            <line x1="60" y1="50" x2="60" y2="200" stroke="#d4d3cc"/>
+            <line x1="370" y1="50" x2="370" y2="200" stroke="#d4d3cc"/>
+            <line x1="660" y1="50" x2="660" y2="200" stroke="#d4d3cc"/>
+            <text x="60"  y="45" text-anchor="middle" fill="#6b6b7e">Client</text>
+            <text x="370" y="45" text-anchor="middle" fill="#6b6b7e">Master</text>
+            <text x="660" y="45" text-anchor="middle" fill="#6b6b7e">Replica</text>
+
+            <line x1="60" y1="70" x2="370" y2="80" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="160" y="68" fill="#7c3aed">SET x = "new"</text>
+            <line x1="370" y1="90" x2="60" y2="100" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="160" y="115" fill="#15803d">OK ← Client 以為成功了</text>
+
+            <text x="370" y="135" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="700">💥 Master 在這裡斷電</text>
+            <text x="370" y="150" text-anchor="middle" fill="#6b6b7e" font-size="10">(還沒推到 replica)</text>
+
+            <line x1="370" y1="165" x2="660" y2="170" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <text x="500" y="162" fill="#94a3b8">(這條複製沒送到)</text>
+
+            <text x="660" y="195" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="700">x = 舊值</text>
+            <text x="500" y="195" text-anchor="middle" fill="#ef4444" font-size="11">replica 接管 → 客戶端「成功」的寫入消失</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 R3.1 — async 複製的根本特性：master 已回應 client 但還沒同步到 replica</div>
+      </div>
+
+      <p>所以「主從複製 ≠ 強一致」。Redis 沒提供同步複製選項，原因之一就是<strong>同步複製會把延遲拖到不可接受的程度</strong>。實務做法：</p>
+      <ul>
+        <li><strong>用 <code>WAIT n timeout</code> 指令</strong>：等到「至少 n 個 replica 確認接收」再回 client。可大幅降低（不能完全消除）掉資料風險。</li>
+        <li><strong>讓 replica 也開 AOF + everysec</strong>：即使 replica 重啟也能還原。</li>
+        <li><strong>關鍵資料雙寫</strong>：超關鍵的資料同時寫 PostgreSQL，Redis 只當 cache。</li>
+      </ul>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>「強一致 + 高可用 + 高吞吐」三者選兩個</strong>
+          這就是 CAP / PACELC 的回音：Redis 預設組合是 (高可用 + 高吞吐)，犧牲了強一致。如果你的場景受不了任何資料丟失，請別把 Redis 當主資料庫，配合可靠的後端（PostgreSQL / Cassandra）做雙寫或 cache-aside。
+        </div>
+      </div>
+    </section>
+
+    <section id="hands-on">
+      <span class="section-eyebrow">07 — 動手玩</span>
+      <h2>用 docker-compose 起 master + 2 replica</h2>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml — docker-compose.yml</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code>services:
+  master:
+    image: redis:8.6
+    command: redis-server --appendonly yes --aof-use-rdb-preamble yes
+    ports: [<span class="tk-st">"6379:6379"</span>]
+
+  replica1:
+    image: redis:8.6
+    command: redis-server --appendonly yes --replicaof master 6379
+    depends_on: [master]
+    ports: [<span class="tk-st">"6380:6379"</span>]
+
+  replica2:
+    image: redis:8.6
+    command: redis-server --appendonly yes --replicaof master 6379
+    depends_on: [master]
+    ports: [<span class="tk-st">"6381:6379"</span>]</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">docker</span> compose up -d
+
+<span class="tk-cm"># 看 master 狀態</span>
+<span class="tk-pn">$</span> <span class="tk-fn">redis-cli</span> -p 6379 INFO replication
+<span class="tk-cm"># role:master
+# connected_slaves:2
+# slave0:ip=...,port=6379,state=online,offset=...
+# slave1:ip=...,port=6379,state=online,offset=...
+# repl_backlog_size:1048576</span>
+
+<span class="tk-pn">$</span> <span class="tk-fn">redis-cli</span> -p 6380 INFO replication
+<span class="tk-cm"># role:slave
+# master_link_status:up
+# master_repl_offset:42
+# master_last_io_seconds_ago:1</span>
+
+<span class="tk-cm"># 寫到 master</span>
+<span class="tk-pn">$</span> <span class="tk-fn">redis-cli</span> -p 6379 SET hello world
+
+<span class="tk-cm"># 從 replica 讀（read scaling）</span>
+<span class="tk-pn">$</span> <span class="tk-fn">redis-cli</span> -p 6380 GET hello
+<span class="tk-st">"world"</span>
+
+<span class="tk-cm"># 試「同步保證」: 寫完等至少 1 個 replica 收到，最多等 100ms</span>
+<span class="tk-pn">$</span> <span class="tk-fn">redis-cli</span> -p 6379 SET key1 val1
+<span class="tk-pn">$</span> <span class="tk-fn">redis-cli</span> -p 6379 WAIT <span class="tk-num">1</span> <span class="tk-num">100</span>
+<span class="tk-num">(integer) 1</span>   <span class="tk-cm"># 1 個 replica 已確認</span></code></pre>
+      </div>
+
+      <p><strong>挑戰</strong>：殺掉 master 之前，先在 client 跑一個迴圈寫 key1, key2, ... 然後在某時間點 <code>docker stop master</code>。觀察 replica 上少了哪些 key。這就是非同步複製的本質。</p>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "你的場景是「session store + 部分熱資料 cache」，可接受 1 秒以內掉資料但不能接受重啟全沒。應該選哪個持久化設定？",
+    "options": [
+      "appendonly no",
+      "appendonly yes + appendfsync always",
+      "appendonly yes + appendfsync everysec + aof-use-rdb-preamble yes",
+      "save 60 10000，關掉 AOF"
+    ],
+    "answer": 2,
+    "explain": "業界 99% 場景的標準組合：AOF 開、everysec（最差掉 1 秒）、Hybrid（重啟還原快）。(0) 關 AOF 等於只剩 RDB，重啟可能掉幾分鐘。(1) always 寫吞吐太低。(3) 純 RDB 重啟掉資料風險大。"
+  },
+  {
+    "question": "下列哪些敘述<strong>正確</strong>描述「非同步複製 + failover 掉資料」這個現象？(多選)",
+    "options": [
+      "master 回應 client 「OK」時，可能還沒推到任何 replica",
+      "WAIT 指令可以降低（但無法完全消除）這個風險",
+      "把 replica 設成同步模式即可解決",
+      "所有 Redis 部署一定會掉資料，沒辦法避免"
+    ],
+    "answer": [0, 1],
+    "explain": "(0)(1) 正確。Redis 複製本質非同步、master 回 OK 時不保證已推到 replica。WAIT 可以等 N 個 replica 確認，降低風險但不能 100% 消除。(2) 錯：Redis 不提供同步複製模式（會嚴重影響吞吐）。(3) 錯：純單機 + AOF always 可避免，只是慢。"
+  },
+  {
+    "question": "為什麼 RDB 在大 dataset (例如 50 GB) 時會帶來 latency 毛刺？",
+    "options": [
+      "RDB 寫入會鎖整個 Redis",
+      "fork() 要複製記憶體頁表，dataset 越大耗時越長；THP 開啟時尤其嚴重",
+      "因為 RDB 用 SSD 寫得太快",
+      "因為 RDB 會壓縮資料"
+    ],
+    "answer": 1,
+    "explain": "RDB 用 fork() + COW，主行程不會被指令層級阻塞，但 fork() 本身要複製整個記憶體頁表 — dataset 50GB 約 1~3 秒。期間延遲變高。Linux Transparent Huge Pages (THP) 把頁變成 2MB，COW 觸發時複製成本暴增 — Redis 啟動會警告，production 一定要關 THP。"
+  },
+  {
+    "question": "<code>repl_backlog_size</code> 為什麼建議調大（例如從預設 1 MB 改成 256 MB）？",
+    "options": [
+      "讓 master 可以暫存更久的寫入串流，replica 短暫斷線重連時能用 partial resync 而不是 full",
+      "降低 master 的記憶體用量",
+      "提高寫入吞吐",
+      "縮短 replica 的同步時間"
+    ],
+    "answer": 0,
+    "explain": "<code>repl_backlog</code> 是 master 端的環形 buffer，記錄最近的寫入串流。replica 重連時若 offset 還在這個 buffer 內，只補差量；超出範圍就 full resync（fork 整份 RDB 送過去，耗網路、可能拖慢 master）。大流量、replica 偶爾斷線的場景請把它調大。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/" target="_blank" rel="noopener">Redis Persistence</a><span class="ref-meta">RDB / AOF / Hybrid</span></li>
+        <li><a href="https://redis.io/docs/latest/operate/oss_and_stack/management/replication/" target="_blank" rel="noopener">Redis Replication</a><span class="ref-meta">主從、partial resync</span></li>
+        <li><a href="https://redis.io/docs/latest/commands/wait/" target="_blank" rel="noopener">WAIT command</a><span class="ref-meta">同步寫保證</span></li>
+        <li><a href="https://redis.io/docs/latest/operate/oss_and_stack/management/admin/" target="_blank" rel="noopener">Admin: Linux THP / overcommit</a><span class="ref-meta">production tuning</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="redis_02_advanced_ds.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Redis 02 · 進階資料結構</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="redis_04_ha_cluster.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Redis 04 · Sentinel vs Cluster</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">6 堂 Redis 系列 <span class="progress-pill">3 / 6</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="redis_01_intro.html"><span class="course-nav-num">01</span><span>Redis 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="redis_02_advanced_ds.html"><span class="course-nav-num">02</span><span>進階資料結構</span></a></li>
+        <li><a class="course-nav-item current" href="redis_03_persistence_replication.html"><span class="course-nav-num">03</span><span>持久化與複製</span></a></li>
+        <li><a class="course-nav-item" href="redis_04_ha_cluster.html"><span class="course-nav-num">04</span><span>Sentinel vs Cluster</span></a></li>
+        <li><a class="course-nav-item" href="redis_05_v8_modules.html"><span class="course-nav-num">05</span><span>Redis 8 新特性</span></a></li>
+        <li><a class="course-nav-item" href="redis_06_patterns_antipatterns.html"><span class="course-nav-num">06</span><span>實戰模式與反模式</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 Redis 課程系列 · Lesson 03
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

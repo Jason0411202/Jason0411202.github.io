@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 09｜TLS、mTLS、Token-based Auth — gRPC 課程</title>
+<meta name="description" content="從 insecure 升級到 production:單向 TLS 加密、mTLS 雙向驗證、用 PerRPCCredentials 帶 OAuth/JWT token,以及 transport 層 vs call 層 credentials 的分工。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 09 · 安全</div>
+    <h1 class="hero-title">TLS、mTLS、<span>Token-based Auth</span></h1>
+    <p class="hero-desc">把上線前該做的安全功課一次學完:server-only TLS、mTLS 雙向驗證、PerRPCCredentials 帶 token。<strong>理解 transport credentials 與 per-RPC credentials 的分工。</strong></p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 9 / 10 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 16 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>進階</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#two-layers">兩層 credentials</a></li>
+      <li><a class="toc-link" href="#cert">準備憑證</a></li>
+      <li><a class="toc-link" href="#tls">單向 TLS</a></li>
+      <li><a class="toc-link" href="#mtls">mTLS</a></li>
+      <li><a class="toc-link" href="#per-rpc">PerRPC token</a></li>
+      <li><a class="toc-link" href="#choose">怎麼選</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="two-layers">
+      <span class="section-eyebrow">01 — 兩層 credentials</span>
+      <h2>Transport vs PerRPC — 兩種 credentials</h2>
+      <p>gRPC 的安全分兩層,兩者可同時存在:</p>
+
+      <table>
+        <thead>
+          <tr><th>層次</th><th>解決什麼</th><th>典型實作</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Transport credentials</strong></td>
+            <td>「<em>連線本身要不要加密、雙方身份驗不驗</em>」 — 對應到 TLS 層</td>
+            <td><code>credentials.NewTLS(...)</code>、<code>insecure.NewCredentials()</code></td>
+          </tr>
+          <tr>
+            <td><strong>PerRPC credentials</strong></td>
+            <td>「<em>每支 RPC 要附什麼 token</em>」 — 對應到 metadata 層</td>
+            <td>OAuth、JWT bearer token、API key</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>兩層獨立、可組合</strong>
+          一個生產系統典型搭配:transport 用 TLS(對外)或 mTLS(內部),plus PerRPC 用 OAuth bearer token 帶 user identity。三件事有清楚分工,不要混用。
+        </div>
+      </div>
+    </section>
+
+    <section id="cert">
+      <span class="section-eyebrow">02 — 準備憑證</span>
+      <h2>本機練習用 self-signed 憑證</h2>
+      <p>Production 應該用 Let's Encrypt 或公司內部 CA。本機練習可以用 <code>openssl</code> 或更方便的 <a class="inline-link" href="https://github.com/FiloSottile/mkcert" target="_blank" rel="noopener">mkcert</a>:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 用 mkcert(推薦)— 自動裝信任根 + 簽 server 憑證</span>
+<span class="tk-pn">$</span> <span class="tk-fn">brew</span> install mkcert
+<span class="tk-pn">$</span> <span class="tk-fn">mkcert</span> <span class="tk-op">-install</span>
+<span class="tk-pn">$</span> <span class="tk-fn">mkcert</span> localhost 127.0.0.1
+<span class="tk-cm"># 產生:localhost+1.pem (cert) 與 localhost+1-key.pem (key)</span>
+
+<span class="tk-cm"># 或用原始 openssl(較囉嗦,但無依賴)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">openssl</span> req <span class="tk-op">-x509</span> <span class="tk-op">-newkey</span> rsa:<span class="tk-num">4096</span> <span class="tk-op">-nodes</span> <span class="tk-op">\</span>
+    <span class="tk-op">-keyout</span> server.key <span class="tk-op">-out</span> server.crt <span class="tk-op">-days</span> <span class="tk-num">365</span> <span class="tk-op">\</span>
+    <span class="tk-op">-subj</span> <span class="tk-st">"/CN=localhost"</span> <span class="tk-op">-addext</span> <span class="tk-st">"subjectAltName=DNS:localhost,IP:127.0.0.1"</span></code></pre>
+      </div>
+    </section>
+
+    <section id="tls">
+      <span class="section-eyebrow">03 — 單向 TLS</span>
+      <h2>Server-only TLS:加密連線、驗 server</h2>
+      <p>最常見的 production 設定 — 像瀏覽器連網站一樣,只驗 server 身份,連線加密。</p>
+
+      <h3>Server 端</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (server)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">import</span> <span class="tk-st">"google.golang.org/grpc/credentials"</span>
+
+creds, err := credentials.NewServerTLSFromFile(<span class="tk-st">"server.crt"</span>, <span class="tk-st">"server.key"</span>)
+<span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
+    log.Fatalf(<span class="tk-st">"load tls: %v"</span>, err)
+}
+
+s := grpc.NewServer(grpc.Creds(creds))
+pb.RegisterGreeterServer(s, &amp;server{})
+s.Serve(lis)</code></pre>
+      </div>
+
+      <h3>Client 端</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (client)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm">// 簡單版:從檔案讀 CA 憑證,信任這個 CA 簽的 cert</span>
+creds, err := credentials.NewClientTLSFromFile(<span class="tk-st">"server.crt"</span>, <span class="tk-st">"localhost"</span>)
+<span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
+    log.Fatalf(<span class="tk-st">"load tls: %v"</span>, err)
+}
+
+conn, err := grpc.NewClient(<span class="tk-st">"localhost:50051"</span>, grpc.WithTransportCredentials(creds))</code></pre>
+      </div>
+
+      <p>更彈性的版本:傳 <code>tls.Config</code>:</p>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (client)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm">// 信任系統根憑證池(對 Let's Encrypt 等公開 CA 用這個)</span>
+pool, err := x509.SystemCertPool()
+<span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> { log.Fatal(err) }
+
+creds := credentials.NewTLS(&amp;tls.Config{
+    RootCAs:    pool,
+    ServerName: <span class="tk-st">"api.example.com"</span>,    <span class="tk-cm">// 必須對應 cert 的 SAN</span>
+    MinVersion: tls.VersionTLS13,
+})
+
+conn, err := grpc.NewClient(<span class="tk-st">"api.example.com:443"</span>, grpc.WithTransportCredentials(creds))</code></pre>
+      </div>
+    </section>
+
+    <section id="mtls">
+      <span class="section-eyebrow">04 — mTLS</span>
+      <h2>mTLS:雙方都出示憑證</h2>
+      <p>內部 service-to-service 常用 mTLS:不只 client 驗 server,server 也驗 client 的憑證。沒有對應 cert 連都連不進來。</p>
+
+      <h3>Server 端 — 同時要求 client 出示 cert</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (server)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>cert, err := tls.LoadX509KeyPair(<span class="tk-st">"server.crt"</span>, <span class="tk-st">"server.key"</span>)
+<span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> { log.Fatal(err) }
+
+clientCAs := x509.NewCertPool()
+caBytes, _ := os.ReadFile(<span class="tk-st">"client-ca.crt"</span>)
+clientCAs.AppendCertsFromPEM(caBytes)
+
+creds := credentials.NewTLS(&amp;tls.Config{
+    Certificates: []tls.Certificate{cert},
+    ClientCAs:    clientCAs,
+    ClientAuth:   tls.RequireAndVerifyClientCert,  <span class="tk-cm">// ← 強制驗 client cert</span>
+    MinVersion:   tls.VersionTLS13,
+})
+
+s := grpc.NewServer(grpc.Creds(creds))</code></pre>
+      </div>
+
+      <h3>Client 端 — 出示自己的 cert</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (client)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>cert, err := tls.LoadX509KeyPair(<span class="tk-st">"client.crt"</span>, <span class="tk-st">"client.key"</span>)
+<span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> { log.Fatal(err) }
+
+serverCAs := x509.NewCertPool()
+caBytes, _ := os.ReadFile(<span class="tk-st">"server-ca.crt"</span>)
+serverCAs.AppendCertsFromPEM(caBytes)
+
+creds := credentials.NewTLS(&amp;tls.Config{
+    Certificates: []tls.Certificate{cert},   <span class="tk-cm">// ← client 自己的 cert</span>
+    RootCAs:      serverCAs,
+    ServerName:   <span class="tk-st">"api.example.com"</span>,
+    MinVersion:   tls.VersionTLS13,
+})
+
+conn, err := grpc.NewClient(<span class="tk-st">"api.example.com:443"</span>, grpc.WithTransportCredentials(creds))</code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>service mesh(Istio / Linkerd)會自動做 mTLS</strong>
+          k8s + service mesh 的環境,sidecar proxy 會在你 application 不知情的情況下做 mTLS,你的 gRPC 還是用 <code>insecure.NewCredentials()</code> 即可 — 安全在 mesh 層處理。手寫 mTLS 仍適合理解原理,以及無 mesh 的環境。
+        </div>
+      </div>
+    </section>
+
+    <section id="per-rpc">
+      <span class="section-eyebrow">05 — PerRPC token</span>
+      <h2>PerRPCCredentials:把 token 自動附在每支 RPC</h2>
+      <p>不想每次手動 <code>metadata.AppendToOutgoingContext</code>?實作 <code>PerRPCCredentials</code> interface 讓 grpc-go 自動帶。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (client)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm">// 自己實作:能動態取 token(例如從 oauth source refresh)</span>
+<span class="tk-kw">type</span> tokenAuth <span class="tk-kw">struct</span> {
+    source <span class="tk-kw">func</span>() (<span class="tk-kw">string</span>, <span class="tk-kw">error</span>)
+}
+
+<span class="tk-kw">func</span> (t *tokenAuth) GetRequestMetadata(ctx context.Context, _ ...<span class="tk-kw">string</span>) (<span class="tk-kw">map</span>[<span class="tk-kw">string</span>]<span class="tk-kw">string</span>, <span class="tk-kw">error</span>) {
+    token, err := t.source()
+    <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> { <span class="tk-kw">return</span> <span class="tk-kw">nil</span>, err }
+    <span class="tk-kw">return</span> <span class="tk-kw">map</span>[<span class="tk-kw">string</span>]<span class="tk-kw">string</span>{
+        <span class="tk-st">"authorization"</span>: <span class="tk-st">"Bearer "</span> + token,
+    }, <span class="tk-kw">nil</span>
+}
+
+<span class="tk-cm">// RequireTransportSecurity = true 表示「沒 TLS 不准用」(token 不能裸傳)</span>
+<span class="tk-kw">func</span> (t *tokenAuth) RequireTransportSecurity() <span class="tk-kw">bool</span> { <span class="tk-kw">return</span> <span class="tk-kw">true</span> }
+
+<span class="tk-cm">// 安裝</span>
+conn, err := grpc.NewClient(addr,
+    grpc.WithTransportCredentials(tlsCreds),
+    grpc.WithPerRPCCredentials(&amp;tokenAuth{source: refreshToken}),
+)</code></pre>
+      </div>
+
+      <p>之後每支 RPC 自動帶 <code>authorization</code> header,handler 不用改。</p>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>token 在裸 HTTP/2 上是<strong>明文</strong></strong>
+          PerRPCCredentials 把 token 放 metadata,沒 TLS 等於明文傳。實作 <code>RequireTransportSecurity() bool</code> 回 <code>true</code>,grpc-go 會在 connection 沒有 TLS 時直接拒絕掛上去 — 這是基礎安全保護。
+        </div>
+      </div>
+    </section>
+
+    <section id="choose">
+      <span class="section-eyebrow">06 — 怎麼選</span>
+      <h2>實際 production 怎麼搭配</h2>
+
+      <table>
+        <thead>
+          <tr><th>場景</th><th>Transport</th><th>PerRPC</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>對外公開 API(client 是其他公司 / 終端用戶)</td>
+            <td>單向 TLS(用公開 CA)</td>
+            <td>OAuth bearer token / API key</td>
+          </tr>
+          <tr>
+            <td>內部 microservice(no mesh)</td>
+            <td>mTLS(內部 CA 簽的)</td>
+            <td>(mTLS cert 已帶身份,通常不必 PerRPC)</td>
+          </tr>
+          <tr>
+            <td>內部 microservice(有 service mesh)</td>
+            <td><code>insecure</code>(mesh sidecar 處理 mTLS)</td>
+            <td>視情況加 user-context token</td>
+          </tr>
+          <tr>
+            <td>本機開發</td>
+            <td><code>insecure</code></td>
+            <td>(略)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-danger">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>對外服務絕對不要用 <code>insecure</code></strong>
+          <code>insecure.NewCredentials()</code> 等於明文 HTTP/2(h2c)。對網際網路曝露 = 流量可被中間人讀取/修改、token 一傳就洩漏。<strong>只在 localhost 開發、或 service mesh 已處理</strong>的情況下用。
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "Transport credentials 與 PerRPC credentials 的差別是?",
+    "options": [
+      "兩者完全等價,擇一即可",
+      "Transport 處理連線層加密與身份(TLS、mTLS);PerRPC 處理每支 RPC 帶的 token(authorization metadata)。兩者可同時存在",
+      "Transport 給 server 用,PerRPC 給 client 用",
+      "Transport 是新 API,PerRPC 是舊 API"
+    ],
+    "answer": 1,
+    "explain": "兩層獨立、可組合。典型 production:transport 用 TLS 加密 + PerRPC 帶 OAuth token 表達 user 身份。"
+  },
+  {
+    "question": "下列哪一項是 mTLS 與單向 TLS 的<strong>差別</strong>?",
+    "options": [
+      "mTLS 速度比較快",
+      "mTLS 只能用於 streaming RPC",
+      "mTLS 中 server 也會驗 client 的憑證(<code>tls.RequireAndVerifyClientCert</code>);單向 TLS 只驗 server",
+      "mTLS 不需要憑證"
+    ],
+    "answer": 2,
+    "explain": "<strong>m</strong>TLS = mutual TLS,雙方互驗。Server 端關鍵設定是 <code>ClientAuth: tls.RequireAndVerifyClientCert</code>,並提供 <code>ClientCAs</code> 信任的 client CA pool。client 端必須出示自己的 <code>Certificates</code>。常用於內部 service-to-service。"
+  },
+  {
+    "question": "實作 PerRPCCredentials 時,<code>RequireTransportSecurity() bool</code> 應該怎麼決定?",
+    "options": [
+      "永遠回 <code>false</code>,簡單就好",
+      "永遠回 <code>true</code>(token 必須在 TLS 上傳;明文傳會被截獲)",
+      "依 token 長度決定",
+      "依 client IP 決定"
+    ],
+    "answer": 1,
+    "explain": "PerRPC 把 token 放 metadata,沒 TLS = 明文。回 <code>true</code> 讓 grpc-go 在 connection 不安全時直接拒絕掛上去。本地測試環境的開發 token 也應該用 TLS 或 unix socket,不要養成裸傳習慣。"
+  },
+  {
+    "question": "k8s 內已部署 Istio service mesh 的環境,內部 service-to-service gRPC 的 transport credentials 該怎麼設?",
+    "options": [
+      "務必手寫 mTLS,不要信任 mesh",
+      "用 <code>insecure.NewCredentials()</code>,因為 mesh sidecar 已自動接管 mTLS",
+      "改用單向 TLS",
+      "完全不能用 gRPC"
+    ],
+    "answer": 1,
+    "explain": "service mesh(Istio、Linkerd)的 sidecar proxy 會在 application 不知情的情況下幫雙方加上 mTLS。Application 用 <code>insecure</code> 即可,不需重複實作。少數例外:application 想額外驗 client 細節時才會自己再做一層。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://grpc.io/docs/guides/auth/" target="_blank" rel="noopener">grpc.io — Authentication</a><span class="ref-meta">官方完整指南</span></li>
+        <li><a href="https://pkg.go.dev/google.golang.org/grpc/credentials" target="_blank" rel="noopener">pkg.go.dev — grpc/credentials</a><span class="ref-meta">credentials API</span></li>
+        <li><a href="https://github.com/grpc/grpc-go/tree/master/examples/features/encryption" target="_blank" rel="noopener">grpc-go/examples/features/encryption</a><span class="ref-meta">TLS / mTLS 範例</span></li>
+        <li><a href="https://github.com/FiloSottile/mkcert" target="_blank" rel="noopener">FiloSottile/mkcert</a><span class="ref-meta">本機憑證快速產生</span></li>
+        <li><a href="https://istio.io/latest/docs/concepts/security/" target="_blank" rel="noopener">Istio Security</a><span class="ref-meta">service mesh mTLS</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="grpc_08_interceptors.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 08 · Interceptors</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="grpc_10_connection_lifecycle.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 10 · 連線生命週期(完結)</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">10 堂 gRPC 系列 <span class="progress-pill">9 / 10</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="grpc_01_intro.html"><span class="course-nav-num">01</span><span>gRPC 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="grpc_02_setup.html"><span class="course-nav-num">02</span><span>環境安裝與工具鏈</span></a></li>
+        <li><a class="course-nav-item" href="grpc_03_protobuf_syntax.html"><span class="course-nav-num">03</span><span>Protobuf 語法</span></a></li>
+        <li><a class="course-nav-item" href="grpc_04_unary_rpc.html"><span class="course-nav-num">04</span><span>Unary RPC 實戰</span></a></li>
+        <li><a class="course-nav-item" href="grpc_05_streaming_rpc.html"><span class="course-nav-num">05</span><span>三種 Streaming</span></a></li>
+        <li><a class="course-nav-item" href="grpc_06_context_metadata.html"><span class="course-nav-num">06</span><span>Context / Metadata</span></a></li>
+        <li><a class="course-nav-item" href="grpc_07_error_handling.html"><span class="course-nav-num">07</span><span>錯誤處理</span></a></li>
+        <li><a class="course-nav-item" href="grpc_08_interceptors.html"><span class="course-nav-num">08</span><span>Interceptors</span></a></li>
+        <li><a class="course-nav-item current" href="grpc_09_tls_auth.html"><span class="course-nav-num">09</span><span>TLS / Auth</span></a></li>
+        <li><a class="course-nav-item" href="grpc_10_connection_lifecycle.html"><span class="course-nav-num">10</span><span>連線生命週期</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 gRPC 課程系列 · Lesson 09
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

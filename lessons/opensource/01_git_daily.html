@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 01｜Git 日常實務速成 — 開源貢獻課程</title>
+<meta name="description" content="從工作區、暫存區、本地倉庫、遠端的四區心智模型出發，掌握每天會用到的 Git 指令：status / add / commit / log / diff / stash / restore。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 01 · Git 基礎篇</div>
+    <h1 class="hero-title">Git 日常<span>實務速成</span></h1>
+    <p class="hero-desc">從四區心智模型出發，把每天會用到的 Git 指令一次學會。<strong>不是教你 Git 物件原理，是讓你今天就能在團隊裡正常工作。</strong></p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 1 / 12 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 12 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>初階</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#mental-model">心智模型</a></li>
+      <li><a class="toc-link" href="#daily-flow">每日工作流</a></li>
+      <li><a class="toc-link" href="#log">看歷史</a></li>
+      <li><a class="toc-link" href="#diff">看差異</a></li>
+      <li><a class="toc-link" href="#amend">修補改動</a></li>
+      <li><a class="toc-link" href="#stash">暫存</a></li>
+      <li><a class="toc-link" href="#restore">取消改動</a></li>
+      <li><a class="toc-link" href="#gitignore">.gitignore</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="mental-model">
+      <span class="section-eyebrow">01 — 心智模型</span>
+      <h2>四個區、一張圖</h2>
+      <p>Git 的所有指令幾乎都在做同一件事：<strong>把檔案在四個區之間搬來搬去</strong>。理解這張圖，你就懂 80% 的 Git 指令在幹嘛。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" aria-label="Git 四區流向圖">
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+            <marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#ff3d1f"/>
+            </marker>
+          </defs>
+          <!-- 四個區方塊 -->
+          <g font-family="JetBrains Mono, monospace" font-size="13">
+            <rect x="20"  y="100" width="140" height="80" rx="10" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="90"  y="135" text-anchor="middle" font-weight="700" fill="#0a0a0f">Working Tree</text>
+            <text x="90"  y="155" text-anchor="middle" fill="#6b6b7e" font-size="11">編輯中的檔案</text>
+
+            <rect x="200" y="100" width="140" height="80" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="270" y="135" text-anchor="middle" font-weight="700" fill="#4c1d95">Staging (Index)</text>
+            <text x="270" y="155" text-anchor="middle" fill="#6b6b7e" font-size="11">準備提交的快照</text>
+
+            <rect x="380" y="100" width="140" height="80" rx="10" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="450" y="135" text-anchor="middle" font-weight="700" fill="#0a0a0f">Local Repo</text>
+            <text x="450" y="155" text-anchor="middle" fill="#6b6b7e" font-size="11">本地 commit 歷史</text>
+
+            <rect x="560" y="100" width="140" height="80" rx="10" fill="#0a0a0f" stroke="#0a0a0f"/>
+            <text x="630" y="135" text-anchor="middle" font-weight="700" fill="#fafaf8">Remote</text>
+            <text x="630" y="155" text-anchor="middle" fill="#a8a8b8" font-size="11">GitHub / GitLab</text>
+
+            <!-- 箭頭：往右 -->
+            <line x1="160" y1="125" x2="200" y2="125" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arr)"/>
+            <text x="180" y="115" text-anchor="middle" fill="#7c3aed" font-size="11">add</text>
+
+            <line x1="340" y1="125" x2="380" y2="125" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arr)"/>
+            <text x="360" y="115" text-anchor="middle" fill="#7c3aed" font-size="11">commit</text>
+
+            <line x1="520" y1="125" x2="560" y2="125" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arr)"/>
+            <text x="540" y="115" text-anchor="middle" fill="#7c3aed" font-size="11">push</text>
+
+            <!-- 箭頭：往左 -->
+            <line x1="560" y1="160" x2="160" y2="160" stroke="#ff3d1f" stroke-width="1.8" marker-end="url(#arrR)"/>
+            <text x="360" y="180" text-anchor="middle" fill="#ff3d1f" font-size="11">pull / fetch + merge</text>
+
+            <!-- 標題 -->
+            <text x="360" y="40" text-anchor="middle" font-family="Syne, sans-serif" font-size="18" font-weight="700" fill="#0a0a0f">檔案在四個區之間流動</text>
+            <text x="360" y="62" text-anchor="middle" fill="#6b6b7e" font-size="12">紫色箭頭 = 往遠端推；橘色箭頭 = 從遠端拉</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 1.1 — Git 四區與主要流向</div>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>記住這四個動作就好</strong>
+          編輯 → <code>add</code> 到 Staging → <code>commit</code> 進 Local → <code>push</code> 上 Remote。所有複雜指令都是這條主線的變體。
+        </div>
+      </div>
+    </section>
+
+    <section id="daily-flow">
+      <span class="section-eyebrow">02 — 每日工作流</span>
+      <h2>每天做事的標準節奏</h2>
+      <p>無論在公司或開源專案，一天的 Git 操作會像下面這樣循環：</p>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">開始前先同步主分支</div>
+            <div class="timeline-desc">避免在過時的程式碼上開發。<code>--rebase</code> 讓本地 commit 接在最新主分支後面，歷史更乾淨。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">看當前狀態</div>
+            <div class="timeline-desc"><code>git status</code> 是 Git 的儀表板，動任何指令前先看一眼。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">挑要進這次 commit 的改動</div>
+            <div class="timeline-desc"><code>git add &lt;file&gt;</code> 一個一個加比 <code>git add .</code> 安全很多，能避免把 debug 用的 <code>console.log</code> 一起送進去。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">提交</div>
+            <div class="timeline-desc"><code>git commit -m "..."</code>。message 寫法之後 Lesson 06 會專門講。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">5</div>
+          <div class="timeline-content">
+            <div class="timeline-title">推上去</div>
+            <div class="timeline-desc">第一次推某個分支用 <code>git push -u origin &lt;branch&gt;</code> 設定上游，之後直接 <code>git push</code> 就好。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 1. 同步主分支</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> checkout main
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> pull <span class="tk-op">--rebase</span>
+
+<span class="tk-cm"># 2. 開新分支做事</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> checkout <span class="tk-op">-b</span> feat/user-profile
+
+<span class="tk-cm"># 3. 寫程式 ... 之後看狀態</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> status
+
+<span class="tk-cm"># 4. 挑檔案 stage</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> add src/profile.ts src/profile.test.ts
+
+<span class="tk-cm"># 5. commit</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> commit <span class="tk-op">-m</span> <span class="tk-st">"feat(profile): add user profile page"</span>
+
+<span class="tk-cm"># 6. 推上去 (第一次推這個分支要 -u)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> push <span class="tk-op">-u</span> origin feat/user-profile</code></pre>
+      </div>
+
+      <h3>add 的三種選法</h3>
+      <table>
+        <thead>
+          <tr><th>指令</th><th>行為</th><th>什麼時候用</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>git add file.ts</code></td><td>加單一檔案</td><td>知道自己要的是哪幾個檔案 (<strong>推薦</strong>)</td></tr>
+          <tr><td><code>git add -p</code></td><td>逐塊互動式選擇</td><td>同一檔案內想拆成兩個 commit 時</td></tr>
+          <tr><td><code>git add .</code></td><td>當前目錄全部</td><td>確認過 <code>status</code> 沒有 debug 殘留時才用</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>不要養成 <code>git add .</code> + <code>commit -am</code> 的習慣</strong>
+          這條黃金組合是業界 PR 被退件的常見原因 —— 你會把暫時 print、TODO 註解、本地實驗檔一起 commit 上去。<code>git add -p</code> 是真正的進階使用者習慣。
+        </div>
+      </div>
+    </section>
+
+    <section id="log">
+      <span class="section-eyebrow">03 — 看歷史</span>
+      <h2>看 commit 歷史的四個工具</h2>
+
+      <h3>git log — 看時間線</h3>
+      <p>原始的 <code>git log</code> 太囉嗦。實務上幾乎都用這個別名：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 一行一個 commit + 分支圖 + 全部分支</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> log <span class="tk-op">--oneline</span> <span class="tk-op">--graph</span> <span class="tk-op">--all</span> <span class="tk-op">--decorate</span>
+
+<span class="tk-cm"># 設成永久別名 (推薦)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> config <span class="tk-op">--global</span> alias.lg <span class="tk-st">"log --oneline --graph --all --decorate"</span>
+
+<span class="tk-cm"># 之後就只要打</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> lg</code></pre>
+      </div>
+
+      <h3>git show — 看單個 commit 的完整內容</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">git</span> show a1b2c3d                <span class="tk-cm"># 看那個 commit 改了什麼</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> show HEAD                   <span class="tk-cm"># 看最新的 commit</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> show HEAD~3                 <span class="tk-cm"># 看 3 個 commit 之前那個</span></code></pre>
+      </div>
+
+      <h3>git blame — 看每一行是誰改的</h3>
+      <p>不是用來找戰犯，是用來找「為什麼這行寫成這樣」的線索。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">git</span> blame src/auth.ts             <span class="tk-cm"># 整個檔案</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> blame <span class="tk-op">-L</span> 42,55 src/auth.ts    <span class="tk-cm"># 只看 42 ~ 55 行</span></code></pre>
+      </div>
+
+      <h3>git log -p — 看歷史 + 每筆 diff</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">git</span> log <span class="tk-op">-p</span> <span class="tk-op">--follow</span> src/auth.ts   <span class="tk-cm"># 這個檔案歷年來的所有改動 + 內容</span></code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong><code>--follow</code> 為什麼重要</strong>
+          檔案被改名後，預設的 <code>git log</code> 只看得到改名後的歷史。<code>--follow</code> 會追溯改名前的內容，看到完整故事。
+        </div>
+      </div>
+    </section>
+
+    <section id="diff">
+      <span class="section-eyebrow">04 — 看差異</span>
+      <h2><code>diff</code> 的四種模式</h2>
+      <p>Git 有四個區，所以 <code>diff</code> 自然有四種比法。能熟練切換是進階使用者的標誌。</p>
+
+      <table>
+        <thead>
+          <tr><th>指令</th><th>比的是</th><th>用在哪</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>git diff</code></td>
+            <td>Working Tree ↔ Staging</td>
+            <td>「我改了什麼<strong>還沒</strong> stage？」</td>
+          </tr>
+          <tr>
+            <td><code>git diff --staged</code></td>
+            <td>Staging ↔ HEAD</td>
+            <td>「commit 前再看一次這次到底要送什麼」</td>
+          </tr>
+          <tr>
+            <td><code>git diff HEAD</code></td>
+            <td>Working Tree + Staging ↔ HEAD</td>
+            <td>「我跟最後一次 commit 的全部差異」</td>
+          </tr>
+          <tr>
+            <td><code>git diff main..feat/x</code></td>
+            <td>分支 vs 分支</td>
+            <td>「我這條 PR 跟 main 差了什麼」</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong><code>--staged</code> vs <code>--cached</code></strong>
+          兩者完全等價，<code>--staged</code> 是新版的別名。看到任何文章混用不必擔心。
+        </div>
+      </div>
+    </section>
+
+    <section id="amend">
+      <span class="section-eyebrow">05 — 修補最近的改動</span>
+      <h2>剛 commit 完發現少改一個地方</h2>
+      <p>不要再開一個 <code>fix typo</code> 的 commit，用 <code>--amend</code> 補進上一筆：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 修了檔案後</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> add src/forgot.ts
+
+<span class="tk-cm"># 補進上一個 commit (message 不變)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> commit <span class="tk-op">--amend</span> <span class="tk-op">--no-edit</span>
+
+<span class="tk-cm"># 想改 message 也可以</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> commit <span class="tk-op">--amend</span> <span class="tk-op">-m</span> <span class="tk-st">"feat(profile): add user profile page with avatar"</span></code></pre>
+      </div>
+
+      <div class="callout callout-danger">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>已經 push 出去的 commit 不要 amend</strong>
+          <code>--amend</code> 會改變 commit 的 SHA，等於 rewrite history。如果這個 commit 已經 push、別人已經 pull 走，他們的 git 會抓狂。<strong>只有自己分支沒推出去前才能 amend。</strong>已 push 後仍要 amend 的話，請改用 <code>git push --force-with-lease</code> (Lesson 02 會說明)。
+        </div>
+      </div>
+    </section>
+
+    <section id="stash">
+      <span class="section-eyebrow">06 — 暫存</span>
+      <h2><code>stash</code>：手邊改一半，但要切去別處救火</h2>
+
+      <p>主管丟一個線上 bug 過來，你手邊有 30% 沒 commit 的工作不想丟掉，這時候就用 stash。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 把當前所有沒 commit 的改動暫存起來 (連未 stage 的都收)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash push <span class="tk-op">-m</span> <span class="tk-st">"WIP: profile avatar upload"</span>
+
+<span class="tk-cm"># 切去主分支處理線上 bug</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> checkout main
+<span class="tk-cm"># ... 修 bug、push、merge ...</span>
+
+<span class="tk-cm"># 回來，把暫存的改動拿回來</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> checkout feat/user-profile
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash list
+stash@{0}: On feat/user-profile: WIP: profile avatar upload
+
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash pop                 <span class="tk-cm"># 拿回來並從 stash 列表移除</span>
+<span class="tk-cm"># 如果不確定要不要拿回來，用 git stash apply (套用但不刪)</span></code></pre>
+      </div>
+
+      <details class="collapse">
+        <summary>進階：stash 只暫存一部分檔案 / 包含 untracked 檔 <span class="collapse-tag">深入</span></summary>
+        <div class="collapse-body">
+<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># 只 stash 已 stage 的部分</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash push <span class="tk-op">--staged</span> <span class="tk-op">-m</span> <span class="tk-st">"only staged"</span>
+
+<span class="tk-cm"># 連 untracked 新檔案也一起收 (預設不收)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash push <span class="tk-op">-u</span> <span class="tk-op">-m</span> <span class="tk-st">"with untracked"</span>
+
+<span class="tk-cm"># 指定要 stash 哪些檔案</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash push <span class="tk-op">-m</span> <span class="tk-st">"only profile"</span> src/profile.ts</code></pre>
+        </div>
+      </details>
+    </section>
+
+    <section id="restore">
+      <span class="section-eyebrow">07 — 取消改動</span>
+      <h2>取消改動：用新的 <code>restore</code>，不要再用 <code>checkout --</code></h2>
+
+      <p>Git 2.23 (2019) 後，把以前 <code>checkout</code> 一個指令做太多事拆成兩個：</p>
+
+      <table>
+        <thead>
+          <tr><th>想做什麼</th><th>新指令 (推薦)</th><th>舊指令 (避免)</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>放棄 working tree 的改動</td>
+            <td><code>git restore &lt;file&gt;</code></td>
+            <td><code>git checkout -- &lt;file&gt;</code></td>
+          </tr>
+          <tr>
+            <td>把已 stage 的取消 stage (改動還在)</td>
+            <td><code>git restore --staged &lt;file&gt;</code></td>
+            <td><code>git reset HEAD &lt;file&gt;</code></td>
+          </tr>
+          <tr>
+            <td>切分支</td>
+            <td><code>git switch &lt;branch&gt;</code></td>
+            <td><code>git checkout &lt;branch&gt;</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>為什麼新指令值得學</strong>
+          <code>checkout</code> 既能切分支又能還原檔案，新手常常不小心打錯就把檔案救不回來。<code>restore</code> 和 <code>switch</code> 各司其職，誤操作風險小很多。新團隊現在都建議用新版。
+        </div>
+      </div>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>舊寫法</div>
+          <div class="compare-body">
+            <code>git checkout -- src/auth.ts</code>
+            一個指令切分支也是 checkout，還原檔案也是 checkout，新人一直搞混。
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>新寫法</div>
+          <div class="compare-body">
+            <code>git restore src/auth.ts</code>
+            指令名稱直接告訴你它在做什麼。
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="gitignore">
+      <span class="section-eyebrow">08 — .gitignore</span>
+      <h2>絕對不能 commit 進去的東西</h2>
+
+      <p>每個專案都該在第一個 commit 就放好 <code>.gitignore</code>，避免下面這些東西不小心進入版本控制：</p>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>絕對不能進去</div>
+          <div class="compare-body">
+            <ul style="margin:0 0 0 1rem;font-size:13px;">
+              <li><code>.env</code> / <code>.env.local</code> — 含 API key 與密碼</li>
+              <li><code>*.pem</code> / <code>id_rsa</code> — 私鑰</li>
+              <li><code>node_modules/</code> — 數萬個檔案，靠 lock 檔還原即可</li>
+              <li><code>__pycache__/</code> / <code>*.pyc</code> — Python 編譯快取</li>
+              <li><code>dist/</code> / <code>build/</code> — 編譯產出</li>
+              <li><code>.DS_Store</code> / <code>Thumbs.db</code> — 作業系統垃圾</li>
+              <li><code>.idea/</code> / <code>.vscode/</code> (團隊不共用時)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>應該進去</div>
+          <div class="compare-body">
+            <ul style="margin:0 0 0 1rem;font-size:13px;">
+              <li><code>.env.example</code> — 列出有哪些變數但不寫值</li>
+              <li><code>package-lock.json</code> / <code>pnpm-lock.yaml</code> 等鎖檔</li>
+              <li><code>.gitignore</code> 本身</li>
+              <li><code>.editorconfig</code> / <code>.prettierrc</code> 等共用設定</li>
+              <li>原始碼、測試、文件</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <h3>從 GitHub 官方範本起手</h3>
+      <p>不用自己一行一行寫，<a class="inline-link" href="https://github.com/github/gitignore" target="_blank" rel="noopener">github/gitignore</a> 倉庫收錄了主流語言/框架的官方 <code>.gitignore</code> 範本，直接複製過來再改。</p>
+
+      <details class="collapse">
+        <summary>已經不小心 commit 進去 .env 怎麼辦？ <span class="collapse-tag">救命</span></summary>
+        <div class="collapse-body">
+          <p style="margin-bottom:0.5rem;">兩件事必須馬上做：</p>
+          <ol style="margin-left:1rem;font-size:14px;">
+            <li><strong>立刻把所有可能洩漏的 key、密碼換掉</strong>。Git 歷史上的東西就算 force push 移除，也可能已被人 clone / fork / scrape。</li>
+            <li>用 <a class="inline-link" href="https://github.com/newren/git-filter-repo" target="_blank" rel="noopener">git-filter-repo</a> (官方推薦工具，取代舊的 <code>filter-branch</code>) 從歷史中移除該檔案。</li>
+          </ol>
+          <p style="margin-top:0.6rem;font-size:13px;color:var(--muted);">細節請見 GitHub Docs：<em>Removing sensitive data from a repository</em>。</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "<code>git diff --staged</code> 比的是哪兩個區？",
+    "options": [
+      "Working Tree 跟 Staging",
+      "Staging 跟 HEAD (最後一次 commit)",
+      "Working Tree 跟 HEAD",
+      "本地分支跟遠端分支"
+    ],
+    "answer": 1,
+    "explain": "<code>--staged</code> 是看「已經 add 進去、即將 commit 的內容跟最後一次 commit 的差異」。commit 前用它再檢查一次最有效。"
+  },
+  {
+    "question": "下列哪些情境<strong>不</strong>適合用 <code>git commit --amend</code>？(多選)",
+    "options": [
+      "剛 commit 完發現 typo，還沒 push",
+      "已經 push 出去、團隊其他人已 pull 過的 commit",
+      "想把 message 改得更清楚 (commit 還在本地)",
+      "已 merge 進 main 的歷史 commit"
+    ],
+    "answer": [1, 3],
+    "explain": "<code>--amend</code> 會改變 commit 的 SHA，等於改寫歷史。<strong>已經被別人看到/拉走的 commit 改寫，會讓他們的 git 抓狂、產生分歧歷史。</strong>只在自己分支沒 push 前用。"
+  },
+  {
+    "question": "下列哪一行<strong>不該</strong>放進 .gitignore？",
+    "options": [
+      "<code>node_modules/</code>",
+      "<code>.env</code>",
+      "<code>package-lock.json</code>",
+      "<code>__pycache__/</code>"
+    ],
+    "answer": 2,
+    "explain": "鎖檔 (<code>package-lock.json</code>、<code>pnpm-lock.yaml</code>、<code>Cargo.lock</code> 等) <strong>必須</strong>進版本控制，這樣團隊每個人裝出來的依賴版本才會一致。其他三個都是該忽略的。"
+  },
+  {
+    "question": "為什麼新版 Git 推薦用 <code>git restore</code> 和 <code>git switch</code> 取代 <code>git checkout</code>？",
+    "options": [
+      "<code>checkout</code> 已經被廢除",
+      "<code>checkout</code> 同時做切分支與還原檔案兩件事，容易誤操作；新指令各司其職",
+      "新指令速度比較快",
+      "舊指令只有英文，新指令支援中文"
+    ],
+    "answer": 1,
+    "explain": "Git 2.23 (2019) 引入 <code>restore</code> / <code>switch</code> 就是為了拆解 <code>checkout</code> 的兩種職責。<code>checkout</code> 還能用，但實務上新團隊都建議用新版避免誤操作。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://git-scm.com/docs" target="_blank" rel="noopener">git-scm.com/docs</a><span class="ref-meta">官方指令參考</span></li>
+        <li><a href="https://git-scm.com/book/zh-tw/v2" target="_blank" rel="noopener">Pro Git Book (繁中版)</a><span class="ref-meta">免費官方書</span></li>
+        <li><a href="https://github.com/github/gitignore" target="_blank" rel="noopener">github/gitignore</a><span class="ref-meta">.gitignore 官方範本庫</span></li>
+        <li><a href="https://github.blog/2019-08-16-highlights-from-git-2-23/" target="_blank" rel="noopener">GitHub Blog: Git 2.23 — restore / switch 介紹</a><span class="ref-meta">新指令出處</span></li>
+        <li><a href="https://docs.github.com/zh/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository" target="_blank" rel="noopener">GitHub Docs: Removing sensitive data from a repository</a><span class="ref-meta">.env 救援</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev disabled" aria-disabled="true">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">這是第一堂</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="02_git_advanced.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 02 · Git 進階操作</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">12 堂課程系列 <span class="progress-pill">1 / 12</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item current" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
+        <li><a class="course-nav-item" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
+        <li><a class="course-nav-item" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇</span></a></li>
+        <li><a class="course-nav-item" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
+        <li><a class="course-nav-item" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
+        <li><a class="course-nav-item" href="06_commits_versioning.html"><span class="course-nav-num">06</span><span>Commit、SemVer、Changelog</span></a></li>
+        <li><a class="course-nav-item" href="07_issues_project_mgmt.html"><span class="course-nav-num">07</span><span>Issue 與專案管理</span></a></li>
+        <li><a class="course-nav-item" href="08_testing_tdd.html"><span class="course-nav-num">08</span><span>測試金字塔與 TDD</span></a></li>
+        <li><a class="course-nav-item" href="09_ci_cd_hooks.html"><span class="course-nav-num">09</span><span>CI/CD、Hooks、Lint</span></a></li>
+        <li><a class="course-nav-item" href="10_rfc_adr_release.html"><span class="course-nav-num">10</span><span>RFC、ADR、Release</span></a></li>
+        <li><a class="course-nav-item" href="11_dependencies_supply_chain.html"><span class="course-nav-num">11</span><span>依賴管理與供應鏈安全</span></a></li>
+        <li><a class="course-nav-item" href="12_first_contribution.html"><span class="course-nav-num">12</span><span>第一次貢獻實戰</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的開源協作課程系列 · Lesson 01
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

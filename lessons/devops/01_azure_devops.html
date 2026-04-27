@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 01｜Azure DevOps 實務 — CI/CD 與專案管理</title>
+<meta name="description" content="從 Org/Project 階層、Boards、Repos、Pipelines 到 Environments 批准與 Key Vault 整合，一次掌握 Azure DevOps 在企業裡的真實流程。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 01 · DevOps 實務篇</div>
+    <h1 class="hero-title">Azure DevOps <span>實務指南</span></h1>
+    <p class="hero-desc">不只 YAML pipeline，還包含 Boards 看板、Repos 分支策略、Environments 批准、Key Vault 整合 secret，以及把這些串成一條從 work item 到部署 artifact 的可追溯鏈。<strong>讓你今天就能在企業內導入 Azure DevOps。</strong></p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 1 / 5 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 90 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>DevOps</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#overview">全景</a></li>
+      <li><a class="toc-link" href="#boards">Boards</a></li>
+      <li><a class="toc-link" href="#repos">Repos</a></li>
+      <li><a class="toc-link" href="#pipelines-basics">Pipelines 基礎</a></li>
+      <li><a class="toc-link" href="#real-pipeline">完整 CI/CD</a></li>
+      <li><a class="toc-link" href="#quality-gates">品質閘門</a></li>
+      <li><a class="toc-link" href="#ops-troubleshoot">排錯</a></li>
+      <li><a class="toc-link" href="#best-practices">最佳實踐</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="overview">
+      <span class="section-eyebrow">01 — 全景</span>
+      <h2>Azure DevOps 全景：從 Organization 到 5 個 Hub</h2>
+      <p>Azure DevOps（簡稱 ADO）是微軟一站式 DevOps 平台。和 GitHub 不一樣的地方在於它把<strong>「專案管理」「版本控制」「CI/CD」「測試計畫」「製品儲存庫」</strong>包成同一個產品 — 也因此左側導覽會看到 5 個 hub：Boards / Repos / Pipelines / Test Plans / Artifacts。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" aria-label="Azure DevOps 階層與 5 個 hub">
+          <defs>
+            <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="12">
+            <!-- Org -->
+            <rect x="280" y="20" width="200" height="56" rx="10" fill="#0a0a0f"/>
+            <text x="380" y="46" text-anchor="middle" font-weight="700" fill="#fafaf8" font-size="14">Organization</text>
+            <text x="380" y="64" text-anchor="middle" fill="#a8a8b8" font-size="11">dev.azure.com/&lt;org&gt;</text>
+
+            <!-- Project -->
+            <rect x="280" y="120" width="200" height="56" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="380" y="146" text-anchor="middle" font-weight="700" fill="#4c1d95" font-size="14">Project</text>
+            <text x="380" y="164" text-anchor="middle" fill="#6b6b7e" font-size="11">&lt;org&gt;/&lt;project&gt;</text>
+
+            <line x1="380" y1="76" x2="380" y2="120" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arr2)"/>
+
+            <!-- 5 hubs -->
+            <g>
+              <rect x="20"  y="230" width="130" height="80" rx="10" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+              <text x="85"  y="262" text-anchor="middle" font-weight="700" fill="#0a0a0f" font-size="13">Boards</text>
+              <text x="85"  y="280" text-anchor="middle" fill="#6b6b7e" font-size="10">Work items</text>
+              <text x="85"  y="295" text-anchor="middle" fill="#6b6b7e" font-size="10">Sprint / Kanban</text>
+
+              <rect x="170" y="230" width="130" height="80" rx="10" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+              <text x="235" y="262" text-anchor="middle" font-weight="700" fill="#0a0a0f" font-size="13">Repos</text>
+              <text x="235" y="280" text-anchor="middle" fill="#6b6b7e" font-size="10">Git + PR</text>
+              <text x="235" y="295" text-anchor="middle" fill="#6b6b7e" font-size="10">Branch policy</text>
+
+              <rect x="320" y="230" width="130" height="80" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+              <text x="385" y="262" text-anchor="middle" font-weight="700" fill="#4c1d95" font-size="13">Pipelines</text>
+              <text x="385" y="280" text-anchor="middle" fill="#6b6b7e" font-size="10">YAML CI/CD</text>
+              <text x="385" y="295" text-anchor="middle" fill="#6b6b7e" font-size="10">Environments</text>
+
+              <rect x="470" y="230" width="130" height="80" rx="10" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+              <text x="535" y="262" text-anchor="middle" font-weight="700" fill="#0a0a0f" font-size="13">Test Plans</text>
+              <text x="535" y="280" text-anchor="middle" fill="#6b6b7e" font-size="10">手動 / 探索</text>
+              <text x="535" y="295" text-anchor="middle" fill="#6b6b7e" font-size="10">test 套件</text>
+
+              <rect x="620" y="230" width="130" height="80" rx="10" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+              <text x="685" y="262" text-anchor="middle" font-weight="700" fill="#0a0a0f" font-size="13">Artifacts</text>
+              <text x="685" y="280" text-anchor="middle" fill="#6b6b7e" font-size="10">npm / NuGet</text>
+              <text x="685" y="295" text-anchor="middle" fill="#6b6b7e" font-size="10">Maven feed</text>
+            </g>
+
+            <line x1="380" y1="176" x2="85"  y2="230" stroke="#7c3aed" stroke-width="1.2" stroke-dasharray="3,3" opacity="0.5"/>
+            <line x1="380" y1="176" x2="235" y2="230" stroke="#7c3aed" stroke-width="1.2" stroke-dasharray="3,3" opacity="0.5"/>
+            <line x1="380" y1="176" x2="385" y2="230" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arr2)"/>
+            <line x1="380" y1="176" x2="535" y2="230" stroke="#7c3aed" stroke-width="1.2" stroke-dasharray="3,3" opacity="0.5"/>
+            <line x1="380" y1="176" x2="685" y2="230" stroke="#7c3aed" stroke-width="1.2" stroke-dasharray="3,3" opacity="0.5"/>
+
+            <text x="380" y="340" text-anchor="middle" fill="#6b6b7e" font-size="11">每個 Project 內都有獨立的 5 個 hub，權限模型也以 Project 為單位</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 23.1 — Azure DevOps 階層：Organization → Project → 5 個 Hub</div>
+      </div>
+
+      <h3>權限模型基礎</h3>
+      <p>ADO 的存取控制以 <strong>Security Group</strong> 為核心，每個 Project 預設有四個內建群組：</p>
+
+      <table>
+        <thead>
+          <tr><th>Group</th><th>能做什麼</th><th>常見用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Project Administrators</code></td><td>所有 Project 設定，含建立 service connection、刪除 repo</td><td>Tech lead / DevOps engineer</td></tr>
+          <tr><td><code>Contributors</code></td><td>建立 / 編輯 work item、push commit、開 PR、執行 pipeline</td><td>一般開發者（預設群組）</td></tr>
+          <tr><td><code>Readers</code></td><td>只讀，看不到 secret 內容</td><td>稽核者、產品經理視需要</td></tr>
+          <tr><td><code>Stakeholders</code> <em>(免費 license)</em></td><td>看 Boards、編輯 work item，<strong>看不到 Repos / Pipelines</strong></td><td>業務 / PM 不寫程式但要追進度</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>Stakeholder license 是 ADO 一個被低估的省錢方案</strong>
+          每位 Basic license 用戶大約 6 美金/月，但 Stakeholder 是<strong>完全免費</strong>。一個有 50 人的公司，如果有 30 個是 PM/業務只看 Boards，那一年省下接近 2,000 美金。在 <code>Organization Settings → Users</code> 可以改 access level。
+        </div>
+      </div>
+
+      <h3>常用導覽路徑</h3>
+      <ul>
+        <li><strong>My Work hub</strong>（左下角頭像旁邊的圖示）：跨所有 project 列出指派給你的 work item、你開的 PR、你正在 review 的 PR — 開工第一個要看的頁面。</li>
+        <li><strong>Project Settings</strong>（左下角齒輪）：service connection、agent pool、repository policy、pipeline 變數群組都在這裡。</li>
+        <li><strong>Organization Settings</strong>：billing、parallel jobs 配額、跨 project 的擴充功能。</li>
+      </ul>
+    </section>
+
+    <section id="boards">
+      <span class="section-eyebrow">02 — 專案管理</span>
+      <h2>Azure Boards：Process 模板、階層、Sprint</h2>
+      <p>Boards 是 ADO 的 work item 系統，但<strong>建立 project 時選的 Process 模板會決定後面所有事情</strong> — 模板選錯後面要改非常痛苦。</p>
+
+      <h3>四種 Process 模板比較</h3>
+      <table>
+        <thead>
+          <tr><th>模板</th><th>頂層階層</th><th>狀態流</th><th>適合對象</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Basic</strong></td><td>Epic → Issue → Task</td><td>To Do / Doing / Done</td><td>新團隊、輕量需求</td></tr>
+          <tr><td><strong>Agile</strong> <em>（推薦）</em></td><td>Epic → Feature → User Story → Task</td><td>New / Active / Resolved / Closed</td><td>大多數軟體團隊（本課採用）</td></tr>
+          <tr><td><strong>Scrum</strong></td><td>Epic → Feature → PBI → Task</td><td>New / Approved / Committed / Done</td><td>嚴格 Scrum 流程的團隊</td></tr>
+          <tr><td><strong>CMMI</strong></td><td>Epic → Feature → Requirement → Task</td><td>Proposed / Active / Resolved / Closed</td><td>受規範產業（金融、醫療、航太）</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>選 Agile 不會錯</strong>
+          <code>User Story</code> 比 <code>PBI</code> 對非工程角色更直覺、欄位少；Bug 是獨立 work item type 而非 task；狀態流剛好夠用。<strong>Agile 可以後續客製，但 Process 一旦建立就不能改成另一個內建類型</strong> — 只能複製成 Inherited Process 再修改。</strong>
+        </div>
+      </div>
+
+      <h3>Work Item 階層範例</h3>
+      <p>以一個典型的 backend 重構需求為例：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">work-item-tree</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># Epic — 半年級的策略目標</span>
+<span class="tk-kw">Epic</span>      <span class="tk-st">"Containerise the example backend"</span>
+├── <span class="tk-kw">Feature</span>   <span class="tk-st">"Build container image in CI"</span>
+│   ├── <span class="tk-kw">User Story</span>  <span class="tk-st">"As a developer, push to main builds an image"</span>
+│   │   ├── <span class="tk-kw">Task</span>  <span class="tk-st">"Write Dockerfile (multi-stage)"</span>
+│   │   ├── <span class="tk-kw">Task</span>  <span class="tk-st">"Add Docker@2 task to azure-pipelines.yml"</span>
+│   │   └── <span class="tk-kw">Task</span>  <span class="tk-st">"Tag image with commit SHA"</span>
+│   └── <span class="tk-kw">User Story</span>  <span class="tk-st">"Push image to container registry"</span>
+└── <span class="tk-kw">Feature</span>   <span class="tk-st">"Deploy via GitOps manifest update"</span>
+    └── <span class="tk-kw">User Story</span>  <span class="tk-st">"Pipeline updates values.yaml on tag push"</span></code></pre>
+      </div>
+
+      <h3>Sprint、Iteration、Capacity</h3>
+      <p>在 <code>Project Settings → Project configuration → Iterations</code> 設定 sprint 週期。Boards 內 Sprint 頁面提供：</p>
+      <ul>
+        <li><strong>Backlog</strong>：drag 排優先順序</li>
+        <li><strong>Taskboard</strong>：sprint 內以 user story 為列、status 為欄的看板</li>
+        <li><strong>Capacity</strong>：每位成員設定可用工時 + 休假，自動算出 sprint 容量</li>
+        <li><strong>Analytics</strong>：burndown、velocity 自動產生（搭配 Dashboards 使用）</li>
+      </ul>
+
+      <h3>Kanban Board 客製</h3>
+      <p>Boards 頁面右上 ⚙️ 圖示 → <code>Configure team settings</code> 可以加 column、設 WIP limit、加 swimlane。</p>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>常見錯誤</div>
+          <div class="compare-body">
+            預設 4 欄（New / Active / Resolved / Closed）就直接用，<strong>沒設 WIP limit</strong>，結果 Active 欄堆 30 張卡，沒人知道誰在做哪張。
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>實務做法</div>
+          <div class="compare-body">
+            拆成 <code>To Do</code> / <code>In Dev (WIP=3)</code> / <code>In Review (WIP=2)</code> / <code>QA</code> / <code>Done</code>。Swimlane 拉出 <code>Expedite</code>（線上事故）讓緊急卡優先。
+          </div>
+        </div>
+      </div>
+
+      <h3>Queries、Delivery Plans、Wiki</h3>
+      <ul>
+        <li><strong>Queries</strong>：用 WIQL 寫過濾條件儲成 Shared Query。例：「My team this sprint, state ≠ Done, sort by priority」。Dashboard widget 可以直接吃 query。</li>
+        <li><strong>Delivery Plans</strong>：跨 team 的 Gantt 視圖，看哪個 feature 卡哪個 sprint。</li>
+        <li><strong>Dashboards</strong>：每個 project 可以自訂 dashboard，常用 widget：Sprint burndown、Cumulative Flow Diagram (CFD)、Build history、Pull request 列表、Markdown（放團隊 SLO）。</li>
+        <li><strong>Wiki</strong>：放 runbook、on-call 流程、架構決策記錄。Wiki 本身就是 Git repo，可以直接 clone 編輯。</li>
+      </ul>
+
+      <details class="collapse">
+        <summary>WIQL 查詢範例：「sprint 內未完成的 user story」 <span class="collapse-tag">進階</span></summary>
+        <div class="collapse-body">
+<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-kw">SELECT</span> [System.Id], [System.Title], [System.AssignedTo], [System.State]
+<span class="tk-kw">FROM</span> WorkItems
+<span class="tk-kw">WHERE</span> [System.TeamProject] = <span class="tk-st">@project</span>
+  <span class="tk-kw">AND</span> [System.WorkItemType] = <span class="tk-st">'User Story'</span>
+  <span class="tk-kw">AND</span> [System.IterationPath] = <span class="tk-st">@currentIteration</span>
+  <span class="tk-kw">AND</span> [System.State] &lt;&gt; <span class="tk-st">'Closed'</span>
+<span class="tk-kw">ORDER BY</span> [Microsoft.VSTS.Common.Priority]</code></pre>
+        </div>
+      </details>
+    </section>
+
+    <section id="repos">
+      <span class="section-eyebrow">03 — 版本控制</span>
+      <h2>Azure Repos 與 Branch Policies</h2>
+      <p>Azure Repos 是內建的 Git 服務（也支援 TFVC，但新 project 一律用 Git）。和 GitHub 比起來介面更傳統一點，但 <strong>branch policy 的細緻度其實比 GitHub 強</strong>。</p>
+
+      <h3>Clone：HTTPS vs SSH</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># HTTPS（推薦給多數開發者，搭配 Git Credential Manager 自動處理 PAT/MSAL）</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> clone https://&lt;org&gt;@dev.azure.com/&lt;org&gt;/&lt;project&gt;/_git/&lt;repo&gt;
+
+<span class="tk-cm"># 確認 GCM 已安裝（Windows 安裝 Git for Windows 預設就有）</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> config <span class="tk-op">--global</span> credential.helper manager
+
+<span class="tk-cm"># SSH（適合 CI agent / 不想常常彈登入視窗者）</span>
+<span class="tk-cm"># 1. 在 User Settings → SSH public keys 加上你的 ~/.ssh/id_ed25519.pub</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> clone git@ssh.dev.azure.com:v3/&lt;org&gt;/&lt;project&gt;/&lt;repo&gt;</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>不要用 PAT 寫進 git remote URL</strong>
+          看到網路上有人寫 <code>https://&lt;PAT&gt;@dev.azure.com/...</code> — 這會把 token 寫進 <code>.git/config</code>，git log 與 hook 也可能洩漏。永遠用 Git Credential Manager（GCM）讓它走 OAuth，token rotate 也自動處理。
+        </div>
+      </div>
+
+      <h3>Branch Policies：把 main 鎖好</h3>
+      <p>到 <code>Project Settings → Repositories → &lt;repo&gt; → Policies → Branch policies → main</code> 設定。建議啟用以下五項：</p>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Require minimum number of reviewers</div>
+            <div class="timeline-desc">至少 1 位 approver。<strong>勾選 “Reset votes on push”</strong>，PR 一旦有新 commit 推上來，approve 自動重置 — 避免 reviewer 看完 A 版本，作者偷塞 B 版本進去。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Check for linked work items</div>
+            <div class="timeline-desc">PR 必須關聯至少一個 work item — 強制 traceability。要關掉時設 “Optional”，不要直接刪除。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Build validation</div>
+            <div class="timeline-desc">指定一個 pipeline，PR 開啟時自動觸發；<strong>build 沒過不能 complete merge</strong>。可以選 “Automatic” 或 “Manual” 觸發；測試覆蓋夠多時用 “When the source branch updates”。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Limit merge types</div>
+            <div class="timeline-desc">勾選 <code>Squash merge</code> only，禁用 <code>Basic merge</code> 與 <code>Rebase</code>。讓 main 線性、每個 user story 對應一筆 commit。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">5</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Automatically include reviewers</div>
+            <div class="timeline-desc">用 path filter 指定 codeowners — 例如 <code>/infra/*</code> 自動加 DevOps team；<code>/security/*</code> 自動加 Security team。比 GitHub <code>CODEOWNERS</code> 檔案更彈性。</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>PR 完整流程</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 1. 從 main 切 feature 分支（命名建議帶 work item id）</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> checkout <span class="tk-op">-b</span> feat/1234-add-health-endpoint
+
+<span class="tk-cm"># 2. 寫程式、commit 時必帶 AB#&lt;id&gt; 自動連結 work item</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> commit <span class="tk-op">-m</span> <span class="tk-st">"feat: add /healthz endpoint AB#1234"</span>
+
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> push <span class="tk-op">-u</span> origin feat/1234-add-health-endpoint
+
+<span class="tk-cm"># 3. 開 PR（瀏覽器點 Repos → Pull requests → New PR）</span>
+<span class="tk-cm">#    或用 az cli（需要 azure-devops extension）</span>
+<span class="tk-pn">$</span> <span class="tk-fn">az</span> repos pr create <span class="tk-op">--auto-complete</span> <span class="tk-op">--squash</span> <span class="tk-op">--delete-source-branch</span> <span class="tk-st">true</span></code></pre>
+      </div>
+
+      <p>PR Complete 視窗有幾個關鍵選項一定要勾：</p>
+      <ul>
+        <li><strong>Complete linked work items after merging</strong>：merge 後自動把關聯 work item 設為 Closed</li>
+        <li><strong>Delete source branch after merging</strong>：避免分支墳場（永遠勾起來）</li>
+        <li><strong>Squash changes when merging</strong>：Squash merge（如果 branch policy 已強制就不用每次手動）</li>
+      </ul>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>AB#&lt;id&gt; 連結語法</strong>
+          在 commit message、PR 標題或內文寫 <code>AB#1234</code> 會自動連結到 work item 1234（雙向可見）。<strong>從 GitHub 連到 ADO 也是同一個語法</strong>，前提是已經透過 <em>Azure Boards GitHub app</em> 連結兩邊 repo。
+        </div>
+      </div>
+    </section>
+
+    <section id="pipelines-basics">
+      <span class="section-eyebrow">04 — Pipelines 基礎</span>
+      <h2>Azure Pipelines：YAML 結構與 agent 模型</h2>
+      <p>Pipelines 是 ADO 最複雜也最核心的功能。新 project 一律用 <strong>YAML pipeline</strong>（檔案存在 repo 內）— 不要用 Classic Editor 那種點選式 pipeline，後者沒法 code review、沒法 diff、無法 rollback。</p>
+
+      <h3>YAML pipeline 五層結構</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml · azure-pipelines.yml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 觸發條件（哪個分支 push 會跑）</span>
+<span class="tk-kw">trigger</span>:
+  <span class="tk-kw">branches</span>:
+    <span class="tk-kw">include</span>: [<span class="tk-st">main</span>, <span class="tk-st">release/*</span>]
+  <span class="tk-kw">paths</span>:
+    <span class="tk-kw">exclude</span>: [<span class="tk-st">'docs/**'</span>, <span class="tk-st">'**/*.md'</span>]
+
+<span class="tk-cm"># PR 觸發（搭配 branch policy 的 build validation）</span>
+<span class="tk-kw">pr</span>:
+  <span class="tk-kw">branches</span>:
+    <span class="tk-kw">include</span>: [<span class="tk-st">main</span>]
+
+<span class="tk-cm"># 執行環境（agent）</span>
+<span class="tk-kw">pool</span>:
+  <span class="tk-kw">vmImage</span>: <span class="tk-st">ubuntu-latest</span>
+
+<span class="tk-cm"># 變數（純文字 + 引用 variable group）</span>
+<span class="tk-kw">variables</span>:
+  - <span class="tk-kw">group</span>: <span class="tk-st">app-shared-vars</span>     <span class="tk-cm"># 從 Library → Variable groups 來</span>
+  - <span class="tk-kw">name</span>: <span class="tk-st">imageName</span>
+    <span class="tk-kw">value</span>: <span class="tk-st">example-app</span>
+
+<span class="tk-cm"># 階段</span>
+<span class="tk-kw">stages</span>:
+  - <span class="tk-kw">stage</span>: <span class="tk-st">CI</span>
+    <span class="tk-kw">jobs</span>:
+      - <span class="tk-kw">job</span>: <span class="tk-st">build</span>
+        <span class="tk-kw">steps</span>:
+          - <span class="tk-kw">checkout</span>: <span class="tk-st">self</span>
+          - <span class="tk-kw">script</span>: <span class="tk-st">echo "Hello, $(imageName)"</span>
+            <span class="tk-kw">displayName</span>: <span class="tk-st">'Smoke step'</span></code></pre>
+      </div>
+
+      <h3>Agent 兩種模式</h3>
+      <table>
+        <thead>
+          <tr><th>類型</th><th>來源</th><th>特性</th><th>適合</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Microsoft-hosted</strong></td>
+            <td><code>vmImage: ubuntu-latest</code> / <code>windows-latest</code> / <code>macos-latest</code></td>
+            <td>每次 job 全新 VM、用完即丟、不可登入；<strong>無持久 cache</strong>（要靠 <code>Cache@2</code>）；free tier <strong>1 個 parallel job</strong></td>
+            <td>絕大多數 build/test</td>
+          </tr>
+          <tr>
+            <td><strong>Self-hosted</strong></td>
+            <td>自己跑 agent service 在 VM/容器/k8s 上</td>
+            <td>持久磁碟、可裝特殊軟體、可進公司內網；維護成本由你扛</td>
+            <td>需要 GPU、私網存取、大型 build cache</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>第一個 Go pipeline 範例</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml · azure-pipelines.yml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">trigger</span>: [<span class="tk-st">main</span>]
+<span class="tk-kw">pool</span>:
+  <span class="tk-kw">vmImage</span>: <span class="tk-st">ubuntu-latest</span>
+
+<span class="tk-kw">steps</span>:
+  - <span class="tk-kw">task</span>: <span class="tk-st">GoTool@0</span>
+    <span class="tk-kw">inputs</span>:
+      <span class="tk-kw">version</span>: <span class="tk-st">'1.22'</span>
+
+  - <span class="tk-kw">script</span>: |
+      <span class="tk-fn">go</span> mod download
+      <span class="tk-fn">go</span> vet ./...
+      <span class="tk-fn">go</span> test <span class="tk-op">-race</span> <span class="tk-op">-coverprofile=coverage.out</span> ./...
+    <span class="tk-kw">displayName</span>: <span class="tk-st">'Test'</span>
+
+  - <span class="tk-kw">script</span>: |
+      <span class="tk-fn">go</span> build <span class="tk-op">-o</span> bin/app ./cmd/server
+    <span class="tk-kw">displayName</span>: <span class="tk-st">'Build'</span>
+
+  - <span class="tk-kw">task</span>: <span class="tk-st">PublishPipelineArtifact@1</span>
+    <span class="tk-kw">inputs</span>:
+      <span class="tk-kw">targetPath</span>: <span class="tk-st">'bin'</span>
+      <span class="tk-kw">artifact</span>: <span class="tk-st">'app-bin'</span></code></pre>
+      </div>
+
+      <h3>從 GitHub Actions 遷移過來？概念對照表</h3>
+      <table>
+        <thead>
+          <tr><th>GitHub Actions</th><th>Azure Pipelines</th><th>備註</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>on: [push]</code></td><td><code>trigger:</code></td><td>ADO 多了 path-based 觸發過濾</td></tr>
+          <tr><td><code>jobs.&lt;id&gt;.runs-on</code></td><td><code>pool.vmImage</code></td><td>ADO agent label 也支援 capabilities matching</td></tr>
+          <tr><td><code>jobs.&lt;id&gt;.steps</code></td><td><code>steps:</code></td><td>結構幾乎一樣</td></tr>
+          <tr><td><code>uses: actions/setup-go@v5</code></td><td><code>task: GoTool@0</code></td><td>ADO 用 task，市集叫 Marketplace</td></tr>
+          <tr><td><code>secrets.MY_KEY</code></td><td><code>$(MY_KEY)</code> + variable group</td><td>secret 不會出現在 log</td></tr>
+          <tr><td><code>environments:</code></td><td><code>environments:</code> + Approvals</td><td>ADO 的 environment 同時是部署目標 + 批准 gate</td></tr>
+          <tr><td><code>matrix:</code></td><td><code>strategy.matrix:</code></td><td>語法略有差異但概念相同</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="real-pipeline">
+      <span class="section-eyebrow">05 — 完整 CI/CD 實作</span>
+      <h2>Test → Docker Build → Push → 更新 manifest</h2>
+      <p>本節組出一條真實可用的 pipeline：跑測試 → 建 Docker image → 推到 registry → 更新另一個 GitOps manifest repo 觸發部署。最後一步把 image 推給後續 lesson 25 的 Argo CD 接手。</p>
+
+      <h3>步驟 1：建立 Service Connection（一次性）</h3>
+      <p>到 <code>Project Settings → Service connections → New service connection</code>：</p>
+      <ul>
+        <li>選 <strong>Docker Registry</strong>（不論你用 GHCR / ACR / Docker Hub）</li>
+        <li>Registry type 選對應的服務（Docker Hub / Others）</li>
+        <li>取個好認的名字，例如 <code>ghcr-example-app</code></li>
+        <li>勾 <strong>Grant access permission to all pipelines</strong>（或之後逐個 pipeline 授權，更安全）</li>
+      </ul>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>最小權限原則：service connection 不要一次給 all pipelines</strong>
+          建立 service connection 時取消勾選 “Grant access permission to all pipelines”，每個需要它的 pipeline 第一次跑時手動授權一次。這樣新建 pipeline 的開發者沒辦法不經審核就把 image 推到 production registry。
+        </div>
+      </div>
+
+      <h3>步驟 2：完整 azure-pipelines.yml</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml · azure-pipelines.yml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">trigger</span>:
+  <span class="tk-kw">branches</span>:
+    <span class="tk-kw">include</span>: [<span class="tk-st">main</span>]
+  <span class="tk-kw">tags</span>:
+    <span class="tk-kw">include</span>: [<span class="tk-st">'v*'</span>]
+
+<span class="tk-kw">variables</span>:
+  - <span class="tk-kw">group</span>: <span class="tk-st">app-shared-vars</span>            <span class="tk-cm"># 含 REGISTRY_HOST / IMAGE_REPO</span>
+  - <span class="tk-kw">group</span>: <span class="tk-st">app-prod-secrets</span>          <span class="tk-cm"># 連 KV，含 MANIFEST_REPO_PAT</span>
+  - <span class="tk-kw">name</span>: <span class="tk-st">tagSha</span>
+    <span class="tk-kw">value</span>: <span class="tk-st">$(Build.SourceVersion)</span>
+
+<span class="tk-kw">stages</span>:
+  <span class="tk-cm"># ───────── CI：測試 ─────────</span>
+  - <span class="tk-kw">stage</span>: <span class="tk-st">test</span>
+    <span class="tk-kw">jobs</span>:
+      - <span class="tk-kw">job</span>: <span class="tk-st">unit</span>
+        <span class="tk-kw">pool</span>: { <span class="tk-kw">vmImage</span>: <span class="tk-st">ubuntu-latest</span> }
+        <span class="tk-kw">steps</span>:
+          - <span class="tk-kw">task</span>: <span class="tk-st">GoTool@0</span>
+            <span class="tk-kw">inputs</span>: { <span class="tk-kw">version</span>: <span class="tk-st">'1.22'</span> }
+
+          - <span class="tk-kw">task</span>: <span class="tk-st">Cache@2</span>
+            <span class="tk-kw">inputs</span>:
+              <span class="tk-kw">key</span>: <span class="tk-st">'go | "$(Agent.OS)" | go.sum'</span>
+              <span class="tk-kw">path</span>: <span class="tk-st">'$(Pipeline.Workspace)/.cache/go-mod'</span>
+            <span class="tk-kw">displayName</span>: <span class="tk-st">'Cache Go modules'</span>
+
+          - <span class="tk-kw">script</span>: |
+              <span class="tk-kw">export</span> GOMODCACHE=$(Pipeline.Workspace)/.cache/go-mod
+              <span class="tk-fn">go</span> test <span class="tk-op">-race</span> <span class="tk-op">-coverprofile=coverage.out</span> ./...
+            <span class="tk-kw">displayName</span>: <span class="tk-st">'Run tests'</span>
+
+  <span class="tk-cm"># ───────── CI：建置 + 推送 ─────────</span>
+  - <span class="tk-kw">stage</span>: <span class="tk-st">build_image</span>
+    <span class="tk-kw">dependsOn</span>: <span class="tk-st">test</span>
+    <span class="tk-kw">jobs</span>:
+      - <span class="tk-kw">job</span>: <span class="tk-st">docker</span>
+        <span class="tk-kw">pool</span>: { <span class="tk-kw">vmImage</span>: <span class="tk-st">ubuntu-latest</span> }
+        <span class="tk-kw">steps</span>:
+          - <span class="tk-kw">task</span>: <span class="tk-st">Docker@2</span>
+            <span class="tk-kw">displayName</span>: <span class="tk-st">'Build &amp; push image'</span>
+            <span class="tk-kw">inputs</span>:
+              <span class="tk-kw">command</span>: <span class="tk-st">buildAndPush</span>
+              <span class="tk-kw">repository</span>: <span class="tk-st">$(IMAGE_REPO)</span>           <span class="tk-cm"># &lt;org&gt;/example-app</span>
+              <span class="tk-kw">containerRegistry</span>: <span class="tk-st">ghcr-example-app</span>  <span class="tk-cm"># 上面建的 service connection 名字</span>
+              <span class="tk-kw">dockerfile</span>: <span class="tk-st">Dockerfile</span>
+              <span class="tk-kw">tags</span>: |
+                $(tagSha)
+                latest
+
+  <span class="tk-cm"># ───────── CD：更新 manifest 觸發 Argo CD ─────────</span>
+  - <span class="tk-kw">stage</span>: <span class="tk-st">update_manifest</span>
+    <span class="tk-kw">dependsOn</span>: <span class="tk-st">build_image</span>
+    <span class="tk-kw">condition</span>: <span class="tk-st">and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))</span>
+    <span class="tk-kw">jobs</span>:
+      - <span class="tk-kw">deployment</span>: <span class="tk-st">bump</span>
+        <span class="tk-kw">environment</span>: <span class="tk-st">prod</span>                     <span class="tk-cm"># 啟用 Approvals 的關鍵</span>
+        <span class="tk-kw">pool</span>: { <span class="tk-kw">vmImage</span>: <span class="tk-st">ubuntu-latest</span> }
+        <span class="tk-kw">strategy</span>:
+          <span class="tk-kw">runOnce</span>:
+            <span class="tk-kw">deploy</span>:
+              <span class="tk-kw">steps</span>:
+                - <span class="tk-kw">script</span>: |
+                    <span class="tk-fn">git</span> clone https://x:$(MANIFEST_REPO_PAT)@dev.azure.com/&lt;org&gt;/&lt;project&gt;/_git/manifests
+                    <span class="tk-fn">cd</span> manifests
+                    <span class="tk-fn">curl</span> <span class="tk-op">-sSL</span> https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 <span class="tk-op">-o</span> /usr/local/bin/yq
+                    <span class="tk-fn">chmod</span> +x /usr/local/bin/yq
+                    <span class="tk-fn">yq</span> <span class="tk-op">-i</span> <span class="tk-st">'.image.tag = strenv(TAG)'</span> apps/example-app/values.yaml
+                    <span class="tk-fn">git</span> config user.email <span class="tk-st">"ci@example.com"</span>
+                    <span class="tk-fn">git</span> config user.name <span class="tk-st">"ADO CI"</span>
+                    <span class="tk-fn">git</span> commit <span class="tk-op">-am</span> <span class="tk-st">"chore: bump example-app to $TAG"</span>
+                    <span class="tk-fn">git</span> push
+                  <span class="tk-kw">env</span>:
+                    <span class="tk-kw">TAG</span>: <span class="tk-st">$(tagSha)</span></code></pre>
+      </div>
+
+      <h3>標籤策略：commit SHA + semver + latest</h3>
+      <table>
+        <thead>
+          <tr><th>Tag</th><th>來源</th><th>用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>&lt;commit-sha&gt;</code></td><td>每次 build 自動產生</td><td><strong>不可變、可追溯</strong>，部署到 prod 一律用這個</td></tr>
+          <tr><td><code>v1.2.3</code></td><td>git tag <code>v*</code> 觸發</td><td>對外發版、CHANGELOG 對應</td></tr>
+          <tr><td><code>latest</code></td><td>main 分支自動覆蓋</td><td>方便 dev 環境 demo，<strong>不可用於 production</strong></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Variable Group + Azure Key Vault 連動</h3>
+      <p>把 secret 寫死在 YAML 是初級錯誤。ADO 的最佳做法是 KV-linked variable group：</p>
+
+      <ol>
+        <li><strong>建 Key Vault</strong>：在 Azure Portal 建 KV，加入需要的 secret（例如 <code>MANIFEST-REPO-PAT</code>，注意 KV secret 名稱不能有底線）。</li>
+        <li><strong>授權 service principal</strong>：到 KV → <code>Access policies</code>，給 ADO 的 service principal <code>Get</code> + <code>List</code> 權限。</li>
+        <li><strong>建 KV-linked variable group</strong>：到 ADO → <code>Pipelines → Library → Variable groups → + Variable group</strong>，勾選 <em>“Link secrets from an Azure key vault as variables”</em>，選 KV，挑要載入的 secret。</li>
+        <li><strong>YAML 引用</strong>：<code>variables: - group: app-prod-secrets</code>，之後可以用 <code>$(MANIFEST_REPO_PAT)</code>。</li>
+      </ol>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>為什麼這比直接寫 ADO secret 好</strong>
+          KV 是 secret 的 single source of truth — 同一份 KV 也給 K8s External Secrets Operator、Azure Functions、其他 pipeline 用。<strong>rotate 一次，到處都更新</strong>。直接寫在 ADO 的 variable group 內，rotate 要去翻每個專案的 settings。
+        </div>
+      </div>
+
+      <h3>Pipeline Templates 重用</h3>
+      <p>三條 pipeline 都要跑同一組測試？把它抽成 template：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml · templates/go-test.yml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">parameters</span>:
+  - <span class="tk-kw">name</span>: <span class="tk-st">goVersion</span>
+    <span class="tk-kw">default</span>: <span class="tk-st">'1.22'</span>
+
+<span class="tk-kw">steps</span>:
+  - <span class="tk-kw">task</span>: <span class="tk-st">GoTool@0</span>
+    <span class="tk-kw">inputs</span>: { <span class="tk-kw">version</span>: <span class="tk-st">'${{ parameters.goVersion }}'</span> }
+  - <span class="tk-kw">script</span>: <span class="tk-fn">go</span> test <span class="tk-op">-race</span> <span class="tk-op">-coverprofile=coverage.out</span> ./...
+    <span class="tk-kw">displayName</span>: <span class="tk-st">'go test'</span></code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml · azure-pipelines.yml（呼叫端）</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">extends</span>:
+  <span class="tk-kw">template</span>: <span class="tk-st">templates/build-test-deploy.yml</span>
+  <span class="tk-kw">parameters</span>:
+    <span class="tk-kw">appName</span>: <span class="tk-st">example-app</span>
+    <span class="tk-kw">goVersion</span>: <span class="tk-st">'1.22'</span></code></pre>
+      </div>
+    </section>
+
+    <section id="quality-gates">
+      <span class="section-eyebrow">06 — 品質閘門</span>
+      <h2>測試結果、覆蓋率、Environments 批准</h2>
+      <p>有 pipeline 還不夠 — 要讓 PR <strong>沒過測試 / 覆蓋率太低 / 沒人批准</strong>就根本 merge / deploy 不下去。這三個閘門是企業 DevOps 與「會跑 build 的玩具」之間的差距。</p>
+
+      <h3>發布測試結果（讓 ADO UI 看得到）</h3>
+      <p>單純 <code>go test</code> 噴 stdout 沒法在 ADO 的 Tests tab 看到 pass/fail 統計。要先輸出 JUnit XML，再 publish：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>- <span class="tk-kw">script</span>: |
+    <span class="tk-fn">go</span> install github.com/jstemmer/go-junit-report/v2@latest
+    <span class="tk-fn">go</span> test <span class="tk-op">-v</span> ./... 2&gt;&amp;1 | go-junit-report <span class="tk-op">-set-exit-code</span> &gt; report.xml
+  <span class="tk-kw">displayName</span>: <span class="tk-st">'Test + JUnit XML'</span>
+
+- <span class="tk-kw">task</span>: <span class="tk-st">PublishTestResults@2</span>
+  <span class="tk-kw">condition</span>: <span class="tk-st">always()</span>           <span class="tk-cm"># 失敗也要 publish，否則 UI 看不到失敗在哪</span>
+  <span class="tk-kw">inputs</span>:
+    <span class="tk-kw">testResultsFormat</span>: <span class="tk-st">JUnit</span>
+    <span class="tk-kw">testResultsFiles</span>: <span class="tk-st">'**/report.xml'</span>
+    <span class="tk-kw">failTaskOnFailedTests</span>: <span class="tk-st">true</span></code></pre>
+      </div>
+
+      <h3>發布測試覆蓋率</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>- <span class="tk-kw">script</span>: |
+    <span class="tk-fn">go</span> install github.com/boumenot/gocover-cobertura@latest
+    gocover-cobertura &lt; coverage.out &gt; coverage.xml
+  <span class="tk-kw">displayName</span>: <span class="tk-st">'Convert to Cobertura'</span>
+
+- <span class="tk-kw">task</span>: <span class="tk-st">PublishCodeCoverageResults@2</span>
+  <span class="tk-kw">inputs</span>:
+    <span class="tk-kw">summaryFileLocation</span>: <span class="tk-st">'$(System.DefaultWorkingDirectory)/coverage.xml'</span></code></pre>
+      </div>
+
+      <p>之後 pipeline run 頁面會多一個 <strong>Code Coverage</strong> tab，PR 頁面也會顯示「這次 PR 把覆蓋率從 78% 提到 81%」這種訊息。</p>
+
+      <h3>Build validation 連動 PR（再強調一次）</h3>
+      <p>Section 3 已經設定 branch policy 的 <em>Build validation</em> 指向這個 pipeline。組合起來的效果：</p>
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>沒設 build validation</div>
+          <div class="compare-body">
+            測試掛了但 reviewer 沒注意 → 直接 approve → merge 進 main → main 變成壞的 → 大家阻塞。
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>有 build validation</div>
+          <div class="compare-body">
+            測試掛了 → PR 頁面顯示紅色 X，<strong>Complete merge 按鈕直接 disabled</strong>。reviewer 想 approve 也沒用，作者必須先把測試修綠。
+          </div>
+        </div>
+      </div>
+
+      <h3>Environments + Approvals</h3>
+      <p>Pipeline 跑到 deploy 階段時，要不要先讓人手動 approve？這就是 <strong>Environment</strong>：</p>
+      <ol>
+        <li>到 <code>Pipelines → Environments → New environment</code>，命名 <code>prod</code>。</li>
+        <li>進入 environment → 右上 ⋯ → <code>Approvals and checks</code> → 加 <strong>Approvals</strong>。</li>
+        <li>指定 approver（人或 group）+ 最少幾位 approve、approver 不能是 PR 作者本人、超時自動拒絕等。</li>
+        <li>YAML 用 <code>environment: prod</code> 對 deployment job 套用 — 跑到這個 job 會卡住等 approve。</li>
+      </ol>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>Approvals 不只是「人按按鈕」</strong>
+          除了人工批准，也可以設 <strong>Invoke REST API</strong>（呼叫 ServiceNow change ticket）、<strong>Business hours</strong>（只有上班時間能 deploy）、<strong>Required template</strong>（只有用指定 template 才放行）。把 change management 自動化。
+        </div>
+      </div>
+    </section>
+
+    <section id="ops-troubleshoot">
+      <span class="section-eyebrow">07 — Operations 與排錯</span>
+      <h2>讀 logs、找慢步驟、開 debug、self-hosted agent</h2>
+      <p>Pipeline 跑掛是日常。會排錯比會寫 pipeline 更重要 — pipeline 寫一次，掛了你會修十次。</p>
+
+      <h3>Logs UI 三層結構</h3>
+      <p>Pipeline run 頁面結構是：<code>Stage → Job → Step</code>。失敗會顯示紅色 X，<strong>點進去會 deep-link 直接跳到失敗的那行 log</strong>。實務操作：</p>
+      <ul>
+        <li>右上 <kbd>Download logs</kbd> 把整個 run 的 log 抓成 zip — 排錯時拉到本地用 <code>grep</code> / <code>less</code> 找關鍵字比 UI 順手。</li>
+        <li><strong>Timeline view</strong>（job 內右上）：把每個 step 的耗時排出來 — 看到某個 step 從平常 2 分鐘變 8 分鐘 → 通常是 cache miss 或網路慢。</li>
+        <li><strong>Tests tab</strong>（要 publish 過才有）：直接看哪幾個測試失敗、失敗 trace。</li>
+      </ul>
+
+      <h3>Rerun：兩種模式差很多</h3>
+      <table>
+        <thead>
+          <tr><th>動作</th><th>行為</th><th>什麼時候用</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Rerun all jobs</strong></td>
+            <td>整條 pipeline 從頭跑</td>
+            <td>程式有改、commit 推新版本</td>
+          </tr>
+          <tr>
+            <td><strong>Rerun failed jobs</strong></td>
+            <td><strong>沿用前一輪成功的 stage artifact</strong>，只重跑失敗 stage</td>
+            <td>網路 flaky、image push 因 registry 503 失敗 — 不需要重新 build</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>開 diagnostic logs</h3>
+      <p>遇到「task 失敗但訊息很模糊」這種狀況，加變數開 verbose：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 方法 1：UI 點 Run pipeline → Variables → 加 system.debug = true</span>
+
+<span class="tk-cm"># 方法 2：用 az cli 觸發 run 時帶 variable</span>
+<span class="tk-pn">$</span> <span class="tk-fn">az</span> pipelines run <span class="tk-op">--name</span> example-app-ci <span class="tk-op">--variables</span> system.debug=true
+
+<span class="tk-cm"># 方法 3（不推薦）：寫死在 YAML — 永遠 verbose 會讓 log 很巨</span>
+<span class="tk-kw">variables</span>:
+  <span class="tk-kw">system.debug</span>: <span class="tk-st">true</span></code></pre>
+      </div>
+
+      <h3>平行度與 free tier 限制</h3>
+      <table>
+        <thead>
+          <tr><th>方案</th><th>Microsoft-hosted parallel jobs</th><th>每月分鐘數</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Free（public project）</td><td>10</td><td>無限</td></tr>
+          <tr><td>Free（private project）</td><td><strong>1</strong></td><td>1,800 分鐘</td></tr>
+          <tr><td>Paid（每個 +$40/月）</td><td>+1</td><td>無限</td></tr>
+          <tr><td>Self-hosted</td><td>不限</td><td>不限（自家機器）</td></tr>
+        </tbody>
+      </table>
+
+      <p>Free private project 只有 1 條平行線 — PR 跑 build validation 時，main 的 release pipeline 就排隊。10 人團隊基本上要付錢買 parallel job，或切去 self-hosted。</p>
+
+      <h3>什麼時候該切去 Self-hosted Agent？</h3>
+      <ul>
+        <li>需要存取公司內網資源（私網 DB、內部 image registry）— Microsoft-hosted 沒法 VPN 進去。</li>
+        <li>build cache 想跨 run 持久化（雖然 <code>Cache@2</code> 也行，但 self-hosted 直接用本機 disk）。</li>
+        <li>要跑 K3d / Kind 起本地 K8s 跑 e2e — Microsoft-hosted ubuntu image 雖然也行，但 self-hosted 不用每次 pull image 比較快。</li>
+        <li>合規要求 build 必須在自家機房內。</li>
+      </ul>
+
+      <details class="collapse">
+        <summary>self-hosted agent 在 Linux 上的最簡安裝步驟 <span class="collapse-tag">操作</span></summary>
+        <div class="collapse-body">
+<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># 1. 在 Project Settings → Agent pools → New pool 建 pool</span>
+<span class="tk-cm"># 2. 進 pool → New agent，照頁面下載對應 OS 的 agent 包</span>
+
+<span class="tk-pn">$</span> <span class="tk-fn">mkdir</span> myagent &amp;&amp; <span class="tk-fn">cd</span> myagent
+<span class="tk-pn">$</span> <span class="tk-fn">tar</span> xzf ../vsts-agent-linux-x64-*.tar.gz
+<span class="tk-pn">$</span> ./config.sh                              <span class="tk-cm"># 互動式輸入 ADO URL + PAT + pool 名</span>
+<span class="tk-pn">$</span> <span class="tk-fn">sudo</span> ./svc.sh install                   <span class="tk-cm"># 註冊成 systemd service</span>
+<span class="tk-pn">$</span> <span class="tk-fn">sudo</span> ./svc.sh start
+
+<span class="tk-cm"># YAML 端改用</span>
+<span class="tk-kw">pool</span>:
+  <span class="tk-kw">name</span>: <span class="tk-st">my-self-hosted-pool</span></code></pre>
+        </div>
+      </details>
+    </section>
+
+    <section id="best-practices">
+      <span class="section-eyebrow">08 — 落地最佳實踐</span>
+      <h2>把專案管理 + DevOps 串成一條 traceability 鏈</h2>
+      <p>到這裡所有零件都有了。最後一節談的是怎麼把它們串成一條<strong>從業務需求到部署 artifact</strong>都能反追的鏈條 — 這是 ADO 比 GitHub 真正占優勢的地方。</p>
+
+      <h3>Sprint Planning 標準流程</h3>
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">設 Capacity</div>
+            <div class="timeline-desc">Boards → Sprint → Capacity tab，每位成員填可用工時、休假。系統會自動算出 sprint 容量上限。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">從 Backlog 拖卡到 Sprint</div>
+            <div class="timeline-desc">拖到接近 capacity 上限就停 — 不要塞滿，留 20% buffer 給線上事故。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">每日 stand-up 看 Taskboard</div>
+            <div class="timeline-desc">焦點在 “In Review” / “Blocked” 的 task — Active 太久（&gt; 2 天）的也要點名問。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Sprint 結束看 Velocity</div>
+            <div class="timeline-desc">Analytics 自動算出每個 sprint 完成的 story point。<strong>連續三個 sprint 取平均</strong>當下次 capacity 參考，不要看單一 sprint。</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Traceability 鏈：從 work item 到 deployed artifact</h3>
+      <p>這是最值得在 onboarding 時跟新人講清楚的一張圖：</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" aria-label="ADO traceability chain">
+          <defs>
+            <marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <rect x="10"  y="80" width="120" height="60" rx="10" fill="#fafaf8" stroke="#d4d3cc"/>
+            <text x="70"  y="105" text-anchor="middle" font-weight="700" fill="#0a0a0f">Work Item</text>
+            <text x="70"  y="122" text-anchor="middle" fill="#6b6b7e" font-size="10">User Story #1234</text>
+
+            <rect x="160" y="80" width="120" height="60" rx="10" fill="#fafaf8" stroke="#d4d3cc"/>
+            <text x="220" y="105" text-anchor="middle" font-weight="700" fill="#0a0a0f">Commit</text>
+            <text x="220" y="122" text-anchor="middle" fill="#6b6b7e" font-size="10">"feat AB#1234"</text>
+
+            <rect x="310" y="80" width="120" height="60" rx="10" fill="#ede9fe" stroke="#7c3aed"/>
+            <text x="370" y="105" text-anchor="middle" font-weight="700" fill="#4c1d95">Pull Request</text>
+            <text x="370" y="122" text-anchor="middle" fill="#6b6b7e" font-size="10">PR #57</text>
+
+            <rect x="460" y="80" width="120" height="60" rx="10" fill="#fafaf8" stroke="#d4d3cc"/>
+            <text x="520" y="105" text-anchor="middle" font-weight="700" fill="#0a0a0f">Pipeline Run</text>
+            <text x="520" y="122" text-anchor="middle" fill="#6b6b7e" font-size="10">Build #890</text>
+
+            <rect x="610" y="80" width="140" height="60" rx="10" fill="#0a0a0f"/>
+            <text x="680" y="105" text-anchor="middle" font-weight="700" fill="#fafaf8">Image + Deploy</text>
+            <text x="680" y="122" text-anchor="middle" fill="#a8a8b8" font-size="10">tag = sha-abc123</text>
+
+            <line x1="130" y1="110" x2="160" y2="110" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arr3)"/>
+            <line x1="280" y1="110" x2="310" y2="110" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arr3)"/>
+            <line x1="430" y1="110" x2="460" y2="110" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arr3)"/>
+            <line x1="580" y1="110" x2="610" y2="110" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arr3)"/>
+
+            <text x="380" y="40" text-anchor="middle" font-family="Syne, sans-serif" font-size="16" font-weight="700">每個箭頭都是「點一下就跳過去」</text>
+            <text x="380" y="58" text-anchor="middle" fill="#6b6b7e" font-size="11">線上事故 → 從 image tag 反推到當時的 Work Item，3 步以內</text>
+
+            <text x="380" y="175" text-anchor="middle" fill="#6b6b7e" font-size="11">關鍵：Commit message 帶 AB#1234 + PR linked work item + Pipeline 觸發來源</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 23.2 — ADO 的 5 段 traceability 鏈</div>
+      </div>
+
+      <h3>慣例 Cheat Sheet</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>慣例</th><th>原因</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>分支命名</td><td><code>feat/&lt;id&gt;-&lt;short-desc&gt;</code> / <code>fix/&lt;id&gt;-...</code></td><td>分支自帶 work item id，肉眼掃過去就知道在做什麼</td></tr>
+          <tr><td>Commit message</td><td>必含 <code>AB#&lt;id&gt;</code></td><td>觸發雙向連結；Conventional Commits 也建議</td></tr>
+          <tr><td>Merge 方式</td><td>強制 Squash</td><td>main 線性、一個 user story 一筆 commit</td></tr>
+          <tr><td>Image 標籤</td><td><code>sha-&lt;commit&gt;</code> 用於 prod，<code>latest</code> 只給 dev</td><td>commit SHA 不可變、可追溯</td></tr>
+          <tr><td>Secret 來源</td><td>Key Vault → KV-linked variable group</td><td>單一來源，rotate 一次到處更新</td></tr>
+          <tr><td>Service connection</td><td>不勾 “grant access to all pipelines”</td><td>最小權限，避免新 pipeline 偷推 prod image</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>下一堂課的伏筆</strong>
+          這條 pipeline 把 image 推上 registry、把 image tag 寫進另一個 manifest repo 的 <code>values.yaml</code>。<strong>但「誰把 image 真正部署到 K8s 裡」？</strong>本系列接下來的 lesson 24 會教 K8s 日常操作（pod / svc / deployment 排錯），lesson 25 會教 Argo CD 監視 manifest repo 自動把改動同步到叢集 — 整條 GitOps 鏈才算閉環。
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "Variable group 連動 Azure Key Vault 的<strong>主要目的</strong>是什麼？",
+    "options": [
+      "讓 pipeline 跑得比較快",
+      "把 secret 集中在 Key Vault 統一管理，rotate 一次到處更新；ADO 端永遠抓最新版",
+      "繞過 service connection 的權限檢查",
+      "讓 secret 在 pipeline log 裡顯示出來方便 debug"
+    ],
+    "answer": 1,
+    "explain": "KV-linked variable group 把 secret 的 single source of truth 留在 Key Vault — pipeline、K8s External Secrets、其他系統都從 KV 拿；rotate 一次大家都更新。直接寫在 ADO secret 內每個專案要各別 rotate。"
+  },
+  {
+    "question": "把 Docker image 建好後推到 container registry，<strong>應該用哪個 task</strong>？",
+    "options": [
+      "<code>DockerInstaller@0</code>",
+      "<code>Bash@3</code> 直接 <code>docker push</code>",
+      "<code>Docker@2</code> with <code>command: buildAndPush</code>",
+      "<code>AzureCLI@2</code> 跑 <code>az acr build</code>"
+    ],
+    "answer": 2,
+    "explain": "<code>Docker@2</code> 的 <code>buildAndPush</code> 是官方標準作法 — 自動處理 service connection 認證、tag 多版本、跨 platform build。<code>az acr build</code> 是 ACR-only 的另一條路，但跨 registry 不通用。"
+  },
+  {
+    "question": "在 branch policy 設定 <code>Build validation</code> 的作用是什麼？",
+    "options": [
+      "PR 開啟時自動加 reviewer",
+      "強制 commit message 格式",
+      "PR 必須跑指定 pipeline 並通過，否則 Complete merge 按鈕 disabled",
+      "把 PR 標題自動加上 work item id"
+    ],
+    "answer": 2,
+    "explain": "Build validation 是 ADO branch policy 最關鍵的一條 — 把 pipeline 設為 PR 必通過的 gate。沒過 build 就不能 merge，從根本上避免「壞掉的程式進 main」這個常見災難。"
+  },
+  {
+    "question": "下列哪些情境<strong>應該</strong>切到 self-hosted agent？(多選)",
+    "options": [
+      "需要存取公司內網的私有 DB / 私有 image registry",
+      "想用 K3d / Kind 起本地 K8s 跑 e2e 並重用 image cache",
+      "build 每次只要 30 秒，純跑單元測試",
+      "希望 build cache 能跨 pipeline run 持久化在本機 disk"
+    ],
+    "answer": [0, 1, 3],
+    "explain": "Self-hosted agent 的核心優勢是：<strong>進得了私網</strong>、<strong>有持久化 disk</strong>、<strong>不限平行度</strong>。30 秒就跑完的純單元測試用 Microsoft-hosted 反而更省事 — 不用維護 agent VM 的更新與監控。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://learn.microsoft.com/azure/devops/pipelines/yaml-schema/" target="_blank" rel="noopener">Azure Pipelines YAML schema reference</a><span class="ref-meta">YAML 完整語法</span></li>
+        <li><a href="https://learn.microsoft.com/azure/devops/pipelines/tasks/reference/docker-v2" target="_blank" rel="noopener">Docker@2 task reference</a><span class="ref-meta">建/推 image</span></li>
+        <li><a href="https://learn.microsoft.com/azure/devops/repos/git/branch-policies" target="_blank" rel="noopener">Configure branch policies</a><span class="ref-meta">main 保護</span></li>
+        <li><a href="https://learn.microsoft.com/azure/devops/pipelines/process/environments" target="_blank" rel="noopener">Environments &amp; approvals</a><span class="ref-meta">CD 批准 gate</span></li>
+        <li><a href="https://learn.microsoft.com/azure/devops/pipelines/library/variable-groups" target="_blank" rel="noopener">Variable groups</a><span class="ref-meta">共用變數</span></li>
+        <li><a href="https://learn.microsoft.com/azure/devops/pipelines/library/link-variable-groups-to-key-vaults" target="_blank" rel="noopener">Link variable groups to Azure Key Vault</a><span class="ref-meta">KV 整合</span></li>
+        <li><a href="https://learn.microsoft.com/azure/devops/boards/work-items/guidance/choose-process" target="_blank" rel="noopener">Choose a process — Agile / Scrum / CMMI</a><span class="ref-meta">Boards 模板</span></li>
+        <li><a href="https://learn.microsoft.com/azure/devops/boards/github/link-to-from-github" target="_blank" rel="noopener">Link Azure Boards to GitHub</a><span class="ref-meta">AB#&lt;id&gt; 跨平台</span></li>
+        <li><a href="https://learn.microsoft.com/azure/devops/pipelines/release/caching" target="_blank" rel="noopener">Cache@2 — Pipeline caching</a><span class="ref-meta">加速 build</span></li>
+        <li><a href="https://learn.microsoft.com/azure/devops/pipelines/process/templates" target="_blank" rel="noopener">Template types &amp; usage</a><span class="ref-meta">extends / steps template</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev disabled" aria-disabled="true">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">這是 DevOps 系列第一堂</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="02_kubernetes_practical.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 02 · Kubernetes 日常操作實務</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">5 堂 DevOps 系列 <span class="progress-pill">1 / 5</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item current" href="01_azure_devops.html"><span class="course-nav-num">01</span><span>Azure DevOps</span></a></li>
+        <li><a class="course-nav-item" href="02_kubernetes_practical.html"><span class="course-nav-num">02</span><span>Kubernetes</span></a></li>
+        <li><a class="course-nav-item" href="03_argocd_gitops.html"><span class="course-nav-num">03</span><span>Argo CD</span></a></li>
+        <li><a class="course-nav-item" href="04_prometheus_grafana.html"><span class="course-nav-num">04</span><span>Prometheus + Grafana</span></a></li>
+        <li><a class="course-nav-item" href="05_elk_log_analysis.html"><span class="course-nav-num">05</span><span>ELK</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 DevOps 實務課程系列 · Lesson 01
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

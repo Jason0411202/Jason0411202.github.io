@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cassandra 04｜讀寫路徑與 Compaction — Cassandra 課程</title>
+<meta name="description" content="Commit Log → Memtable → SSTable 寫路徑、Bloom filter + read repair 讀路徑、tombstone 跟 gc_grace_seconds、五種 compaction 策略 (5.0 預設 UCS)、repair 為什麼必要。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Cassandra 04 · 引擎內部</div>
+    <h1 class="hero-title">寫入快、<span>讀取慢</span>的祕密</h1>
+    <p class="hero-desc">Cassandra 的 LSM-tree 引擎：append-only 寫入、多 SSTable 讀取、tombstone、compaction 策略、為什麼要定期 repair。理解這層後 anti-pattern 為何是 anti-pattern 就一目瞭然。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 4 / 6 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>進階</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#write-path">寫入路徑</a></li>
+      <li><a class="toc-link" href="#read-path">讀取路徑</a></li>
+      <li><a class="toc-link" href="#tombstone">Tombstone</a></li>
+      <li><a class="toc-link" href="#compaction">Compaction 策略</a></li>
+      <li><a class="toc-link" href="#repair">Repair</a></li>
+      <li><a class="toc-link" href="#hands-on">動手玩</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="write-path">
+      <span class="section-eyebrow">01 — 寫入</span>
+      <h2>寫入路徑：為什麼 Cassandra 寫得快</h2>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 230" xmlns="http://www.w3.org/2000/svg" aria-label="寫入路徑">
+          <defs>
+            <marker id="arrW4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="12">
+            <text x="360" y="28" text-anchor="middle" font-family="Syne, sans-serif" font-size="16" font-weight="700" fill="#0a0a0f">寫入路徑（單節點視角）</text>
+
+            <rect x="20" y="80" width="100" height="60" rx="8" fill="#fafaf8" stroke="#d4d3cc"/>
+            <text x="70" y="105" text-anchor="middle" font-weight="700">Client</text>
+            <text x="70" y="125" text-anchor="middle" fill="#6b6b7e" font-size="10">INSERT/UPDATE</text>
+
+            <rect x="160" y="60" width="120" height="100" rx="8" fill="#fef3c7" stroke="#f59e0b"/>
+            <text x="220" y="85" text-anchor="middle" font-weight="700" fill="#92400e">Commit Log</text>
+            <text x="220" y="103" text-anchor="middle" fill="#6b6b7e" font-size="10">磁碟 append</text>
+            <text x="220" y="120" text-anchor="middle" fill="#6b6b7e" font-size="10">crash 時</text>
+            <text x="220" y="137" text-anchor="middle" fill="#6b6b7e" font-size="10">replay 還原</text>
+
+            <rect x="320" y="60" width="120" height="100" rx="8" fill="#ede9fe" stroke="#7c3aed"/>
+            <text x="380" y="85" text-anchor="middle" font-weight="700" fill="#4c1d95">Memtable</text>
+            <text x="380" y="103" text-anchor="middle" fill="#6b6b7e" font-size="10">記憶體中</text>
+            <text x="380" y="120" text-anchor="middle" fill="#6b6b7e" font-size="10">B-tree / Trie</text>
+            <text x="380" y="137" text-anchor="middle" fill="#6b6b7e" font-size="10">即可回 client</text>
+
+            <rect x="480" y="40" width="220" height="140" rx="8" fill="#0a0a0f" stroke="#0a0a0f"/>
+            <text x="590" y="65" text-anchor="middle" font-weight="700" fill="#fafaf8">SSTables</text>
+            <text x="590" y="85" text-anchor="middle" fill="#a8a8b8" font-size="10">磁碟上 immutable 檔案</text>
+            <g font-size="10">
+              <rect x="510" y="100" width="180" height="20" rx="3" fill="#1c1c28" stroke="#3a3a4a"/>
+              <text x="600" y="114" text-anchor="middle" fill="#a8a8b8">sstable-1.db</text>
+              <rect x="510" y="125" width="180" height="20" rx="3" fill="#1c1c28" stroke="#3a3a4a"/>
+              <text x="600" y="139" text-anchor="middle" fill="#a8a8b8">sstable-2.db</text>
+              <rect x="510" y="150" width="180" height="20" rx="3" fill="#1c1c28" stroke="#3a3a4a"/>
+              <text x="600" y="164" text-anchor="middle" fill="#a8a8b8">sstable-3.db</text>
+            </g>
+
+            <line x1="120" y1="110" x2="160" y2="110" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arrW4)"/>
+            <line x1="280" y1="110" x2="320" y2="110" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arrW4)"/>
+            <line x1="440" y1="110" x2="480" y2="110" stroke="#ff3d1f" stroke-width="1.8" stroke-dasharray="4 3" marker-end="url(#arrW4)"/>
+            <text x="460" y="100" text-anchor="middle" fill="#ff3d1f" font-size="9">flush</text>
+
+            <text x="360" y="200" text-anchor="middle" fill="#6b6b7e" font-size="11">寫到 Commit Log + Memtable 即回 client。Memtable 滿了就 flush 成 SSTable。</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 C4.1 — Cassandra 是 LSM-tree，純 sequential 寫入，極快</div>
+      </div>
+
+      <ol>
+        <li><strong>Commit Log</strong>：append 一行到磁碟（durability 保險）。</li>
+        <li><strong>Memtable</strong>：寫到記憶體裡的有序結構（5.0 起預設 <em>Trie Memtable</em>，更省 RAM）。</li>
+        <li><strong>回 Client</strong>：上面兩步完成就回成功。整個寫入路徑沒有「找舊資料 + 修改」的步驟，全部 append-only。</li>
+        <li><strong>背景 flush</strong>：memtable 滿了（或定期）會 flush 成新的 SSTable 到磁碟。SSTable 是 <strong>immutable</strong>（永不修改）。</li>
+      </ol>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>「更新」其實是「再寫一筆新的」</strong>
+          <code>UPDATE x SET name='new' WHERE id=1;</code> 在 Cassandra 內部就是寫一筆新的「name 欄位 = 'new'」record，舊的還在某個 SSTable 裡。讀取時取 timestamp 最新的那一筆勝出。<em>這就是「寫入快」的代價：讀取要做合併</em>。
+        </div>
+      </div>
+    </section>
+
+    <section id="read-path">
+      <span class="section-eyebrow">02 — 讀取</span>
+      <h2>讀取路徑：把多份散落的資料合併</h2>
+      <p>同一筆資料可能散落在多個 SSTable + memtable 裡。讀取流程：</p>
+
+      <ol>
+        <li><strong>查 row cache（如果開）</strong>：直接命中。</li>
+        <li><strong>查 memtable</strong>：找最新版本。</li>
+        <li><strong>查 SSTable 之前先用 Bloom filter</strong>：每個 SSTable 都有 bloom filter（記憶體中），用 partition key 快速判斷「這個 SSTable 可能包含這個 partition」。命中才去開檔。</li>
+        <li><strong>查 Partition Index / Summary</strong>：定位 partition 在 SSTable 內的 offset。</li>
+        <li><strong>讀出多份結果，依 timestamp 合併</strong>：保留最新的、丟掉舊的、處理 tombstone。</li>
+        <li><strong>Read Repair</strong>（如果有設）：發現 replica 之間不一致時，背景修補。</li>
+      </ol>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>SSTable 越多，讀越慢</strong>
+          每多一個 SSTable，讀取就多查一次 bloom filter（命中時還要 disk I/O）。<em>compaction 的本質就是不斷把多個 SSTable 合併成更少、更大的 SSTable</em>。
+        </div>
+      </div>
+    </section>
+
+    <section id="tombstone">
+      <span class="section-eyebrow">03 — Tombstone</span>
+      <h2>刪除其實是「寫一個墓碑」</h2>
+      <p>Cassandra 的 SSTable 是 immutable，所以 <code>DELETE</code> 不能就地把資料移除 — 它會寫一個特殊標記叫 <strong>tombstone</strong> 進去，記錄「這個 column 在這個 timestamp 被刪了」。</p>
+
+      <p>Tombstone 必須保留一段時間（叫 <code>gc_grace_seconds</code>，預設 10 天）才能真的清除。為什麼？</p>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>tombstone 是分散式刪除的「保險絲」</strong>
+          想像 N3 節點離線時 client 在 N1/N2 刪了一筆資料。當 N3 回來，N1/N2 必須記得「這筆已被刪」並推給 N3 — 不然 N3 那份舊資料會在下次讀取時「復活」。tombstone 就是這個記號。<code>gc_grace_seconds</code> 必須 &gt; 你能容忍節點離線的最長時間 + repair 週期。
+        </div>
+      </div>
+
+      <h3>Tombstone 太多會發生什麼</h3>
+      <ul>
+        <li>讀取 partition 時要把<em>有效資料 + tombstone</em>都掃過才能算出最終結果。</li>
+        <li>如果一個 partition 有上萬個 tombstone，讀取超慢，且會在 log 看到 <code>Read X live and Y tombstone cells in...</code> 警告。</li>
+        <li><strong>反模式：用 Cassandra 當 queue</strong>（不斷 enqueue + dequeue）→ tombstone 暴增、讀取變慢。Cassandra 不適合這類 high-churn 場景。</li>
+      </ul>
+    </section>
+
+    <section id="compaction">
+      <span class="section-eyebrow">04 — Compaction</span>
+      <h2>Compaction 策略：合併 SSTable 的方式</h2>
+
+      <p>Compaction 在背景跑，把多個 SSTable 合併成一個大的，順便<em>清理過期 tombstone</em>。Cassandra 提供 5 種策略：</p>
+
+      <table>
+        <thead>
+          <tr><th>策略</th><th>適合場景</th><th>取捨</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>STCS</strong> (SizeTieredCompactionStrategy)</td>
+            <td>寫入為主、讀取較少</td>
+            <td>寫便宜；讀可能要查很多 SSTable</td>
+          </tr>
+          <tr>
+            <td><strong>LCS</strong> (LeveledCompactionStrategy)</td>
+            <td>讀寫平均、需要可預測讀延遲</td>
+            <td>每筆資料保證在每個 level 最多 1 個 SSTable；I/O 高</td>
+          </tr>
+          <tr>
+            <td><strong>TWCS</strong> (TimeWindowCompactionStrategy)</td>
+            <td><strong>時序資料 + TTL</strong></td>
+            <td>相同時間窗的資料同檔，整檔過期可一次刪</td>
+          </tr>
+          <tr>
+            <td><strong>UCS</strong> (UnifiedCompactionStrategy) 5.0 預設</td>
+            <td><strong>幾乎所有場景</strong></td>
+            <td>用一個策略動態調，類似 STCS+LCS+TWCS 的綜合體</td>
+          </tr>
+          <tr>
+            <td><s>DTCS</s></td>
+            <td>(已 deprecated)</td>
+            <td>由 TWCS 取代</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>5.0 起的建議：先用 UCS</strong>
+          UCS 是 Cassandra 5.0 引入的「統一 compaction」，社群目標是讓你不用為了不同 workload 切換策略。預設值對 90% 場景夠好。<em>除非你有實測證明 LCS / TWCS 更好</em>，就先用 UCS。
+        </div>
+      </div>
+
+      <h3>怎麼觀察</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 nodetool compactionstats
+pending tasks: 2
+- ks.tbl: 2
+
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 nodetool tablestats stockbot.price_by_symbol
+SSTable count: 4
+SSTable Compression Ratio: 0.39
+Number of partitions (estimate): 1024
+Memtable cell count: 12305
+Memtable data size: 824 KiB</code></pre>
+      </div>
+    </section>
+
+    <section id="repair">
+      <span class="section-eyebrow">05 — Repair</span>
+      <h2>Repair：定期讓 replica 達成一致</h2>
+      <p>Cassandra 是 AP 系統，加上有 hinted handoff 上限、CL 不見得都用 ALL，所以 replica 之間<strong>會逐漸偏差</strong>。<code>nodetool repair</code> 就是用來強制比對所有 replica、補齊差異的指令。</p>
+
+      <ul>
+        <li><strong>full repair</strong>：比較 replica 上所有資料的 Merkle tree，找差異補齊。代價高。</li>
+        <li><strong>incremental repair</strong>：只比較「上次 repair 後的變更」。預設方法，便宜。</li>
+        <li><strong>subrange repair</strong>：只 repair 某一段 token range，可分批跑。</li>
+      </ul>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>必須在 <code>gc_grace_seconds</code> 內 repair 過一次</strong>
+          否則被刪的 tombstone 過期清除後，舊資料可能在某個 replica 上「復活」。所以多數 production 設定每 7~10 天跑一次 incremental repair（可用 Reaper 工具排程）。
+        </div>
+      </div>
+    </section>
+
+    <section id="hands-on">
+      <span class="section-eyebrow">06 — 動手玩</span>
+      <h2>觀察 SSTable + tombstone</h2>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash + cqlsh</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 1. 寫進去 → 看 memtable 大小</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 cqlsh
+cqlsh&gt; <span class="tk-fn">USE</span> stockbot;
+cqlsh&gt; <span class="tk-fn">INSERT INTO</span> price_by_symbol (symbol, ts, price, volume)
+       <span class="tk-kw">VALUES</span> (<span class="tk-st">'NVDA'</span>, toTimeStamp(now()), <span class="tk-num">700.5</span>, <span class="tk-num">5000</span>);
+cqlsh&gt; <span class="tk-fn">EXIT</span>;
+
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 nodetool tablestats stockbot.price_by_symbol \
+    | grep -E <span class="tk-st">'(SSTable count|Memtable)'</span>
+
+<span class="tk-cm"># 2. 強制 flush memtable → 變成新 SSTable</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 nodetool flush stockbot price_by_symbol
+
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 ls /var/lib/cassandra/data/stockbot/price_by_symbol-*
+
+<span class="tk-cm"># 3. 用 sstabledump 看 SSTable 內容</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 \
+    sstabledump /var/lib/cassandra/data/stockbot/price_by_symbol-*/nb-*-big-Data.db | head -40
+
+<span class="tk-cm"># 4. 製造一些 tombstone</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 cqlsh -e \
+    <span class="tk-st">"DELETE FROM stockbot.price_by_symbol WHERE symbol='NVDA' AND ts &gt; '2026-01-01';"</span>
+
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 nodetool tablestats stockbot.price_by_symbol \
+    | grep -i tombstone
+
+<span class="tk-cm"># 5. 強制 compact (production 不要這樣做!) → 觀察清理</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it cass5 nodetool compact stockbot price_by_symbol</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong><code>nodetool compact</code>（major compaction）在 production 不要用</strong>
+          Major compaction 把所有 SSTable 合併成一個巨大檔案。短期內讀取變快，但<em>之後新進來的資料無法跟這個大檔合併</em>，磁碟使用率失衡。除非你用 STCS 且很清楚自己在做什麼。
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "為什麼 Cassandra 的「寫入快、讀取慢」？",
+    "options": [
+      "寫入只在記憶體做，讀取要查磁碟",
+      "寫入是 append-only (Commit Log + Memtable 即回)；讀取要從多個 SSTable 合併最新版本，可能要多次磁碟 I/O",
+      "因為寫入是平行的，讀取是序列的",
+      "因為 Cassandra 用 SQL 解析寫入"
+    ],
+    "answer": 1,
+    "explain": "Cassandra 是 LSM-tree。寫入只 append (Commit Log + Memtable) 就回，沒有「找舊資料修改」步驟，所以快。讀取則必須從多個 SSTable + memtable 抓出同一筆資料的所有版本、依 timestamp 合併、處理 tombstone — 所以較慢。Compaction 就是用來減緩這個讀取代價。"
+  },
+  {
+    "question": "Tombstone 太多時會發生什麼？(多選)",
+    "options": [
+      "讀取 partition 時必須把 tombstone 一起掃過，效能變差",
+      "在 log 看到 「Read X live and Y tombstone cells」警告",
+      "可能觸發 read 超時",
+      "Cassandra 會自動把整張表移除"
+    ],
+    "answer": [0, 1, 2],
+    "explain": "(0)(1)(2) 都是 tombstone 過量的真實副作用。(3) 錯：Cassandra 不會自動 drop table — 它會給你警告並讓 read 變慢，最終可能超時但不會自我刪除資料。"
+  },
+  {
+    "question": "你正在做時序資料表（每筆 TTL=30 天，append-only），下列 compaction 策略<strong>最適合</strong>？",
+    "options": [
+      "STCS - 寫入便宜",
+      "LCS - 讀延遲低",
+      "TWCS 或 UCS（搭配 TTL hint）— 同時間窗的資料整檔過期可一次刪",
+      "DTCS - 專為時序設計"
+    ],
+    "answer": 2,
+    "explain": "時序 + TTL 是 TWCS / UCS 的甜蜜點：TWCS 把每個時間窗的資料寫進一個 SSTable，TTL 到了整檔可一次淘汰，幾乎不產生 tombstone。5.0+ 推薦 UCS（可看作統一版本）。DTCS 已被 deprecated。STCS / LCS 不會利用 TTL 結構特性。"
+  },
+  {
+    "question": "為什麼 production 必須在 <code>gc_grace_seconds</code>（預設 10 天）內跑過 repair？",
+    "options": [
+      "否則 SSTable 會壞掉",
+      "否則 tombstone 過期被清除，但離線過的 replica 還沒收到刪除訊息，舊資料會在下次讀取時「復活」",
+      "因為 Cassandra 強制要求",
+      "為了釋放磁碟空間"
+    ],
+    "answer": 1,
+    "explain": "tombstone 是分散式刪除的記號 — 必須讓所有 replica 都「看過」這個 tombstone，才能安心清除。如果某個 replica 離線超過 hinted handoff 上限（3 小時），又沒在 gc_grace_seconds 內 repair，舊資料可能死灰復燃。所以 production 多半每週 incremental repair 一次。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/architecture/storage_engine.html" target="_blank" rel="noopener">Storage engine</a><span class="ref-meta">commit log / memtable / SSTable</span></li>
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/managing/operating/compaction/index.html" target="_blank" rel="noopener">Compaction</a><span class="ref-meta">5 種策略 + UCS</span></li>
+        <li><a href="https://cassandra.apache.org/doc/latest/cassandra/managing/operating/repair.html" target="_blank" rel="noopener">Repair</a><span class="ref-meta">full / incremental</span></li>
+        <li><a href="https://cassandra-reaper.io/" target="_blank" rel="noopener">Cassandra Reaper</a><span class="ref-meta">repair 排程工具</span></li>
+        <li><a href="https://thelastpickle.com/blog/2016/07/27/about-deletes-and-tombstones.html" target="_blank" rel="noopener">About Deletes and Tombstones — TLP</a><span class="ref-meta">tombstone 經典文</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="cassandra_03_cql_modeling.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Cassandra 03 · CQL 與資料建模</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="cassandra_05_v5_features.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Cassandra 05 · 5.0 新特性</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">6 堂 Cassandra 系列 <span class="progress-pill">4 / 6</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="cassandra_01_intro.html"><span class="course-nav-num">01</span><span>Cassandra 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_02_architecture.html"><span class="course-nav-num">02</span><span>環狀架構與一致性</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_03_cql_modeling.html"><span class="course-nav-num">03</span><span>CQL 與資料建模</span></a></li>
+        <li><a class="course-nav-item current" href="cassandra_04_read_write_path.html"><span class="course-nav-num">04</span><span>讀寫路徑 / Compaction</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_05_v5_features.html"><span class="course-nav-num">05</span><span>5.0 新特性</span></a></li>
+        <li><a class="course-nav-item" href="cassandra_06_ops_practice.html"><span class="course-nav-num">06</span><span>運維實務</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 Cassandra 課程系列 · Lesson 04
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

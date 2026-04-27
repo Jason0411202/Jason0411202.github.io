@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 04｜第一支 gRPC 服務:Unary RPC — gRPC 課程</title>
+<meta name="description" content="從零寫一個完整可跑的 Greeter unary RPC:proto 定義、server (grpc.NewServer) 與 client (grpc.NewClient,取代 deprecated 的 grpc.Dial),含完整 import 與執行步驟。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 04 · Unary RPC 實戰</div>
+    <h1 class="hero-title">第一支 gRPC 服務:<span>Unary RPC</span></h1>
+    <p class="hero-desc">從 proto 寫到 server、client 全部 hand on。<strong>本課使用 grpc-go v1.80.0 的新 API:<code>grpc.NewClient()</code> 取代已 deprecated 的 <code>grpc.Dial()</code>。</strong></p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 4 / 10 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 15 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>中階 · 動手</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#overview">流程總覽</a></li>
+      <li><a class="toc-link" href="#proto">定義 proto</a></li>
+      <li><a class="toc-link" href="#generate">生成 stub</a></li>
+      <li><a class="toc-link" href="#server">寫 Server</a></li>
+      <li><a class="toc-link" href="#client">寫 Client</a></li>
+      <li><a class="toc-link" href="#run">跑起來</a></li>
+      <li><a class="toc-link" href="#api-evolution">舊 API vs 新 API</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="overview">
+      <span class="section-eyebrow">01 — 流程總覽</span>
+      <h2>從 0 到 client 收到 "Hello, Jason"</h2>
+      <p>這堂課要做的事:</p>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">寫 <code>greeter.proto</code></div>
+            <div class="timeline-desc">定義 service 與 message。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">執行 <code>protoc</code> 生成 stub</div>
+            <div class="timeline-desc">產出 <code>greeter.pb.go</code> 與 <code>greeter_grpc.pb.go</code>。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">寫 server</div>
+            <div class="timeline-desc">實作 <code>GreeterServer</code> interface,啟動 listener。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">寫 client</div>
+            <div class="timeline-desc">用 <code>grpc.NewClient</code> 建連線、呼叫 <code>SayHello</code>。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">5</div>
+          <div class="timeline-content">
+            <div class="timeline-title">兩個 terminal 分別跑起來</div>
+            <div class="timeline-desc">看到 <code>Hello, Jason</code> 就成功了。</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>專案目錄</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">tree</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>greeter/
+├── go.mod
+├── proto/
+│   ├── greeter.proto
+│   ├── greeter.pb.go        <span class="tk-cm"># 自動生成</span>
+│   └── greeter_grpc.pb.go   <span class="tk-cm"># 自動生成</span>
+├── server/
+│   └── main.go
+└── client/
+    └── main.go</code></pre>
+      </div>
+    </section>
+
+    <section id="proto">
+      <span class="section-eyebrow">02 — 定義 proto</span>
+      <h2>Step 1 — 寫 <code>proto/greeter.proto</code></h2>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">proto/greeter.proto</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">syntax</span> = <span class="tk-st">"proto3"</span>;
+
+<span class="tk-kw">package</span> greeter.v1;
+
+<span class="tk-kw">option</span> go_package = <span class="tk-st">"example.com/greeter/proto;greeterpb"</span>;
+
+<span class="tk-kw">service</span> Greeter {
+  <span class="tk-cm">// Unary RPC:1 req → 1 resp</span>
+  <span class="tk-kw">rpc</span> SayHello (HelloRequest) <span class="tk-kw">returns</span> (HelloReply);
+}
+
+<span class="tk-kw">message</span> HelloRequest {
+  <span class="tk-kw">string</span> name = <span class="tk-num">1</span>;
+}
+
+<span class="tk-kw">message</span> HelloReply {
+  <span class="tk-kw">string</span> message = <span class="tk-num">1</span>;
+}</code></pre>
+      </div>
+    </section>
+
+    <section id="generate">
+      <span class="section-eyebrow">03 — 生成 stub</span>
+      <h2>Step 2 — 執行 protoc 與裝套件</h2>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 在 greeter/ 根目錄</span>
+<span class="tk-pn">$</span> <span class="tk-fn">go</span> mod init example.com/greeter
+
+<span class="tk-cm"># 加入 grpc-go 與 protobuf runtime</span>
+<span class="tk-pn">$</span> <span class="tk-fn">go</span> get google.golang.org/grpc@latest
+<span class="tk-pn">$</span> <span class="tk-fn">go</span> get google.golang.org/protobuf@latest
+
+<span class="tk-cm"># 生成 stub</span>
+<span class="tk-pn">$</span> <span class="tk-fn">protoc</span> <span class="tk-op">\</span>
+    <span class="tk-op">--go_out=.</span> <span class="tk-op">--go_opt=paths=source_relative</span> <span class="tk-op">\</span>
+    <span class="tk-op">--go-grpc_out=.</span> <span class="tk-op">--go-grpc_opt=paths=source_relative</span> <span class="tk-op">\</span>
+    proto/greeter.proto</code></pre>
+      </div>
+
+      <h3>生成檔給了什麼</h3>
+      <p><code>greeter_grpc.pb.go</code> 會包含:</p>
+      <ul>
+        <li><code>GreeterServer</code> — 你要實作的 interface</li>
+        <li><code>GreeterClient</code> — client 呼叫用的 interface</li>
+        <li><code>RegisterGreeterServer(s *grpc.Server, srv GreeterServer)</code> — server 註冊</li>
+        <li><code>NewGreeterClient(cc *grpc.ClientConn) GreeterClient</code> — client 建構</li>
+        <li><code>UnimplementedGreeterServer</code> — 一定要 embed 進你的 server struct(處理 forward compatibility)</li>
+      </ul>
+    </section>
+
+    <section id="server">
+      <span class="section-eyebrow">04 — 寫 Server</span>
+      <h2>Step 3 — <code>server/main.go</code></h2>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">package</span> main
+
+<span class="tk-kw">import</span> (
+    <span class="tk-st">"context"</span>
+    <span class="tk-st">"log"</span>
+    <span class="tk-st">"net"</span>
+
+    <span class="tk-st">"google.golang.org/grpc"</span>
+    pb <span class="tk-st">"example.com/greeter/proto"</span>
+)
+
+<span class="tk-cm">// 1. 定義 server struct,必須 embed UnimplementedGreeterServer</span>
+<span class="tk-cm">// 這個 embedding 提供 forward-compatible 的預設實作 —</span>
+<span class="tk-cm">// 將來 proto 加新 method 時,你的 server 不會編不過。</span>
+<span class="tk-kw">type</span> server <span class="tk-kw">struct</span> {
+    pb.UnimplementedGreeterServer
+}
+
+<span class="tk-cm">// 2. 實作 SayHello — handler 簽名固定:</span>
+<span class="tk-cm">//    (ctx context.Context, req *PB) (*PB, error)</span>
+<span class="tk-kw">func</span> (s *server) SayHello(ctx context.Context, req *pb.HelloRequest) (*pb.HelloReply, <span class="tk-kw">error</span>) {
+    log.Printf(<span class="tk-st">"received: %v"</span>, req.GetName())
+    <span class="tk-kw">return</span> &amp;pb.HelloReply{
+        Message: <span class="tk-st">"Hello, "</span> + req.GetName(),
+    }, <span class="tk-kw">nil</span>
+}
+
+<span class="tk-kw">func</span> main() {
+    <span class="tk-cm">// 3. 開 TCP listener</span>
+    lis, err := net.Listen(<span class="tk-st">"tcp"</span>, <span class="tk-st">":50051"</span>)
+    <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
+        log.Fatalf(<span class="tk-st">"failed to listen: %v"</span>, err)
+    }
+
+    <span class="tk-cm">// 4. 建 gRPC server,註冊我們的 implementation</span>
+    s := grpc.NewServer()
+    pb.RegisterGreeterServer(s, &amp;server{})
+
+    log.Printf(<span class="tk-st">"server listening on %v"</span>, lis.Addr())
+
+    <span class="tk-cm">// 5. Serve 會 block,直到 server 被 stop</span>
+    <span class="tk-kw">if</span> err := s.Serve(lis); err != <span class="tk-kw">nil</span> {
+        log.Fatalf(<span class="tk-st">"failed to serve: %v"</span>, err)
+    }
+}</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>務必 embed <code>pb.UnimplementedGreeterServer</code></strong>
+          這是 protoc-gen-go-grpc <strong>強制</strong>的(你可以用 <code>require_unimplemented_servers=false</code> 關掉但<strong>不建議</strong>)。
+          它做兩件事:(1) 為將來新增 method 提供「<code>Unimplemented</code> 預設回傳」,讓你的 server 升級 proto 時不會編不過;(2) 強迫你寫 forward-compatible 的 service 實作。
+        </div>
+      </div>
+    </section>
+
+    <section id="client">
+      <span class="section-eyebrow">05 — 寫 Client</span>
+      <h2>Step 4 — <code>client/main.go</code></h2>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">package</span> main
+
+<span class="tk-kw">import</span> (
+    <span class="tk-st">"context"</span>
+    <span class="tk-st">"log"</span>
+    <span class="tk-st">"os"</span>
+    <span class="tk-st">"time"</span>
+
+    <span class="tk-st">"google.golang.org/grpc"</span>
+    <span class="tk-st">"google.golang.org/grpc/credentials/insecure"</span>
+    pb <span class="tk-st">"example.com/greeter/proto"</span>
+)
+
+<span class="tk-kw">func</span> main() {
+    name := <span class="tk-st">"world"</span>
+    <span class="tk-kw">if</span> len(os.Args) &gt; <span class="tk-num">1</span> {
+        name = os.Args[<span class="tk-num">1</span>]
+    }
+
+    <span class="tk-cm">// 1. 建立連線(注意:NewClient 是 lazy 的,這裡不會真的 dial)</span>
+    conn, err := grpc.NewClient(
+        <span class="tk-st">"localhost:50051"</span>,
+        grpc.WithTransportCredentials(insecure.NewCredentials()),
+    )
+    <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
+        log.Fatalf(<span class="tk-st">"failed to create client: %v"</span>, err)
+    }
+    <span class="tk-kw">defer</span> conn.Close()
+
+    <span class="tk-cm">// 2. 從生成檔拿到 client stub</span>
+    client := pb.NewGreeterClient(conn)
+
+    <span class="tk-cm">// 3. 設一個 1 秒 deadline 的 context</span>
+    ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+    <span class="tk-kw">defer</span> cancel()
+
+    <span class="tk-cm">// 4. 真正的 RPC call(連線會在這裡實際建立)</span>
+    resp, err := client.SayHello(ctx, &amp;pb.HelloRequest{Name: name})
+    <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
+        log.Fatalf(<span class="tk-st">"could not greet: %v"</span>, err)
+    }
+    log.Printf(<span class="tk-st">"greeting: %s"</span>, resp.GetMessage())
+}</code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>insecure.NewCredentials() 是什麼</strong>
+          告訴 gRPC「我這條連線不加密」 — 純明文 HTTP/2(h2c)。<strong>只在 localhost 開發、或在 service mesh 內部已有 mTLS</strong> 的情況下用。production 對外連線一定要 TLS,第 9 課會教。
+        </div>
+      </div>
+    </section>
+
+    <section id="run">
+      <span class="section-eyebrow">06 — 跑起來</span>
+      <h2>Step 5 — 兩個 terminal 跑</h2>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">terminal A</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">go</span> run ./server
+2026/04/27 11:00:00 server listening on [::]:50051</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">terminal B</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">go</span> run ./client Jason
+2026/04/27 11:00:05 greeting: Hello, Jason</code></pre>
+      </div>
+
+      <p>同時 terminal A 會看到:</p>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">terminal A</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>2026/04/27 11:00:05 received: Jason</code></pre>
+      </div>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>恭喜,你的第一支 gRPC service 跑起來了!</strong>
+          這就是最小可行的 unary RPC。下一課會看 streaming(三種模式),第 6 課會教 deadline、metadata、cancellation 怎麼運作。
+        </div>
+      </div>
+    </section>
+
+    <section id="api-evolution">
+      <span class="section-eyebrow">07 — 舊 API vs 新 API</span>
+      <h2>為什麼網路上很多教學 client 寫法不一樣?</h2>
+      <p>因為 <strong>grpc-go v1.63.0(2024 初)</strong>把 client API 換掉了。如果你看到 <code>grpc.Dial(...)</code> 或 <code>grpc.WithInsecure()</code>,那是<strong>舊 API,已經 deprecated</strong>。</p>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>舊 API (deprecated)</div>
+          <div class="compare-body">
+            <pre style="background:var(--paper);padding:0.6rem;border-radius:6px;font-size:12px;line-height:1.6;"><code>conn, err := grpc.Dial(
+    <span class="tk-st">"localhost:50051"</span>,
+    grpc.WithInsecure(),
+    grpc.WithBlock(),
+)</code></pre>
+            <p style="font-size:13px;margin-top:0.5rem;color:var(--muted);">v1.63 後 deprecated,1.x 還能用但會警告。</p>
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>新 API</div>
+          <div class="compare-body">
+            <pre style="background:var(--paper);padding:0.6rem;border-radius:6px;font-size:12px;line-height:1.6;"><code>conn, err := grpc.NewClient(
+    <span class="tk-st">"localhost:50051"</span>,
+    grpc.WithTransportCredentials(
+        insecure.NewCredentials(),
+    ),
+)</code></pre>
+            <p style="font-size:13px;margin-top:0.5rem;color:var(--muted);">v1.63+ 推薦寫法。</p>
+          </div>
+        </div>
+      </div>
+
+      <h3>三件你需要知道的差別</h3>
+      <ol>
+        <li><strong><code>NewClient</code> 是 lazy</strong> — 呼叫時不會真的 dial,第一次 RPC 才會建連線。所以這幾個 DialOption <strong>會被 NewClient 忽略</strong>:<code>WithBlock()</code>、<code>WithTimeout()</code>、<code>WithReturnConnectionError()</code>、<code>FailOnNonTempDialError()</code>。</li>
+        <li><strong>預設 name resolver 從 <code>passthrough</code> 改為 <code>dns</code></strong> — 寫 <code>"foo.com:80"</code> 時 NewClient 會做 DNS 解析、支援多個 backend address。</li>
+        <li><strong><code>WithInsecure()</code> 換成 <code>WithTransportCredentials(insecure.NewCredentials())</code></strong> — 老寫法 import 簡單但無法擴充,新寫法統一用 <code>credentials</code> 套件介面。</li>
+      </ol>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>新專案一律用 <code>NewClient</code></strong>
+          舊專案維護時看到 <code>Dial</code> 不用急著換(1.x 還支援),但寫新 code 時請用新 API。本系列後續所有 client 範例全部用 <code>NewClient</code>。
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "為什麼 server struct 必須 embed <code>pb.UnimplementedGreeterServer</code>?",
+    "options": [
+      "為了讓 server 速度更快",
+      "為了 forward compatibility — 將來 proto 加新 method,你的 server 不會編不過,且新 method 會回傳預設的 Unimplemented 錯誤",
+      "為了讓 client 能呼叫",
+      "為了符合 Go interface 的私有欄位要求"
+    ],
+    "answer": 1,
+    "explain": "embedding 的核心目的是 forward compatibility — proto 演進加新 method 時你不必立刻實作,server 仍能編譯並對未實作的 method 回傳 Unimplemented。protoc-gen-go-grpc 預設強制要求,可關但<strong>不建議</strong>關。"
+  },
+  {
+    "question": "<code>grpc.NewClient</code> 與已 deprecated 的 <code>grpc.Dial</code> 最重要的行為差別是?",
+    "options": [
+      "NewClient 是 lazy 的,不會立刻建連線;第一次 RPC 才實際 dial。所以 WithBlock/WithTimeout 等選項對 NewClient 無效",
+      "NewClient 速度比較快,但功能比較少",
+      "NewClient 只支援 TLS,不能用 insecure",
+      "NewClient 不支援 DNS 解析"
+    ],
+    "answer": 0,
+    "explain": "<code>NewClient</code> 設計成 lazy(<em>No I/O is performed</em>),這也是為什麼 <code>WithBlock</code>、<code>WithTimeout</code>、<code>WithReturnConnectionError</code>、<code>FailOnNonTempDialError</code> 對 <code>NewClient</code> 無效。另外 NewClient 預設 name resolver 是 <code>dns</code>(Dial 是 <code>passthrough</code>)。"
+  },
+  {
+    "question": "下列哪一個 client 寫法是 grpc-go 2026 年的<strong>推薦寫法</strong>?",
+    "options": [
+      "<code>grpc.Dial(\"x:50051\", grpc.WithInsecure(), grpc.WithBlock())</code>",
+      "<code>grpc.DialContext(ctx, \"x:50051\", grpc.WithInsecure())</code>",
+      "<code>grpc.NewClient(\"x:50051\", grpc.WithTransportCredentials(insecure.NewCredentials()))</code>",
+      "<code>grpc.Connect(\"x:50051\")</code>"
+    ],
+    "answer": 2,
+    "explain": "選項 A、B 用了 deprecated 的 <code>Dial</code>/<code>DialContext</code>(v1.63+ 廢棄)和 deprecated 的 <code>WithInsecure()</code>。選項 D 不存在。正確現代寫法是 <code>grpc.NewClient + WithTransportCredentials(insecure.NewCredentials())</code>。"
+  },
+  {
+    "question": "Unary RPC handler 在 server 端的標準簽名是?",
+    "options": [
+      "<code>func(req *pb.X) *pb.Y</code>",
+      "<code>func(ctx context.Context, req *pb.X) (*pb.Y, error)</code>",
+      "<code>func(stream pb.Service_MethodServer) error</code>",
+      "<code>func(req *pb.X) (*pb.Y, error)</code>"
+    ],
+    "answer": 1,
+    "explain": "Unary handler 簽名固定為 <code>(ctx context.Context, req *pb.X) (*pb.Y, error)</code>。<code>ctx</code> 帶 deadline、cancellation、metadata(下一課詳講)。選項 C 是 streaming handler 的形式。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://grpc.io/docs/languages/go/basics/" target="_blank" rel="noopener">grpc.io — Basics tutorial (Go)</a><span class="ref-meta">本課實作的基礎</span></li>
+        <li><a href="https://pkg.go.dev/google.golang.org/grpc#NewClient" target="_blank" rel="noopener">pkg.go.dev — grpc.NewClient</a><span class="ref-meta">新版 client API</span></li>
+        <li><a href="https://pkg.go.dev/google.golang.org/grpc#Dial" target="_blank" rel="noopener">pkg.go.dev — grpc.Dial (deprecated)</a><span class="ref-meta">舊版,參考用</span></li>
+        <li><a href="https://github.com/grpc/grpc-go/tree/master/examples/helloworld" target="_blank" rel="noopener">grpc-go/examples/helloworld</a><span class="ref-meta">官方範例</span></li>
+        <li><a href="https://pkg.go.dev/google.golang.org/grpc/credentials/insecure" target="_blank" rel="noopener">pkg.go.dev — credentials/insecure</a><span class="ref-meta">明文連線 helper</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="grpc_03_protobuf_syntax.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 03 · Protobuf 語法</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="grpc_05_streaming_rpc.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 05 · 三種 Streaming RPC</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">10 堂 gRPC 系列 <span class="progress-pill">4 / 10</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="grpc_01_intro.html"><span class="course-nav-num">01</span><span>gRPC 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="grpc_02_setup.html"><span class="course-nav-num">02</span><span>環境安裝與工具鏈</span></a></li>
+        <li><a class="course-nav-item" href="grpc_03_protobuf_syntax.html"><span class="course-nav-num">03</span><span>Protobuf 語法</span></a></li>
+        <li><a class="course-nav-item current" href="grpc_04_unary_rpc.html"><span class="course-nav-num">04</span><span>Unary RPC 實戰</span></a></li>
+        <li><a class="course-nav-item" href="grpc_05_streaming_rpc.html"><span class="course-nav-num">05</span><span>三種 Streaming</span></a></li>
+        <li><a class="course-nav-item" href="grpc_06_context_metadata.html"><span class="course-nav-num">06</span><span>Context / Metadata</span></a></li>
+        <li><a class="course-nav-item" href="grpc_07_error_handling.html"><span class="course-nav-num">07</span><span>錯誤處理</span></a></li>
+        <li><a class="course-nav-item" href="grpc_08_interceptors.html"><span class="course-nav-num">08</span><span>Interceptors</span></a></li>
+        <li><a class="course-nav-item" href="grpc_09_tls_auth.html"><span class="course-nav-num">09</span><span>TLS / Auth</span></a></li>
+        <li><a class="course-nav-item" href="grpc_10_connection_lifecycle.html"><span class="course-nav-num">10</span><span>連線生命週期</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 gRPC 課程系列 · Lesson 04
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

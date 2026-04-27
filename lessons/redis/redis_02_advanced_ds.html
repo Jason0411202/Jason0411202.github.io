@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redis 02｜進階資料結構與真實場景 — Redis 課程</title>
+<meta name="description" content="Streams、Bitmap、HyperLogLog、Geo、Pub/Sub、Pipelining、Transactions、Lua scripting — Redis 八成的進階用法在這一堂。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Redis 02 · 進階資料結構</div>
+    <h1 class="hero-title">把 Redis 真正<span>用起來</span>的 8 個工具</h1>
+    <p class="hero-desc">Streams（取代 Pub/Sub 做可靠佇列）、Bitmap、HyperLogLog、Geo、Pipelining、Transactions、Lua scripting — 每個工具一個小故事 + 一段 redis-cli 範例。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 2 / 6 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 15 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>核心</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#streams">Streams</a></li>
+      <li><a class="toc-link" href="#pubsub">Pub/Sub</a></li>
+      <li><a class="toc-link" href="#bitmap">Bitmap</a></li>
+      <li><a class="toc-link" href="#hll">HyperLogLog</a></li>
+      <li><a class="toc-link" href="#geo">Geo</a></li>
+      <li><a class="toc-link" href="#pipeline">Pipelining</a></li>
+      <li><a class="toc-link" href="#tx">Transactions</a></li>
+      <li><a class="toc-link" href="#lua">Lua Scripting</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="streams">
+      <span class="section-eyebrow">01 — Streams</span>
+      <h2>Streams：認真的訊息佇列（5.0 引入）</h2>
+      <p>Stream 是一個 <strong>append-only 的有序日誌</strong>，每筆 entry 有自動產生的 ID（<code>ms-seq</code>），支援 <strong>consumer group</strong>（多消費者協作 + 已讀追蹤），是 Redis 最像 Kafka 的結構。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis-cli</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 寫入訊息</span>
+<span class="tk-fn">XADD</span> orders <span class="tk-op">*</span> user_id <span class="tk-num">100</span> amount <span class="tk-num">299</span> sku <span class="tk-st">"AAPL"</span>
+<span class="tk-st">"1745912345678-0"</span>
+
+<span class="tk-fn">XADD</span> orders <span class="tk-op">*</span> user_id <span class="tk-num">101</span> amount <span class="tk-num">158</span> sku <span class="tk-st">"TSLA"</span>
+<span class="tk-st">"1745912345892-0"</span>
+
+<span class="tk-cm"># 建一個 consumer group（從頭開始消費）</span>
+<span class="tk-fn">XGROUP</span> CREATE orders billing <span class="tk-num">0</span> MKSTREAM
+OK
+
+<span class="tk-cm"># consumer "worker-A" 拿一筆</span>
+<span class="tk-fn">XREADGROUP</span> GROUP billing worker-A COUNT <span class="tk-num">1</span> STREAMS orders <span class="tk-op">&gt;</span>
+<span class="tk-cm"># 收到一筆訊息</span>
+
+<span class="tk-cm"># 處理完，ACK 掉</span>
+<span class="tk-fn">XACK</span> orders billing 1745912345678-0
+<span class="tk-num">(integer) 1</span>
+
+<span class="tk-cm"># 看「還沒 ACK」的（pending entries list）</span>
+<span class="tk-fn">XPENDING</span> orders billing</code></pre>
+      </div>
+
+      <ul>
+        <li><strong>多 consumer 協作</strong>：consumer group 確保一筆訊息只被組內一個 worker 收到。</li>
+        <li><strong>已讀追蹤</strong>：未 ACK 的訊息會留在 <em>pending entries list</em>，worker 重啟後可重拿。</li>
+        <li><strong>Cap by length</strong>：用 <code>XADD ... MAXLEN ~ 10000</code> 限制長度，避免 memory 爆炸。</li>
+      </ul>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>什麼時候用 Streams 而不是 Kafka？</strong>
+          訊息量小（&lt; 10 萬 msg/s）、要求低延遲、不需要長期保存（&lt; 1 day）、團隊已經有 Redis — 用 Streams 省一個元件。訊息量大、要長期保存、有跨團隊接上下游的對接需求 — 用 Kafka。
+        </div>
+      </div>
+    </section>
+
+    <section id="pubsub">
+      <span class="section-eyebrow">02 — Pub/Sub</span>
+      <h2>Pub/Sub：fire-and-forget 廣播（不可靠）</h2>
+      <p>Redis 早期的訊息機制。<strong>publisher 發出去，沒有 subscriber 在線就丟掉</strong>，沒有訂閱歷史、沒有 ACK、沒有重試。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis-cli (兩個視窗)</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 視窗 ① 訂閱</span>
+127.0.0.1:6379&gt; <span class="tk-fn">SUBSCRIBE</span> news.tech
+Reading messages...
+
+<span class="tk-cm"># 視窗 ② 發布</span>
+127.0.0.1:6379&gt; <span class="tk-fn">PUBLISH</span> news.tech <span class="tk-st">"Redis 8.6 GA released"</span>
+<span class="tk-num">(integer) 1</span>   <span class="tk-cm"># 1 個 subscriber 收到</span></code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>Pub/Sub 不適合做訂單佇列</strong>
+          沒有持久化、沒有重試、subscriber 暫時離線就漏訊息。<strong>有「至少一次」需求請改用 Streams</strong>。Pub/Sub 適合：即時通知 (chat)、cache invalidation 廣播、metric streaming。
+        </div>
+      </div>
+
+      <p>Redis 7.0 起新增 <strong>Sharded Pub/Sub</strong>（<code>SPUBLISH</code> / <code>SSUBSCRIBE</code>），訊息只會跨 cluster 中持有對應 hash slot 的節點，避免在大叢集內 fan-out 造成效能問題。</p>
+    </section>
+
+    <section id="bitmap">
+      <span class="section-eyebrow">03 — Bitmap</span>
+      <h2>Bitmap：用 bit 算「特徵」</h2>
+      <p>Bitmap 不是獨立 type，而是 <code>SETBIT</code> / <code>GETBIT</code> / <code>BITCOUNT</code> / <code>BITOP</code> 一組指令操作 String 的二進位位元。1KB 字串就能放 8000 個 bit。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis-cli</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 場景：每天記錄哪些 user 上線（user_id 當 offset）</span>
+<span class="tk-fn">SETBIT</span> active:2026-04-27 <span class="tk-num">100</span> <span class="tk-num">1</span>   <span class="tk-cm"># user 100 來了</span>
+<span class="tk-fn">SETBIT</span> active:2026-04-27 <span class="tk-num">501</span> <span class="tk-num">1</span>   <span class="tk-cm"># user 501 來了</span>
+
+<span class="tk-fn">BITCOUNT</span> active:2026-04-27          <span class="tk-cm"># 今天有幾個人上線</span>
+<span class="tk-num">(integer) 2</span>
+
+<span class="tk-cm"># 算「昨天和今天都來」的人</span>
+<span class="tk-fn">BITOP</span> AND retained active:2026-04-26 active:2026-04-27
+<span class="tk-fn">BITCOUNT</span> retained</code></pre>
+      </div>
+
+      <p>1 億用戶用 1 億 bit = 12.5 MB，<strong>10 元美金的記憶體就能算出每天 DAU、留存率、A/B 分群</strong>。傳統 SQL 做這事要多少資源？</p>
+    </section>
+
+    <section id="hll">
+      <span class="section-eyebrow">04 — HyperLogLog</span>
+      <h2>HyperLogLog：12 KB 算 UV，誤差 0.81%</h2>
+      <p>要算「不重複訪問人數」（UV / Unique Visitors），最直覺是用 Set 把每個訪客 ID 加進去再算 size。但 1 億用戶就要 1 億個字串，記憶體吃不下。</p>
+
+      <p><strong>HyperLogLog</strong> 用機率近似演算法，<em>無論基數多大都只用 12 KB</em>，標準誤差 0.81%。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis-cli</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-fn">PFADD</span> uv:home user_a user_b user_c user_a   <span class="tk-cm"># 重複的 user_a 算一次</span>
+<span class="tk-num">(integer) 1</span>
+
+<span class="tk-fn">PFCOUNT</span> uv:home
+<span class="tk-num">(integer) 3</span>
+
+<span class="tk-cm"># 合併兩個 HLL（聯集）</span>
+<span class="tk-fn">PFMERGE</span> uv:total uv:home uv:product
+<span class="tk-fn">PFCOUNT</span> uv:total
+<span class="tk-num">(integer) 4521</span></code></pre>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>HLL 的限制</strong>
+          只能<em>算個數</em>，無法列出所有元素。如果你需要拿到「上線的用戶 ID 清單」，請改用 Set 或 Bitmap。
+        </div>
+      </div>
+    </section>
+
+    <section id="geo">
+      <span class="section-eyebrow">05 — Geo</span>
+      <h2>Geo：附近 1 公里有什麼店</h2>
+      <p>Geo 內部其實是 <strong>Sorted Set + GeoHash</strong>。經緯度經過 GeoHash 編成 52-bit int 當 score。所以你能用 ZSET 的所有指令操作 Geo。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis-cli</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-fn">GEOADD</span> shops <span class="tk-num">121.5654</span> <span class="tk-num">25.0330</span> <span class="tk-st">"taipei-101"</span>
+<span class="tk-fn">GEOADD</span> shops <span class="tk-num">121.5170</span> <span class="tk-num">25.0478</span> <span class="tk-st">"ximen"</span>
+<span class="tk-fn">GEOADD</span> shops <span class="tk-num">121.5436</span> <span class="tk-num">25.0856</span> <span class="tk-st">"shilin-night"</span>
+
+<span class="tk-cm"># 從台北車站(121.5170, 25.0478) 找半徑 3km 內的點</span>
+<span class="tk-fn">GEOSEARCH</span> shops FROMLONLAT <span class="tk-num">121.5170</span> <span class="tk-num">25.0478</span> \
+  BYRADIUS <span class="tk-num">3</span> km ASC WITHCOORD WITHDIST</code></pre>
+      </div>
+
+      <p><code>GEOSEARCH</code> 是 6.2 後推薦的指令（取代舊的 <code>GEORADIUS</code>，後者已 deprecated）。</p>
+    </section>
+
+    <section id="pipeline">
+      <span class="section-eyebrow">06 — Pipelining</span>
+      <h2>Pipelining：把 100 條指令的 RTT 砍掉</h2>
+      <p>每次 redis-cli 發指令到 server 都有一次網路 round-trip（RTT）。如果你要連送 1000 條指令，1ms RTT × 1000 = 1 秒。Pipelining 讓 client 把多條指令<strong>一次塞進 TCP buffer 一起送</strong>，server 也一次回 1000 條 reply。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" aria-label="pipelining 比較">
+          <g font-family="JetBrains Mono, monospace" font-size="12">
+            <text x="180" y="30" text-anchor="middle" font-family="Syne, sans-serif" font-size="15" font-weight="700" fill="#0a0a0f">沒 pipeline：N × RTT</text>
+            <text x="540" y="30" text-anchor="middle" font-family="Syne, sans-serif" font-size="15" font-weight="700" fill="#0a0a0f">用 pipeline：1 × RTT</text>
+
+            <line x1="80" y1="60" x2="80" y2="200" stroke="#d4d3cc"/>
+            <line x1="280" y1="60" x2="280" y2="200" stroke="#d4d3cc"/>
+            <text x="80"  y="55" text-anchor="middle" fill="#6b6b7e" font-size="11">Client</text>
+            <text x="280" y="55" text-anchor="middle" fill="#6b6b7e" font-size="11">Server</text>
+
+            <line x1="80" y1="80" x2="280" y2="90"  stroke="#7c3aed" stroke-width="1.5"/>
+            <line x1="280" y1="100" x2="80" y2="110" stroke="#ff3d1f" stroke-width="1.5"/>
+            <line x1="80" y1="125" x2="280" y2="135" stroke="#7c3aed" stroke-width="1.5"/>
+            <line x1="280" y1="145" x2="80" y2="155" stroke="#ff3d1f" stroke-width="1.5"/>
+            <line x1="80" y1="170" x2="280" y2="180" stroke="#7c3aed" stroke-width="1.5"/>
+            <line x1="280" y1="190" x2="80" y2="200" stroke="#ff3d1f" stroke-width="1.5"/>
+
+            <line x1="440" y1="60" x2="440" y2="200" stroke="#d4d3cc"/>
+            <line x1="640" y1="60" x2="640" y2="200" stroke="#d4d3cc"/>
+            <text x="440" y="55" text-anchor="middle" fill="#6b6b7e" font-size="11">Client</text>
+            <text x="640" y="55" text-anchor="middle" fill="#6b6b7e" font-size="11">Server</text>
+
+            <line x1="440" y1="80" x2="640" y2="100" stroke="#7c3aed" stroke-width="3"/>
+            <text x="540" y="78" text-anchor="middle" fill="#7c3aed" font-size="10">[cmd1, cmd2, cmd3]</text>
+            <line x1="640" y1="170" x2="440" y2="190" stroke="#ff3d1f" stroke-width="3"/>
+            <text x="540" y="185" text-anchor="middle" fill="#ff3d1f" font-size="10">[r1, r2, r3]</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 R2.1 — pipeline 把 N 次 RTT 壓縮成 1 次</div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 用 redis-cli --pipe 灌 10 萬筆</span>
+<span class="tk-pn">$</span> <span class="tk-fn">seq</span> <span class="tk-num">100000</span> | <span class="tk-fn">awk</span> <span class="tk-st">'{print "SET key:"$1" val:"$1}'</span> \
+    | <span class="tk-fn">docker</span> exec -i redis8 redis-cli --pipe
+
+All data transferred. Waiting for the last reply...
+Last reply received from server.
+errors: <span class="tk-num">0</span>, replies: <span class="tk-num">100000</span></code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>Pipeline 不是 Transaction</strong>
+          Pipeline 只是「把多條指令一次送出」 — 中間還是可能被別的 client 指令穿插（但因為 single-thread，每條仍是原子）。要保證「這幾條指令連續執行不被穿插」，要用 <code>MULTI/EXEC</code> 或 Lua。
+        </div>
+      </div>
+    </section>
+
+    <section id="tx">
+      <span class="section-eyebrow">07 — Transactions</span>
+      <h2>MULTI / EXEC + WATCH 樂觀鎖</h2>
+      <p>Redis 的「transaction」跟 RDBMS 的 ACID 不太一樣，更像「指令打包後一次執行」：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis-cli</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 簡單 MULTI/EXEC：包成一個原子單位</span>
+<span class="tk-fn">MULTI</span>
+<span class="tk-fn">INCR</span> account:1:balance
+<span class="tk-fn">DECR</span> account:2:balance
+<span class="tk-fn">EXEC</span>
+1) <span class="tk-num">(integer) 101</span>
+2) <span class="tk-num">(integer) 49</span>
+
+<span class="tk-cm"># WATCH：樂觀鎖（CAS） 「如果中間有人改了 watched key，就 abort」</span>
+<span class="tk-fn">WATCH</span> account:1:balance
+<span class="tk-fn">GET</span> account:1:balance      <span class="tk-cm"># app 邏輯：看餘額決定要不要扣</span>
+<span class="tk-fn">MULTI</span>
+<span class="tk-fn">DECR</span> account:1:balance
+<span class="tk-fn">EXEC</span>
+<span class="tk-cm"># 若中間有別人改 account:1:balance, EXEC 回 (nil) 表示 abort</span></code></pre>
+      </div>
+
+      <p>注意：<strong>Redis transaction 不能 rollback</strong>。如果 MULTI 內某條指令執行失敗（例如 type error），其他指令照樣執行 — 跟 SQL 的 ROLLBACK 完全不同概念。</p>
+    </section>
+
+    <section id="lua">
+      <span class="section-eyebrow">08 — Lua Scripting</span>
+      <h2>Lua：把多條指令做成一條原子操作</h2>
+      <p>Lua script 在 Redis server 端執行，<strong>整個 script 是一個原子操作</strong>。比 MULTI/EXEC 強的地方是 — 你可以基於前面指令的結果做分支判斷。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">redis-cli</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 場景：原子地「扣庫存,但不能扣到負」</span>
+<span class="tk-fn">EVAL</span> <span class="tk-st">"local cur = tonumber(redis.call('GET', KEYS[1]) or 0)
+       if cur &gt; 0 then
+         redis.call('DECR', KEYS[1])
+         return 1
+       else
+         return 0
+       end"</span> <span class="tk-num">1</span> stock:AAPL
+
+<span class="tk-cm"># 8.0+ 可以用 FUNCTION（更現代的方式,可命名、可版本化）</span>
+<span class="tk-fn">FUNCTION</span> LOAD <span class="tk-st">"#!lua name=mylib
+  redis.register_function('decr_safe', function(keys, args)
+    local cur = tonumber(redis.call('GET', keys[1]) or 0)
+    if cur &gt; 0 then redis.call('DECR', keys[1]); return 1
+    else return 0 end
+  end)"</span>
+
+<span class="tk-fn">FCALL</span> decr_safe <span class="tk-num">1</span> stock:AAPL</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>Lua 別寫太久</strong>
+          Lua 在單緒內跑 — script 執行多久，<em>所有 client 就卡多久</em>。生產環境的 script 應該 &lt; 1 ms。複雜邏輯該往 application 層放。
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "你正在做一個訂單系統，每秒約 5000 筆，要求「至少一次」、消費端可水平擴展。下列選哪個最合適？",
+    "options": [
+      "Redis Pub/Sub：簡單、好用",
+      "Redis Streams + consumer group：有持久化、有 ACK、有重試",
+      "Redis List + LPUSH/BRPOP：最輕量",
+      "Redis Sorted Set 模擬延遲佇列"
+    ],
+    "answer": 1,
+    "explain": "Streams 是專為「可靠訊息佇列」設計，consumer group 確保訊息只被一個 worker 收到，未 ACK 留在 PEL 可重試。Pub/Sub 沒持久化、subscriber 離線就漏；List+BRPOP 沒 ACK 機制（worker 中途死亡就漏）；Sorted Set 是延遲佇列場景。"
+  },
+  {
+    "question": "下列關於 HyperLogLog 的敘述，哪些<strong>正確</strong>？(多選)",
+    "options": [
+      "用 12 KB 記憶體可估算到 2^64 級別的不重複個數",
+      "可以列出所有元素",
+      "標準誤差約 0.81%",
+      "可以用 PFMERGE 合併多個 HLL"
+    ],
+    "answer": [0, 2, 3],
+    "explain": "(0)(2)(3) 都是 HLL 的特性。(1) 錯：HLL <strong>只能算個數</strong>，無法列舉元素。要列舉請用 Set 或 Bitmap。"
+  },
+  {
+    "question": "下列哪個敘述描述了 Pipeline 與 Transaction 的<strong>關鍵差異</strong>？",
+    "options": [
+      "Pipeline 一次送多條指令省 RTT，但中間可能被其他 client 指令穿插；Transaction（MULTI/EXEC）才能保證連續執行",
+      "Transaction 一定比 Pipeline 慢",
+      "Pipeline 是原子的，Transaction 不是",
+      "兩者完全等同"
+    ],
+    "answer": 0,
+    "explain": "Pipeline 只解決「網路 RTT」，server 端仍可能在你 pipeline 的指令之間執行別人的指令（雖然每條本身原子）。MULTI/EXEC 才保證「這一串指令連續執行不被穿插」。"
+  },
+  {
+    "question": "為什麼 Lua script 不該寫得太複雜（執行時間長）？",
+    "options": [
+      "因為 Lua 不支援迴圈",
+      "Lua script 在單緒內執行,跑越久,所有 client 就卡越久",
+      "Lua 會佔用記憶體",
+      "Lua 無法呼叫 Redis 指令"
+    ],
+    "answer": 1,
+    "explain": "Redis 的命令執行是單緒的。Lua script 在 server 端執行期間，<em>所有其他 client 都被阻塞</em>。複雜邏輯應該放在 application 層；Lua 用來保證「幾條 Redis 指令的原子性」。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://redis.io/docs/latest/develop/data-types/streams/" target="_blank" rel="noopener">Redis Streams</a><span class="ref-meta">官方</span></li>
+        <li><a href="https://redis.io/docs/latest/develop/interact/pubsub/" target="_blank" rel="noopener">Redis Pub/Sub</a><span class="ref-meta">含 sharded pub/sub</span></li>
+        <li><a href="https://redis.io/docs/latest/develop/data-types/bitmaps/" target="_blank" rel="noopener">Bitmaps</a><span class="ref-meta">官方</span></li>
+        <li><a href="https://redis.io/docs/latest/develop/data-types/probabilistic/hyperloglogs/" target="_blank" rel="noopener">HyperLogLog</a><span class="ref-meta">官方</span></li>
+        <li><a href="https://redis.io/docs/latest/develop/data-types/geospatial/" target="_blank" rel="noopener">Geospatial</a><span class="ref-meta">GEOSEARCH</span></li>
+        <li><a href="https://redis.io/docs/latest/develop/use/pipelining/" target="_blank" rel="noopener">Pipelining</a><span class="ref-meta">官方</span></li>
+        <li><a href="https://redis.io/docs/latest/develop/interact/transactions/" target="_blank" rel="noopener">Transactions</a><span class="ref-meta">MULTI/EXEC/WATCH</span></li>
+        <li><a href="https://redis.io/docs/latest/develop/interact/programmability/eval-intro/" target="_blank" rel="noopener">Lua scripting / Functions</a><span class="ref-meta">7.0+ FUNCTION</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="redis_01_intro.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Redis 01 · 是什麼、何時用</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="redis_03_persistence_replication.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Redis 03 · 持久化與複製</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">6 堂 Redis 系列 <span class="progress-pill">2 / 6</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="redis_01_intro.html"><span class="course-nav-num">01</span><span>Redis 是什麼</span></a></li>
+        <li><a class="course-nav-item current" href="redis_02_advanced_ds.html"><span class="course-nav-num">02</span><span>進階資料結構</span></a></li>
+        <li><a class="course-nav-item" href="redis_03_persistence_replication.html"><span class="course-nav-num">03</span><span>持久化與複製</span></a></li>
+        <li><a class="course-nav-item" href="redis_04_ha_cluster.html"><span class="course-nav-num">04</span><span>Sentinel vs Cluster</span></a></li>
+        <li><a class="course-nav-item" href="redis_05_v8_modules.html"><span class="course-nav-num">05</span><span>Redis 8 新特性</span></a></li>
+        <li><a class="course-nav-item" href="redis_06_patterns_antipatterns.html"><span class="course-nav-num">06</span><span>實戰模式與反模式</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 Redis 課程系列 · Lesson 02
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

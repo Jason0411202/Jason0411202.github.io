@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 02｜Git 進階操作 — 開源貢獻課程</title>
+<meta name="description" content="rebase / cherry-pick / reflog / bisect / worktree / reset vs revert / --force-with-lease — 把 Git 真正用到 90 分。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 02 · Git 基礎篇</div>
+    <h1 class="hero-title">Git <span>進階操作</span></h1>
+    <p class="hero-desc">這幾個指令你不會，PR 一被退件你就會卡很久 — rebase、cherry-pick、reflog、bisect、worktree、reset vs revert，全部一次學會。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 2 / 12 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 15 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>中階</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#rebase">rebase</a></li>
+      <li><a class="toc-link" href="#interactive">互動 rebase</a></li>
+      <li><a class="toc-link" href="#rebase-vs-merge">rebase vs merge</a></li>
+      <li><a class="toc-link" href="#cherry-pick">cherry-pick</a></li>
+      <li><a class="toc-link" href="#reflog">reflog</a></li>
+      <li><a class="toc-link" href="#bisect">bisect</a></li>
+      <li><a class="toc-link" href="#worktree">worktree</a></li>
+      <li><a class="toc-link" href="#reset-revert">reset vs revert</a></li>
+      <li><a class="toc-link" href="#force">force-with-lease</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="rebase">
+      <span class="section-eyebrow">01 — rebase</span>
+      <h2><code>rebase</code>：把分支「移植」到別人後面</h2>
+
+      <p><code>rebase</code> 字面意思是「換 base」 —— 把你的分支從原本接的點，搬到另一個點上。常見場景：你的 feature branch 是從兩週前的 main 開的，現在 main 已經往前跑了 30 個 commit，你想把自己的工作接到最新 main 後面。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" aria-label="rebase 前後對照">
+          <defs>
+            <marker id="rb-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <!-- BEFORE -->
+            <text x="160" y="30" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">rebase 前</text>
+
+            <!-- main 線 -->
+            <line x1="40" y1="70" x2="280" y2="70" stroke="#0a0a0f" stroke-width="2"/>
+            <circle cx="60" cy="70" r="8" fill="#fafaf8" stroke="#0a0a0f" stroke-width="2"/>
+            <circle cx="120" cy="70" r="8" fill="#fafaf8" stroke="#0a0a0f" stroke-width="2"/>
+            <circle cx="180" cy="70" r="8" fill="#fafaf8" stroke="#0a0a0f" stroke-width="2"/>
+            <circle cx="240" cy="70" r="8" fill="#fafaf8" stroke="#0a0a0f" stroke-width="2"/>
+            <text x="40" y="95" fill="#6b6b7e" font-size="10">A</text>
+            <text x="100" y="95" fill="#6b6b7e" font-size="10">B</text>
+            <text x="160" y="95" fill="#6b6b7e" font-size="10">C</text>
+            <text x="220" y="95" fill="#6b6b7e" font-size="10">D</text>
+            <text x="290" y="73" fill="#0a0a0f" font-weight="700">main</text>
+
+            <!-- feature 從 B 分出 -->
+            <line x1="120" y1="70" x2="160" y2="140" stroke="#7c3aed" stroke-width="2"/>
+            <line x1="160" y1="140" x2="240" y2="140" stroke="#7c3aed" stroke-width="2"/>
+            <circle cx="160" cy="140" r="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+            <circle cx="220" cy="140" r="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+            <text x="140" y="160" fill="#7c3aed" font-size="10">X</text>
+            <text x="200" y="160" fill="#7c3aed" font-size="10">Y</text>
+            <text x="240" y="143" fill="#7c3aed" font-weight="700">feature</text>
+
+            <!-- 命令 -->
+            <text x="160" y="200" text-anchor="middle" fill="#6b6b7e" font-size="11">$ git rebase main</text>
+            <line x1="160" y1="210" x2="500" y2="210" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#rb-arr)"/>
+
+            <!-- AFTER -->
+            <text x="560" y="30" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">rebase 後</text>
+
+            <line x1="380" y1="70" x2="620" y2="70" stroke="#0a0a0f" stroke-width="2"/>
+            <circle cx="400" cy="70" r="8" fill="#fafaf8" stroke="#0a0a0f" stroke-width="2"/>
+            <circle cx="460" cy="70" r="8" fill="#fafaf8" stroke="#0a0a0f" stroke-width="2"/>
+            <circle cx="520" cy="70" r="8" fill="#fafaf8" stroke="#0a0a0f" stroke-width="2"/>
+            <circle cx="580" cy="70" r="8" fill="#fafaf8" stroke="#0a0a0f" stroke-width="2"/>
+            <text x="380" y="95" fill="#6b6b7e" font-size="10">A</text>
+            <text x="440" y="95" fill="#6b6b7e" font-size="10">B</text>
+            <text x="500" y="95" fill="#6b6b7e" font-size="10">C</text>
+            <text x="560" y="95" fill="#6b6b7e" font-size="10">D</text>
+            <text x="630" y="73" fill="#0a0a0f" font-weight="700">main</text>
+
+            <!-- 新的 feature 接在 D 後面 -->
+            <line x1="580" y1="70" x2="640" y2="140" stroke="#7c3aed" stroke-width="2"/>
+            <line x1="640" y1="140" x2="700" y2="140" stroke="#7c3aed" stroke-width="2"/>
+            <circle cx="640" cy="140" r="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+            <circle cx="700" cy="140" r="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+            <text x="620" y="160" fill="#7c3aed" font-size="10">X'</text>
+            <text x="680" y="160" fill="#7c3aed" font-size="10">Y'</text>
+
+            <text x="560" y="280" text-anchor="middle" fill="#6b6b7e" font-size="11">X、Y 重新建立成 X'、Y' (新 SHA)</text>
+            <text x="560" y="298" text-anchor="middle" fill="#ff3d1f" font-size="11" font-weight="700">SHA 改變 = 改寫歷史 = 不能對公開分支做</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 2.1 — rebase 把 X、Y 重新接到最新 main 後面</div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 在 feature branch 上</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> fetch origin
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase origin/main
+
+<span class="tk-cm"># 如果有衝突，解決後</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> add &lt;檔案&gt;
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase <span class="tk-op">--continue</span>
+
+<span class="tk-cm"># 不想繼續了 (回到 rebase 前狀態)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase <span class="tk-op">--abort</span></code></pre>
+      </div>
+    </section>
+
+    <section id="interactive">
+      <span class="section-eyebrow">02 — interactive rebase</span>
+      <h2>互動式 rebase：整理自己的歷史</h2>
+
+      <p>送 PR 前最常用 — 把混亂的 commit 整理成乾淨的故事。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 整理最近 5 個 commit</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase <span class="tk-op">-i</span> HEAD~5
+
+<span class="tk-cm"># 整理從 main 分出去後的所有 commit</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase <span class="tk-op">-i</span> origin/main</code></pre>
+      </div>
+
+      <p>跳出來的編輯器會列出這些 commit，每行最前面寫一個動作：</p>
+
+      <table>
+        <thead>
+          <tr><th>動作</th><th>意思</th><th>用在哪</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>pick</code></td><td>保留</td><td>什麼都不改</td></tr>
+          <tr><td><code>reword</code> / <code>r</code></td><td>保留改動但重寫 message</td><td>commit message 寫得不夠好</td></tr>
+          <tr><td><code>squash</code> / <code>s</code></td><td>跟上一個合併，<strong>合併兩邊的 message</strong></td><td>把 3 個 commit 合成 1 個有意義的 commit</td></tr>
+          <tr><td><code>fixup</code> / <code>f</code></td><td>跟上一個合併，<strong>丟掉這個的 message</strong></td><td>「修上一個 commit 的小錯」這種補丁</td></tr>
+          <tr><td><code>edit</code> / <code>e</code></td><td>停在這個 commit 讓你重新改檔案</td><td>想拆開或大改某個 commit</td></tr>
+          <tr><td><code>drop</code> / <code>d</code></td><td>整個 commit 丟掉</td><td>不該存在的實驗 commit</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>squash 與 fixup 的差別很重要</strong>
+          兩者都合併 commit，但 <code>squash</code> 會打開編輯器讓你寫合併後的新 message，<code>fixup</code> 直接用上一個 commit 的 message。實務上 <strong>「修 typo / 修 lint」這種 commit 用 fixup，把多個有意義小步驟收成一個大功能用 squash</strong>。
+        </div>
+      </div>
+
+      <details class="collapse">
+        <summary><code>--autosquash</code>：自動排好 fixup commit <span class="collapse-tag">技巧</span></summary>
+        <div class="collapse-body">
+<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># commit 的時候用 --fixup 指定要修哪個</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> commit <span class="tk-op">--fixup=a1b2c3d</span>
+
+<span class="tk-cm"># 之後 rebase 時加 --autosquash，git 自動排好順序</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase <span class="tk-op">-i --autosquash</span> origin/main</code></pre>
+          <p style="margin-top:0.6rem;font-size:13px;">這個組合在邊寫程式邊修小錯時特別省力，不用手動拖動 fixup 行到目標 commit 旁邊。</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="rebase-vs-merge">
+      <span class="section-eyebrow">03 — Golden Rule</span>
+      <h2><code>rebase</code> vs <code>merge</code>：黃金守則</h2>
+
+      <div class="callout callout-danger">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>The Golden Rule of Rebasing</strong>
+          <strong>不要對「已經 push 到別人會用的公開分支」做 rebase。</strong>因為 rebase 會改寫 commit SHA，等於從別人的角度看歷史突然變了，他們的本地 git 會迷路。
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>情境</th><th>該用</th><th>原因</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>只有自己用的 feature branch，要跟上 main</td>
+            <td><code>rebase</code></td>
+            <td>歷史線性、乾淨</td>
+          </tr>
+          <tr>
+            <td>把 feature 合進 main</td>
+            <td><code>merge</code> (PR merge)</td>
+            <td>保留 PR 完整脈絡</td>
+          </tr>
+          <tr>
+            <td>合別人正在用的共用分支</td>
+            <td><code>merge</code></td>
+            <td>不能改寫別人的歷史</td>
+          </tr>
+          <tr>
+            <td>送 PR 前整理自己的 commit</td>
+            <td><code>rebase -i</code></td>
+            <td>清理混亂的 WIP commits</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="cherry-pick">
+      <span class="section-eyebrow">04 — cherry-pick</span>
+      <h2><code>cherry-pick</code>：只挑一個 commit 搬到別處</h2>
+
+      <p>典型場景：main 上有個 bugfix，你想把它 backport 到 v2 維護分支，但 v2 跟 main 已經差很多，沒辦法整支 merge。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 切到目標分支</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> checkout release/v2.x
+
+<span class="tk-cm"># 把 main 上某個 commit 拿過來</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> cherry-pick a1b2c3d
+
+<span class="tk-cm"># 一次 cherry-pick 多個</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> cherry-pick a1b2c3d e4f5g6h
+
+<span class="tk-cm"># 一個範圍 (含 e4f5g6h，不含 a1b2c3d)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> cherry-pick a1b2c3d..e4f5g6h
+
+<span class="tk-cm"># 衝突解掉之後</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> add &lt;files&gt;
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> cherry-pick <span class="tk-op">--continue</span></code></pre>
+      </div>
+    </section>
+
+    <section id="reflog">
+      <span class="section-eyebrow">05 — reflog</span>
+      <h2><code>reflog</code>：救回任何「不見」的 commit</h2>
+
+      <p><code>reflog</code> 記錄你的 HEAD 移動過的所有位置。<strong>就算 commit 從分支上消失、被 rebase 改寫、被 reset --hard 蓋掉，只要還沒 GC (預設 90 天)，它都還在 reflog 裡。</strong></p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 看 HEAD 最近 30 個移動</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> reflog
+
+a1b2c3d HEAD@{0}: reset: moving to HEAD~3
+e4f5g6h HEAD@{1}: commit: feat(profile): add avatar upload
+i7j8k9l HEAD@{2}: commit: fix(profile): handle empty name
+...
+
+<span class="tk-cm"># 我想救回 e4f5g6h 那個 commit</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> checkout <span class="tk-op">-b</span> rescue HEAD@{1}
+<span class="tk-cm"># 或直接</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> reset <span class="tk-op">--hard</span> HEAD@{1}</code></pre>
+      </div>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>記住這個指令，它救過很多人</strong>
+          只要你的 commit 曾經被你的 git 看過 (reachable from HEAD) — 即使誤 reset、誤 rebase、誤刪分支 — 它都還在 reflog 裡。<strong>但 untracked / 沒 commit 的檔案救不回來</strong>，那些連 reflog 也不會記錄。
+        </div>
+      </div>
+    </section>
+
+    <section id="bisect">
+      <span class="section-eyebrow">06 — bisect</span>
+      <h2><code>bisect</code>：二分搜尋，找出哪個 commit 引入 bug</h2>
+
+      <p>典型場景：「上週這個功能還能跑、今天壞了，但中間有 200 個 commit」 — 用 bisect 自動二分搜尋，最多 log₂(200) ≈ 8 次測試就找到兇手。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 開始二分搜尋</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> bisect start
+
+<span class="tk-cm"># 告訴 git 哪個版本是壞的、哪個是好的</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> bisect bad                  <span class="tk-cm"># 當前 (HEAD) 是壞的</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> bisect good v1.4.0           <span class="tk-cm"># v1.4.0 是好的</span>
+
+<span class="tk-cm"># Git 會 checkout 中間的 commit，你跑測試後告訴它結果</span>
+<span class="tk-pn">$</span> npm test
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> bisect bad                  <span class="tk-cm"># 或 git bisect good</span>
+
+<span class="tk-cm"># ... 反覆幾次後 git 會說：</span>
+<span class="tk-cm"># a1b2c3d is the first bad commit</span>
+
+<span class="tk-cm"># 結束</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> bisect reset</code></pre>
+      </div>
+
+      <h3>自動化：<code>bisect run</code></h3>
+      <p>如果有測試指令能判斷好壞 (exit 0 = 好，非 0 = 壞)，可以全自動：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">git</span> bisect start HEAD v1.4.0
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> bisect run npm test <span class="tk-op">--</span> tests/regression.test.ts
+
+<span class="tk-cm"># 喝口咖啡，回來時 git 已經告訴你哪個 commit 引入 bug</span></code></pre>
+      </div>
+    </section>
+
+    <section id="worktree">
+      <span class="section-eyebrow">07 — worktree</span>
+      <h2><code>worktree</code>：同一個 repo 開多個工作目錄</h2>
+
+      <p>你正在 feature 分支寫到一半，主管要你立刻 review 一個 PR。傳統做法是 <code>git stash</code> + <code>git switch pr/123</code>，但 stash 容易忘記、切回來還要解 IDE 重新索引。<code>worktree</code> 直接幫你開出第二個目錄，兩個分支同時存在不互相干擾。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 在隔壁目錄開一個新工作區，checkout 別的分支</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> worktree add ../myrepo-review pr/123
+
+<span class="tk-cm"># 開 IDE 進去 ../myrepo-review 看 PR，原本目錄完全不動</span>
+
+<span class="tk-cm"># 看完了，刪掉這個 worktree</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> worktree remove ../myrepo-review
+
+<span class="tk-cm"># 列出全部 worktree</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> worktree list</code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>用 worktree 取代多 clone</strong>
+          以前需要看別的分支時，常常會 clone 兩份同樣的 repo。<code>worktree</code> 讓你共用 <code>.git</code>，磁碟空間省一半，fetch / pull 也只要做一次。
+        </div>
+      </div>
+    </section>
+
+    <section id="reset-revert">
+      <span class="section-eyebrow">08 — reset vs revert</span>
+      <h2><code>reset</code> 跟 <code>revert</code> 的差別</h2>
+
+      <p>兩個都能「取消 commit」，但機制完全不同：</p>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">⚠</span><code>reset</code> 改寫歷史</div>
+          <div class="compare-body">
+            把指針往回搬，被略過的 commit 從分支上消失 (還在 reflog)。<strong>已 push 過的 commit 別 reset，會破壞別人的歷史。</strong>
+            適合：本地還沒 push 前把幾個 commit 撤掉重做。
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span><code>revert</code> 加新 commit</div>
+          <div class="compare-body">
+            建立一個「反向操作」的新 commit，原本的 commit 還在歷史中。<strong>已 push 的公開分支該用 revert。</strong>
+            適合：production 上線後發現問題、要安全回退。
+          </div>
+        </div>
+      </div>
+
+      <h3><code>reset</code> 的三種模式</h3>
+
+      <table>
+        <thead>
+          <tr><th>模式</th><th>HEAD 動?</th><th>Staging 動?</th><th>Working Tree 動?</th><th>用在哪</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>--soft</code></td>
+            <td>✓ 動</td>
+            <td>✗ 不動</td>
+            <td>✗ 不動</td>
+            <td>把幾個 commit 退回成「即將要 commit」的狀態</td>
+          </tr>
+          <tr>
+            <td><code>--mixed</code> (預設)</td>
+            <td>✓ 動</td>
+            <td>✓ 動 (清空)</td>
+            <td>✗ 不動</td>
+            <td>退回 commit 又把 staging 清空，改動還在</td>
+          </tr>
+          <tr>
+            <td><code>--hard</code></td>
+            <td>✓ 動</td>
+            <td>✓ 動</td>
+            <td>✓ 動 (覆寫)</td>
+            <td><strong>連檔案都還原</strong> — 會吃掉沒 commit 的改動，務必確認</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># reset：把最近 3 個 commit 撤掉但保留改動 (預設 mixed)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> reset HEAD~3
+
+<span class="tk-cm"># reset --hard：連改動也丟掉 (危險，誤用要靠 reflog 救)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> reset <span class="tk-op">--hard</span> HEAD~3
+
+<span class="tk-cm"># revert：產生一個反向 commit (安全)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> revert a1b2c3d
+<span class="tk-cm"># 一次 revert 一個 merge commit (要指定父分支 -m 1)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> revert <span class="tk-op">-m</span> 1 &lt;merge-commit&gt;</code></pre>
+      </div>
+    </section>
+
+    <section id="force">
+      <span class="section-eyebrow">09 — 安全的 force push</span>
+      <h2><code>--force-with-lease</code>：force push 的安全版</h2>
+
+      <p>rebase 整理過自己的 PR 分支後，要把改寫過的歷史推上去，必須用 force push。但純 <code>--force</code> 有風險 — 如果同事在你 rebase 期間剛好 push 了東西到同一支分支，你會直接覆蓋掉他的工作。</p>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>危險</div>
+          <div class="compare-body">
+            <code>git push --force</code><br>
+            無條件覆蓋，同事剛 push 的 commit 會被你蓋掉，<strong>且不會警告。</strong>
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>推薦</div>
+          <div class="compare-body">
+            <code>git push --force-with-lease</code><br>
+            「除非遠端跟我上次 fetch 看到的一樣，否則拒絕推」 — 同事有新 push 時會擋下來提醒你。
+          </div>
+        </div>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>建議設成預設 alias</strong>
+          <code>git config --global alias.fpush "push --force-with-lease"</code> — 之後習慣性打 <code>git fpush</code>，徹底避開 <code>--force</code>。
+        </div>
+      </div>
+    </section>
+
+    <section id="extra">
+      <span class="section-eyebrow">10 — 加碼</span>
+      <h2>還有兩個進階技巧</h2>
+
+      <details class="collapse">
+        <summary><code>rerere</code>：自動記住衝突解法 <span class="collapse-tag">技巧</span></summary>
+        <div class="collapse-body">
+          <p style="margin-bottom:0.5rem;">「reuse recorded resolution」— 當你在 long-running rebase 反覆解同樣的衝突，<code>rerere</code> 會記住你怎麼解的，下次自動套用。</p>
+<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-pn">$</span> <span class="tk-fn">git</span> config <span class="tk-op">--global</span> rerere.enabled <span class="tk-st">true</span></code></pre>
+          <p style="margin-top:0.6rem;font-size:13px;">設好就忘了它存在，但它會默默幫你省下很多重複工作。</p>
+        </div>
+      </details>
+
+      <details class="collapse">
+        <summary><code>submodule</code> 救命指令 <span class="collapse-tag">深入</span></summary>
+        <div class="collapse-body">
+          <p style="margin-bottom:0.5rem;">submodule 是 Git 給跨 repo 依賴用的，但很多新人 clone 完發現 submodule 是空的：</p>
+<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># clone 時就把 submodule 一起拉</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> clone <span class="tk-op">--recurse-submodules</span> &lt;repo&gt;
+
+<span class="tk-cm"># 已經 clone 了，補拉 submodule</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> submodule update <span class="tk-op">--init --recursive</span>
+
+<span class="tk-cm"># 把所有 submodule 更新到他們各自分支的最新</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> submodule update <span class="tk-op">--remote --merge</span></code></pre>
+          <p style="margin-top:0.6rem;font-size:13px;color:var(--muted);">如果不是必要，現代專案多用 monorepo 或 package manager 取代 submodule，比較好維護。</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 5</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "下列哪個情境<strong>應該</strong>用 <code>git rebase</code> 而非 <code>git merge</code>？",
+    "options": [
+      "把自己還沒 push 的 feature 分支同步到最新 main",
+      "把同事正在用的 develop 分支整理掉幾個 commit",
+      "把 production 釋出版本的 hotfix 合進 main",
+      "main 分支歷史的整理"
+    ],
+    "answer": 0,
+    "explain": "Golden Rule：rebase 改寫 commit SHA，不能對「別人會用到」的公開分支做。只有自己 local、還沒 push 的分支可以放心 rebase。"
+  },
+  {
+    "question": "你 <code>git reset --hard HEAD~5</code> 之後突然發現第 4 個 commit 不該丟，怎麼救？",
+    "options": [
+      "已經 reset --hard 了，沒救",
+      "<code>git reflog</code> 找回那個 SHA，再 <code>git reset --hard &lt;SHA&gt;</code>",
+      "重新從 GitHub clone 一份",
+      "<code>git pull</code> 就會回來"
+    ],
+    "answer": 1,
+    "explain": "reflog 會記錄 HEAD 的所有移動，被 reset 的 commit 還在裡面 (預設保留 90 天)。這就是為什麼很多老手不太怕 reset --hard — 只要 reflog 還在就能救。"
+  },
+  {
+    "question": "<code>git revert a1b2c3d</code> 跟 <code>git reset --hard a1b2c3d~1</code> 的最大差別是？",
+    "options": [
+      "速度不同",
+      "revert 產生一個新 commit 不改寫歷史；reset 改寫歷史",
+      "revert 只能用在 main，reset 不限",
+      "兩者完全一樣，只是別名"
+    ],
+    "answer": 1,
+    "explain": "revert 適合已 push 的公開分支 (產生新 commit 不影響別人歷史)；reset --hard 改寫歷史，只在自己未 push 前用。"
+  },
+  {
+    "question": "下列哪些是 <code>--force-with-lease</code> 比 <code>--force</code> 安全的原因？(多選)",
+    "options": [
+      "會檢查遠端是否與本地上次 fetch 看到的相符",
+      "如果同事在期間 push 了新 commit，會擋下來警告",
+      "速度比較快",
+      "完全等同 <code>--force</code>，只是名字不同"
+    ],
+    "answer": [0, 1],
+    "explain": "<code>--force-with-lease</code> 會比對「我上次看到的遠端 SHA」跟「現在的遠端 SHA」是否一致，不一致就拒推 — 這正好攔下「同事在你 rebase 期間 push 新東西」的情境。"
+  },
+  {
+    "question": "interactive rebase 中，<code>fixup</code> 跟 <code>squash</code> 都是合併 commit，差別是什麼？",
+    "options": [
+      "fixup 比較快",
+      "squash 會打開編輯器讓你寫合併後的 message；fixup 直接丟掉這個 commit 的 message",
+      "fixup 只能合併 2 個，squash 可以合併多個",
+      "完全一樣"
+    ],
+    "answer": 1,
+    "explain": "「修 typo」「修 lint」這種補丁 commit 的 message 沒保留價值，用 <code>fixup</code> 直接丟掉；如果是兩個都有意義想合成一個更大的 commit，用 <code>squash</code> 寫新 message。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://git-scm.com/book/zh-tw/v2/Git-%E5%88%86%E6%94%AF-%E8%AE%93%E5%9F%BA" target="_blank" rel="noopener">Pro Git Book Ch.3.6 — 變基 (rebase)</a><span class="ref-meta">官方繁中書</span></li>
+        <li><a href="https://www.atlassian.com/git/tutorials/rewriting-history" target="_blank" rel="noopener">Atlassian Git Tutorials: Rewriting history</a><span class="ref-meta">rebase / amend / reflog</span></li>
+        <li><a href="https://git-scm.com/docs/git-bisect" target="_blank" rel="noopener">git-scm.com/docs/git-bisect</a><span class="ref-meta">含 bisect run 完整範例</span></li>
+        <li><a href="https://git-scm.com/docs/git-worktree" target="_blank" rel="noopener">git-scm.com/docs/git-worktree</a><span class="ref-meta">worktree 官方文件</span></li>
+        <li><a href="https://git-scm.com/docs/git-rerere" target="_blank" rel="noopener">git-scm.com/docs/git-rerere</a><span class="ref-meta">rerere 官方文件</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="01_git_daily.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 01 · Git 日常實務速成</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="03_branching_strategies.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 03 · 分支策略選擇</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">12 堂課程系列 <span class="progress-pill">2 / 12</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
+        <li><a class="course-nav-item current" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
+        <li><a class="course-nav-item" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇</span></a></li>
+        <li><a class="course-nav-item" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
+        <li><a class="course-nav-item" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
+        <li><a class="course-nav-item" href="06_commits_versioning.html"><span class="course-nav-num">06</span><span>Commit、SemVer、Changelog</span></a></li>
+        <li><a class="course-nav-item" href="07_issues_project_mgmt.html"><span class="course-nav-num">07</span><span>Issue 與專案管理</span></a></li>
+        <li><a class="course-nav-item" href="08_testing_tdd.html"><span class="course-nav-num">08</span><span>測試金字塔與 TDD</span></a></li>
+        <li><a class="course-nav-item" href="09_ci_cd_hooks.html"><span class="course-nav-num">09</span><span>CI/CD、Hooks、Lint</span></a></li>
+        <li><a class="course-nav-item" href="10_rfc_adr_release.html"><span class="course-nav-num">10</span><span>RFC、ADR、Release</span></a></li>
+        <li><a class="course-nav-item" href="11_dependencies_supply_chain.html"><span class="course-nav-num">11</span><span>依賴管理與供應鏈安全</span></a></li>
+        <li><a class="course-nav-item" href="12_first_contribution.html"><span class="course-nav-num">12</span><span>第一次貢獻實戰</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的開源協作課程系列 · Lesson 02
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 03｜Argo CD — GitOps 持續部署 — DevOps 實務課程</title>
+<meta name="description" content="把 Git 變成 cluster 的 single source of truth：Argo CD Application CRD、sync waves、ignoreDifferences、webhook、ApplicationSet 完整實戰。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 03 · DevOps 實務篇</div>
+    <h1 class="hero-title">Argo CD <span>GitOps 持續部署</span></h1>
+    <p class="hero-desc">把 Git 變成 cluster 的 <strong>single source of truth</strong>：CI 不再 <code>kubectl apply</code>，而是更新 manifest，剩下交給 cluster 內常駐的 Argo CD 自動拉取、比對、套用。<strong>從根本上改變部署的權責與安全模型。</strong></p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 3 / 5 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 70 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>DevOps</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#gitops-mental-model">心智模型</a></li>
+      <li><a class="toc-link" href="#ui-walkthrough">UI 全景</a></li>
+      <li><a class="toc-link" href="#sync-dialog">Sync 選項</a></li>
+      <li><a class="toc-link" href="#application-crd">Application CRD</a></li>
+      <li><a class="toc-link" href="#sync-waves-hooks">Waves / Hooks</a></li>
+      <li><a class="toc-link" href="#ignore-differences">ignoreDifferences</a></li>
+      <li><a class="toc-link" href="#gitops-flow">完整流程</a></li>
+      <li><a class="toc-link" href="#rollback">Rollback</a></li>
+      <li><a class="toc-link" href="#argocd-cli">argocd CLI</a></li>
+      <li><a class="toc-link" href="#advanced">進階主題</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="gitops-mental-model">
+      <span class="section-eyebrow">01 — 心智模型</span>
+      <h2>為什麼 Git 該是 single source of truth</h2>
+      <p>傳統 CI/CD 的部署流是這樣的：CI build 完 image 之後，<strong>同一條 pipeline 直接拿著 cluster 的 kubeconfig 去 <code>kubectl apply</code></strong>。這條路看起來很順，但有四個結構性問題：</p>
+
+      <ul>
+        <li><strong>權限太大</strong>：CI runner 會有對 production cluster 的寫入權，CI 一旦被入侵就等於 cluster 被入侵。</li>
+        <li><strong>狀態不可知</strong>：cluster 現在跑的版本，跟 Git 上看到的版本是不是一致？沒人能精確回答。</li>
+        <li><strong>漂移無法察覺</strong>：有人手動 <code>kubectl edit</code> 改了 production 的 deployment，沒人知道、沒人攔得住。</li>
+        <li><strong>Rollback 靠運氣</strong>：要回到上週版本，得手動回 CI 找對應 commit、重 build、重 apply。</li>
+      </ul>
+
+      <p>GitOps 把這條路反轉過來：<strong>cluster 自己跑一個 controller，定期看 Git，發現有差異就自己同步</strong>。CI 永遠不碰 cluster，它只負責更新 manifest repo。</p>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>Push-based（傳統 CI）</div>
+          <div class="compare-body">
+            <ul style="margin:0 0 0 1rem;font-size:13px;">
+              <li>CI 持有 cluster credential</li>
+              <li>CI 跑 <code>kubectl apply</code> 推到 cluster</li>
+              <li>無漂移偵測，手動 edit 不會被反映出來</li>
+              <li>Rollback 要靠重跑 CI</li>
+              <li>多 cluster 要管 N 份 credential</li>
+            </ul>
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>Pull-based（GitOps / Argo CD）</div>
+          <div class="compare-body">
+            <ul style="margin:0 0 0 1rem;font-size:13px;">
+              <li>cluster 內 controller 主動 pull Git</li>
+              <li>CI 只 push commit，不碰 cluster</li>
+              <li>Self-heal 自動把手動改動拉回 Git 狀態</li>
+              <li>Rollback = git revert，歷史清楚</li>
+              <li>credential 統一在 Argo CD 管</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <h3>Argo CD 在這張圖裡的角色</h3>
+      <p>Argo CD 是一個跑在 Kubernetes 內的 controller。它做兩件事：<strong>(1) 定期 fetch manifest repo</strong>、<strong>(2) 把 Git 想要的 desired state 跟 cluster 現在的 live state 比對</strong>。如果不一致，依照 sync policy 決定要不要自動套用。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" aria-label="GitOps 流程圖">
+          <defs>
+            <marker id="arr-p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+            <marker id="arr-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#ff3d1f"/>
+            </marker>
+            <marker id="arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#15803d"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="12">
+            <text x="380" y="28" text-anchor="middle" font-family="Syne, sans-serif" font-size="17" font-weight="700" fill="#0a0a0f">GitOps 完整流程</text>
+            <text x="380" y="48" text-anchor="middle" fill="#6b6b7e" font-size="11">紫色 = CI 推 commit；橘色 = Argo CD 拉 manifest；綠色 = 套用到 cluster</text>
+
+            <!-- 開發者 -->
+            <rect x="20" y="90" width="130" height="60" rx="8" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="85" y="118" text-anchor="middle" font-weight="700" fill="#0a0a0f">開發者</text>
+            <text x="85" y="135" text-anchor="middle" fill="#6b6b7e" font-size="10">git push code</text>
+
+            <!-- CI -->
+            <rect x="190" y="90" width="130" height="60" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="255" y="115" text-anchor="middle" font-weight="700" fill="#4c1d95">CI Pipeline</text>
+            <text x="255" y="132" text-anchor="middle" fill="#6b6b7e" font-size="10">build image</text>
+            <text x="255" y="145" text-anchor="middle" fill="#6b6b7e" font-size="10">push registry</text>
+
+            <!-- Image Registry -->
+            <rect x="360" y="90" width="130" height="60" rx="8" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="425" y="118" text-anchor="middle" font-weight="700" fill="#0a0a0f">Image Registry</text>
+            <text x="425" y="135" text-anchor="middle" fill="#6b6b7e" font-size="10">ghcr / ECR / GAR</text>
+
+            <!-- Manifest Repo -->
+            <rect x="190" y="200" width="130" height="60" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="255" y="225" text-anchor="middle" font-weight="700" fill="#4c1d95">Manifest Repo</text>
+            <text x="255" y="242" text-anchor="middle" fill="#6b6b7e" font-size="10">values.yaml</text>
+            <text x="255" y="255" text-anchor="middle" fill="#6b6b7e" font-size="10">image tag bumped</text>
+
+            <!-- Argo CD -->
+            <rect x="380" y="200" width="130" height="60" rx="8" fill="#fff" stroke="#ff3d1f" stroke-width="2"/>
+            <text x="445" y="225" text-anchor="middle" font-weight="700" fill="#ff3d1f">Argo CD</text>
+            <text x="445" y="242" text-anchor="middle" fill="#6b6b7e" font-size="10">controller in</text>
+            <text x="445" y="255" text-anchor="middle" fill="#6b6b7e" font-size="10">namespace argocd</text>
+
+            <!-- Cluster -->
+            <rect x="560" y="200" width="170" height="60" rx="8" fill="#0a0a0f" stroke="#0a0a0f"/>
+            <text x="645" y="225" text-anchor="middle" font-weight="700" fill="#fafaf8">Kubernetes Cluster</text>
+            <text x="645" y="242" text-anchor="middle" fill="#a8a8b8" font-size="10">Deployment / Service</text>
+            <text x="645" y="255" text-anchor="middle" fill="#a8a8b8" font-size="10">/ Ingress / ConfigMap</text>
+
+            <!-- 箭頭 -->
+            <line x1="150" y1="120" x2="190" y2="120" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arr-p)"/>
+            <line x1="320" y1="120" x2="360" y2="120" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arr-p)"/>
+            <line x1="255" y1="150" x2="255" y2="200" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arr-p)"/>
+            <text x="265" y="180" fill="#7c3aed" font-size="10">CI 用 yq</text>
+            <text x="265" y="194" fill="#7c3aed" font-size="10">改 image tag</text>
+
+            <line x1="380" y1="230" x2="320" y2="230" stroke="#ff3d1f" stroke-width="1.8" marker-end="url(#arr-a)"/>
+            <text x="350" y="222" text-anchor="middle" fill="#ff3d1f" font-size="10">pull</text>
+
+            <line x1="510" y1="230" x2="560" y2="230" stroke="#15803d" stroke-width="1.8" marker-end="url(#arr-g)"/>
+            <text x="535" y="222" text-anchor="middle" fill="#15803d" font-size="10">apply</text>
+
+            <!-- 底下說明 -->
+            <text x="380" y="310" text-anchor="middle" fill="#6b6b7e" font-size="11">Argo CD 每 3 分鐘 reconcile 一次（或 webhook 觸發），看到 Git 跟 cluster 不同就自動 sync</text>
+            <text x="380" y="330" text-anchor="middle" fill="#6b6b7e" font-size="11">CI 永遠不碰 cluster；cluster credential 全部收在 argocd namespace 裡</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 1.1 — GitOps Pull-based 部署模型</div>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>code repo 與 manifest repo 通常分開</strong>
+          一個 repo 放應用程式原始碼，另一個 repo 放 Kubernetes manifests / Helm values。CI 跑完 build 後 commit 到 manifest repo，Argo CD 才 watch manifest repo。這樣 image build 失敗時不會把舊版的 manifest 弄髒。小團隊也可以放在同一個 repo 不同資料夾，重點是 Argo CD watch 的 path 要清楚。
+        </div>
+      </div>
+    </section>
+
+    <section id="ui-walkthrough">
+      <span class="section-eyebrow">02 — UI 全景</span>
+      <h2>Argo CD UI 怎麼看</h2>
+      <p>裝完 Argo CD 後，第一件事是登入 UI 確認狀態。預設 admin 密碼存在 secret 裡，要自己撈出來。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 1. 取得初始 admin password (預設只用一次，第一次登入後請改掉)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> <span class="tk-op">-n</span> argocd get secret argocd-initial-admin-secret \
+    <span class="tk-op">-o</span> jsonpath=<span class="tk-st">'{.data.password}'</span> | base64 <span class="tk-op">-d</span>; echo
+
+<span class="tk-cm"># 2. port-forward 把 UI 暴出來 (production 請用 Ingress + TLS)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> port-forward svc/argocd-server <span class="tk-op">-n</span> argocd 8080:443
+
+<span class="tk-cm"># 3. 瀏覽器打開 https://localhost:8080，使用者 admin、密碼貼上</span></code></pre>
+      </div>
+
+      <h3>三個你會反覆回來的頁面</h3>
+      <table>
+        <thead>
+          <tr><th>頁面</th><th>看到什麼</th><th>常用操作</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Application 列表</td>
+            <td>所有 App 的 health（綠/黃/紅）與 sync 狀態（Synced / OutOfSync）</td>
+            <td>filter by health/sync/project/cluster；切 tile 與 list view；星號 favorite</td>
+          </tr>
+          <tr>
+            <td>App detail</td>
+            <td>resource tree：Deployment → ReplicaSet → Pod 一層層展開</td>
+            <td>點 resource 看 live diff vs Git desired manifest；看 events / logs</td>
+          </tr>
+          <tr>
+            <td>Settings</td>
+            <td>repo connection、cluster、project、user、SSO 設定</td>
+            <td>新增 private repo（SSH key 或 token）、加新的 cluster</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Resource tree 上每個節點的顏色代表 health：</p>
+      <ul>
+        <li><strong>綠色</strong>：Healthy（Pod Running、Service 有 Endpoints）</li>
+        <li><strong>黃色</strong>：Progressing（rolling update 中、還在等 readiness）</li>
+        <li><strong>紅色</strong>：Degraded（CrashLoopBackOff、ImagePullBackOff）</li>
+        <li><strong>灰色</strong>：Missing / Unknown</li>
+      </ul>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>關掉 admin / 改用 SSO</strong>
+          上線後請把 <code>admin</code> 帳號透過 ConfigMap <code>argocd-cm</code> 設成 <code>admin.enabled: "false"</code>，並接 OIDC（Google / GitHub / Auth0）。Production 集群不該長期留 shared admin 密碼。
+        </div>
+      </div>
+    </section>
+
+    <section id="sync-dialog">
+      <span class="section-eyebrow">03 — Sync 選項</span>
+      <h2>Sync 對話框每個 checkbox 的真實後果</h2>
+      <p>UI 上點 Sync 會跳出一堆 checkbox，每個都對應 cluster 的真實行為。<strong>不要無腦全勾</strong>，下面這張表是線上事故來源 Top 5。</p>
+
+      <table>
+        <thead>
+          <tr><th>選項</th><th>實際做什麼</th><th>什麼時候勾</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>Prune</code></td>
+            <td>刪掉「Git 已移除、但 cluster 還在」的資源</td>
+            <td>確定 Git 是 source of truth，重構 manifest 結構時要勾</td>
+          </tr>
+          <tr>
+            <td><code>Force</code></td>
+            <td>用 <code>kubectl replace</code> 取代 <code>apply</code>。會強制覆蓋整個物件，破壞 immutable 欄位也直接砍重建</td>
+            <td>幾乎不該勾。只有 spec.selector 之類 immutable 欄位真的要改才用</td>
+          </tr>
+          <tr>
+            <td><code>Dry Run</code></td>
+            <td>只跑 server-side dry-run，看 diff 不寫入 cluster</td>
+            <td>第一次 sync 一個複雜的 chart 時，先勾這個確認結果</td>
+          </tr>
+          <tr>
+            <td><code>Apply Out Of Sync Only</code></td>
+            <td>只 sync 偵測到 drift 的資源，其他 in-sync 的略過</td>
+            <td>App 很大、只想動有變化的部分時。可以加快 sync 速度</td>
+          </tr>
+          <tr>
+            <td><code>Sync Source Branch</code></td>
+            <td>暫時切換到別的 branch / tag / commit SHA sync 一次</td>
+            <td>要部署 hotfix branch 看效果，又不想動 Application 設定時</td>
+          </tr>
+          <tr>
+            <td><code>Replace</code></td>
+            <td>跟 Force 類似但不會刪 finalizer。仍然會破壞欄位</td>
+            <td>處理 Helm chart 從舊版本升級時 immutable 欄位卡住的情況</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>單一 resource sync vs 整個 App sync</h3>
+      <p>UI 上點某個資源（例如某個 Deployment）右鍵也能選 <strong>Sync</strong>，這樣只會動那個資源、不會碰其他。<strong>修一個 ConfigMap 不希望順便 restart 鄰居 Deployment 時超有用</strong>。</p>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>Force + Prune 同時勾，可能在 30 秒內讓整個 namespace 消失</strong>
+          假設你不小心把 Application 的 <code>spec.source.path</code> 改成空資料夾（或新建空 directory 的 PR 被誤 merge），<code>Prune</code> 會把所有「Git 沒有但 cluster 有」的資源刪掉、<code>Force</code> 會繞過 finalizer 直接刪除。<strong>實務上強烈建議：自動 sync 不要開 prune；手動點 Force 前看三遍 diff。</strong>下面 Section 4 會講 <code>allowEmpty: false</code> 這條保命線。
+        </div>
+      </div>
+    </section>
+
+    <section id="application-crd">
+      <span class="section-eyebrow">04 — Application CRD</span>
+      <h2>Application 完整 spec 解析</h2>
+      <p>Argo CD 的所有概念最終都落在一份 <code>Application</code> CRD。學會手寫這份 YAML，等於掌握 Argo CD 的全部。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">apiVersion</span>: argoproj.io/v1alpha1
+<span class="tk-kw">kind</span>: Application
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: example-app
+  <span class="tk-kw">namespace</span>: argocd                <span class="tk-cm"># Application 物件本身存哪</span>
+  <span class="tk-kw">finalizers</span>:
+    <span class="tk-op">-</span> resources-finalizer.argocd.argoproj.io  <span class="tk-cm"># 刪 Application 時連 cluster 內的 resources 一起刪</span>
+
+<span class="tk-kw">spec</span>:
+  <span class="tk-kw">project</span>: default                 <span class="tk-cm"># 對應 AppProject，限制 sourceRepos / destinations</span>
+
+  <span class="tk-kw">source</span>:
+    <span class="tk-kw">repoURL</span>: https://github.com/&lt;your-org&gt;/&lt;repo&gt;.git
+    <span class="tk-kw">targetRevision</span>: HEAD          <span class="tk-cm"># 也可以是 branch / tag / commit SHA</span>
+    <span class="tk-kw">path</span>: deploy/example-app       <span class="tk-cm"># Helm chart 或 kustomize 根目錄</span>
+    <span class="tk-kw">helm</span>:                          <span class="tk-cm"># 自動偵測 Chart.yaml；想覆蓋 values 才寫</span>
+      <span class="tk-kw">valueFiles</span>:
+        <span class="tk-op">-</span> values.yaml
+        <span class="tk-op">-</span> values-prod.yaml          <span class="tk-cm"># 多 values 後面覆蓋前面</span>
+      <span class="tk-kw">parameters</span>:
+        <span class="tk-op">-</span> <span class="tk-kw">name</span>: image.tag
+          <span class="tk-kw">value</span>: v1.4.2
+
+  <span class="tk-kw">destination</span>:
+    <span class="tk-kw">server</span>: https://kubernetes.default.svc  <span class="tk-cm"># in-cluster；外部 cluster 要先 argocd cluster add</span>
+    <span class="tk-kw">namespace</span>: example-prod        <span class="tk-cm"># resources 安裝到哪個 namespace</span>
+
+  <span class="tk-kw">syncPolicy</span>:
+    <span class="tk-kw">automated</span>:                     <span class="tk-cm"># 不寫這段就是純手動 sync</span>
+      <span class="tk-kw">prune</span>: <span class="tk-num">true</span>                 <span class="tk-cm"># Git 移除的資源也跟著刪</span>
+      <span class="tk-kw">selfHeal</span>: <span class="tk-num">true</span>              <span class="tk-cm"># 任何 kubectl edit 都會被改回 Git</span>
+      <span class="tk-kw">allowEmpty</span>: <span class="tk-num">false</span>           <span class="tk-cm"># 預設 false：保命，防止 Git path 變空時清光 namespace</span>
+    <span class="tk-kw">syncOptions</span>:
+      <span class="tk-op">-</span> CreateNamespace=true        <span class="tk-cm"># namespace 不存在時自動建</span>
+      <span class="tk-op">-</span> PrunePropagationPolicy=foreground
+      <span class="tk-op">-</span> PruneLast=true              <span class="tk-cm"># prune 排到 sync 最後一步，避免依賴錯亂</span>
+    <span class="tk-kw">retry</span>:
+      <span class="tk-kw">limit</span>: <span class="tk-num">5</span>
+      <span class="tk-kw">backoff</span>:
+        <span class="tk-kw">duration</span>: 5s
+        <span class="tk-kw">factor</span>: <span class="tk-num">2</span>
+        <span class="tk-kw">maxDuration</span>: 3m</code></pre>
+      </div>
+
+      <h3>四個 automated 旗標一個一個拆</h3>
+      <table>
+        <thead>
+          <tr><th>欄位</th><th>預設</th><th>意義</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>automated.enabled</code></td>
+            <td>true（只要寫了 automated 區塊）</td>
+            <td>是否要自動 sync。設 false 等於暫時關閉自動，sync 改用手動觸發</td>
+          </tr>
+          <tr>
+            <td><code>prune</code></td>
+            <td>false</td>
+            <td>自動清除 Git 移除的資源。沒開的話刪除 Git 檔案後 cluster 仍會留下舊資源</td>
+          </tr>
+          <tr>
+            <td><code>selfHeal</code></td>
+            <td>false</td>
+            <td>手動 <code>kubectl edit</code> 後是否強制回 Git 狀態。<strong>跟 HPA 衝突的元兇</strong>（看 Section 6）</td>
+          </tr>
+          <tr>
+            <td><code>allowEmpty</code></td>
+            <td>false</td>
+            <td>當 Git 偵測到 0 個 resource 時，是否允許 prune 把 cluster 也清空。<strong>預設 false 是保命機制</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-danger">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong><code>allowEmpty: false</code> 救過很多人，不要關</strong>
+          想像一下：有人手滑把 <code>deploy/example-app</code> 整個目錄刪掉提了 PR，CI 通過、merge 進 main。Argo CD 看到 Git path 下 0 個 manifest，如果 <code>allowEmpty: true</code> 又開了 <code>prune: true</code>，就會把整個 production namespace 的 Deployment / Service / ConfigMap 全部 prune 掉。<strong>預設 false 會擋下這個動作、把 App 標成 Sync Failed，等人去看。</strong>非常多公司被這條救過命，不要為了「我覺得 Git 應該總是對」就把它打開。
+        </div>
+      </div>
+
+      <h3>Helm 與 Kustomize 自動偵測</h3>
+      <p>Argo CD 看 <code>spec.source.path</code> 底下的檔案：</p>
+      <ul>
+        <li>有 <code>Chart.yaml</code> → 當 Helm chart，跑 <code>helm template</code></li>
+        <li>有 <code>kustomization.yaml</code> → 當 Kustomize，跑 <code>kustomize build</code></li>
+        <li>都沒有 → 純 directory of YAML，直接 apply</li>
+      </ul>
+      <p>不用在 Application spec 裡明寫 <code>helm:</code> 或 <code>kustomize:</code> 區塊，<strong>只有要傳 values / parameters 才需要寫</strong>。</p>
+    </section>
+
+    <section id="sync-waves-hooks">
+      <span class="section-eyebrow">05 — Sync waves 與 Hooks</span>
+      <h2>控制 sync 順序：sync waves & resource hooks</h2>
+      <p>有些資源必須跑在前面、有些必須跑在後面。例如 DB schema migration 一定要在新版 Pod 滾出來前跑完，否則新 code 連到舊 schema 會炸。Argo CD 用兩種機制解這件事：<strong>sync waves</strong> 控制順序，<strong>hooks</strong> 控制時機。</p>
+
+      <h3>Sync waves — annotation 排序</h3>
+      <p>每個 resource 可以掛一個 <code>argocd.argoproj.io/sync-wave</code> annotation，<strong>數字小的先 apply、數字大的後 apply</strong>。沒掛的預設 wave 是 <code>0</code>。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># wave -2：先建 Namespace 與 ConfigMap（基礎設施）</span>
+<span class="tk-kw">apiVersion</span>: v1
+<span class="tk-kw">kind</span>: Namespace
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: example-prod
+  <span class="tk-kw">annotations</span>:
+    argocd.argoproj.io/sync-wave: <span class="tk-st">"-2"</span>
+<span class="tk-op">---</span>
+<span class="tk-cm"># wave -1：跑 schema migration Job（必須在新 Pod 起來前完成）</span>
+<span class="tk-kw">apiVersion</span>: batch/v1
+<span class="tk-kw">kind</span>: Job
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: db-migration
+  <span class="tk-kw">annotations</span>:
+    argocd.argoproj.io/sync-wave: <span class="tk-st">"-1"</span>
+<span class="tk-op">---</span>
+<span class="tk-cm"># wave 0：預設，Deployment / Service 在這層</span>
+<span class="tk-kw">apiVersion</span>: apps/v1
+<span class="tk-kw">kind</span>: Deployment
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: example-app</code></pre>
+      </div>
+
+      <h3>Resource hooks — 在 sync 生命週期的哪個點跑</h3>
+      <p>Hook annotation 把一個 resource 從「正常 manifest」升級成「sync 流程的一部分」：</p>
+
+      <table>
+        <thead>
+          <tr><th>Hook</th><th>什麼時候跑</th><th>典型用途</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>PreSync</code></td>
+            <td>所有資源 apply <strong>之前</strong></td>
+            <td>DB schema migration、清快取</td>
+          </tr>
+          <tr>
+            <td><code>Sync</code></td>
+            <td>主要 sync 流程中（跟其他 resource 一起，但可控 wave）</td>
+            <td>少用，幾乎等同於普通 manifest</td>
+          </tr>
+          <tr>
+            <td><code>PostSync</code></td>
+            <td>所有資源 apply <strong>且 healthy 之後</strong></td>
+            <td>send Slack notification、跑 e2e smoke test</td>
+          </tr>
+          <tr>
+            <td><code>SyncFail</code></td>
+            <td>sync 失敗時</td>
+            <td>send 告警、自動回滾</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Hook delete policy — 跑完之後要不要留</h3>
+      <p>Hook 通常是 Job，跑完想要自動清掉避免堆積。用 <code>argocd.argoproj.io/hook-delete-policy</code> annotation：</p>
+
+      <ul>
+        <li><code>HookSucceeded</code>：成功就刪</li>
+        <li><code>HookFailed</code>：失敗就刪</li>
+        <li><code>BeforeHookCreation</code>：下次跑之前刪舊的（<strong>最常用</strong>，方便看上次 log）</li>
+      </ul>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 完整範例：DB migration Job 放 PreSync wave -1</span>
+<span class="tk-kw">apiVersion</span>: batch/v1
+<span class="tk-kw">kind</span>: Job
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: example-app-migrate
+  <span class="tk-kw">annotations</span>:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: <span class="tk-st">"-1"</span>
+<span class="tk-kw">spec</span>:
+  <span class="tk-kw">backoffLimit</span>: <span class="tk-num">2</span>
+  <span class="tk-kw">template</span>:
+    <span class="tk-kw">spec</span>:
+      <span class="tk-kw">restartPolicy</span>: Never
+      <span class="tk-kw">containers</span>:
+        <span class="tk-op">-</span> <span class="tk-kw">name</span>: migrate
+          <span class="tk-kw">image</span>: ghcr.io/&lt;your-org&gt;/example-app-migrator:v1.4.2
+          <span class="tk-kw">command</span>: [<span class="tk-st">"./migrate"</span>, <span class="tk-st">"up"</span>]</code></pre>
+      </div>
+
+      <p><strong>關鍵：PreSync hook 失敗，後續 wave 全部不會跑。</strong>schema migration 沒成功 → 新版 Pod 不會被 apply 出去 → app 不會看到自己連到不對的 schema。這就是 GitOps 安全 deploy 的核心。</p>
+    </section>
+
+    <section id="ignore-differences">
+      <span class="section-eyebrow">06 — ignoreDifferences</span>
+      <h2>處理「Argo CD 跟其他 controller 打架」</h2>
+      <p>Cluster 上很多東西不只 Argo CD 在改：HPA 動態調 replicas、cert-manager 換憑證內容、kube-controller 加 pod-template-hash label。<strong>Argo CD 看 Git 是 A、cluster 是 B → 就要 self-heal 改回 A → 然後其他 controller 又改回 B → 無限循環</strong>。</p>
+
+      <h3>HPA 案例：最常見的衝突</h3>
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Git 寫 <code>spec.replicas: 2</code></div>
+            <div class="timeline-desc">這是團隊定的「最小起手 replica」</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">流量上來，HPA 動態擴到 8 個 Pod</div>
+            <div class="timeline-desc">HPA controller 把 <code>spec.replicas</code> 改成 <code>8</code></div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Argo CD reconcile：發現 cluster 8 ≠ Git 2</div>
+            <div class="timeline-desc">selfHeal 把 replicas 改回 2，Pod 開始大量 terminate</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">HPA 看到負載還是高，又把 replicas 改回 8</div>
+            <div class="timeline-desc">兩個 controller 開始 ping-pong，<strong>使用者體驗瞬間爆炸</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <h3>解法：<code>ignoreDifferences</code> 用 JSON pointer 排除特定欄位</h3>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">apiVersion</span>: argoproj.io/v1alpha1
+<span class="tk-kw">kind</span>: Application
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: example-app
+<span class="tk-kw">spec</span>:
+  <span class="tk-cm"># ... 其他欄位省略 ...</span>
+  <span class="tk-kw">ignoreDifferences</span>:
+    <span class="tk-cm"># 1. HPA 管的 replicas，不要追</span>
+    <span class="tk-op">-</span> <span class="tk-kw">group</span>: apps
+      <span class="tk-kw">kind</span>: Deployment
+      <span class="tk-kw">jsonPointers</span>:
+        <span class="tk-op">-</span> /spec/replicas
+
+    <span class="tk-cm"># 2. cert-manager 動態填 secret data，不要追</span>
+    <span class="tk-op">-</span> <span class="tk-kw">group</span>: <span class="tk-st">""</span>
+      <span class="tk-kw">kind</span>: Secret
+      <span class="tk-kw">name</span>: example-app-tls
+      <span class="tk-kw">jsonPointers</span>:
+        <span class="tk-op">-</span> /data
+
+    <span class="tk-cm"># 3. 用 jqPathExpressions 處理 list 內的特定 entry</span>
+    <span class="tk-op">-</span> <span class="tk-kw">group</span>: apps
+      <span class="tk-kw">kind</span>: Deployment
+      <span class="tk-kw">jqPathExpressions</span>:
+        <span class="tk-op">-</span> <span class="tk-st">'.spec.template.spec.containers[].image'</span>  <span class="tk-cm"># 例如 image 由其他工具改</span></code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong><code>ignoreDifferences</code> 不是逃避，是必要設計</strong>
+          很多新手第一次看到 OutOfSync 的反應是「為什麼 Argo CD 一直紅」，然後就把 selfHeal 關掉。這是錯的方向。<strong>正確作法是搞清楚是誰在改、把那欄位排除掉</strong>。selfHeal 仍然會盯其他欄位（image、env、resources、selector），保護真正的 drift。常見要排除的還有：<code>kube-controller</code> 加的 <code>pod-template-hash</code>、Linkerd / Istio 注入的 sidecar annotation、metrics-server 寫的 status 欄位。
+        </div>
+      </div>
+
+      <details class="collapse">
+        <summary>進階：cluster-wide 預設 ignoreDifferences <span class="collapse-tag">深入</span></summary>
+        <div class="collapse-body">
+          <p>Argo CD 的 <code>argocd-cm</code> ConfigMap 可以設一份全 cluster 預設的 <code>resource.customizations.ignoreDifferences.&lt;group&gt;_&lt;kind&gt;</code>，這樣不用每個 Application 都重寫一次：</p>
+<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code>resource.customizations.ignoreDifferences.apps_Deployment: |
+  jsonPointers:
+    - /spec/replicas
+resource.customizations.ignoreDifferences.all: |
+  jqPathExpressions:
+    - '.metadata.annotations."deployment.kubernetes.io/revision"'</code></pre>
+          <p style="margin-top:0.6rem;font-size:13px;color:var(--muted);">寫在 ConfigMap 裡時改完要 restart <code>argocd-application-controller</code> Pod 才會生效。</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="gitops-flow">
+      <span class="section-eyebrow">07 — 完整流程</span>
+      <h2>從 commit 到 Pod 滾完的完整路徑</h2>
+      <p>把前面所有概念串起來，一次 deploy 從開發者按下 <code>git push</code> 到新版 Pod 跑起來，會經過下面這些階段：</p>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">CI build image 並 push 到 registry</div>
+            <div class="timeline-desc">image tag 通常用 git commit SHA 或 semver，例如 <code>v1.4.2</code> 或 <code>sha-a1b2c3d</code></div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">CI 用 yq 改 manifest repo 的 values.yaml</div>
+            <div class="timeline-desc"><code>yq -i '.image.tag = "v1.4.2"' deploy/example-app/values.yaml</code> 然後 commit + push 回 manifest repo</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Argo CD 偵測 Git 有新 commit</div>
+            <div class="timeline-desc">兩條路：(a) 預設 <strong>polling 每 3 分鐘</strong>；(b) 設 <strong>webhook</strong> 達到秒級</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Refresh + reconcile</div>
+            <div class="timeline-desc">跑 <code>helm template</code> 算出 desired manifests，跟 cluster live state diff</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">5</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Sync（自動或手動）</div>
+            <div class="timeline-desc">依 sync waves 排序、先跑 PreSync hook（migration）、再 apply Deployment</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">6</div>
+          <div class="timeline-content">
+            <div class="timeline-title">kubectl rollout 進行中</div>
+            <div class="timeline-desc">App health 變黃（Progressing），等 readinessProbe 通過後變綠</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">7</div>
+          <div class="timeline-content">
+            <div class="timeline-title">PostSync hook 跑完 → 通知</div>
+            <div class="timeline-desc">Notification controller 把 sync-succeeded 事件發到 Slack/Discord</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>從 3 分鐘到秒級：webhook 設定</h3>
+      <p>預設 <code>timeout.reconciliation: 180s</code>（在 ConfigMap <code>argocd-cm</code> 裡）會讓所有 App 每 3 分鐘 polling 一次 Git。production 通常嫌慢，要設 webhook：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># GitHub webhook 設定步驟</span>
+<span class="tk-cm"># 1. 在 manifest repo: Settings → Webhooks → Add webhook</span>
+<span class="tk-cm">#    Payload URL: https://&lt;argocd-server&gt;/api/webhook</span>
+<span class="tk-cm">#    Content type: application/json</span>
+<span class="tk-cm">#    Secret: &lt;random-string&gt;  (記下來)</span>
+<span class="tk-cm">#    Events: Just the push event</span>
+
+<span class="tk-cm"># 2. 把 secret 寫進 argocd-secret</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> <span class="tk-op">-n</span> argocd patch secret argocd-secret \
+    <span class="tk-op">--type</span> merge \
+    <span class="tk-op">-p</span> <span class="tk-st">'{"stringData":{"webhook.github.secret":"&lt;random-string&gt;"}}'</span>
+
+<span class="tk-cm"># 3. 從此 push commit → 幾秒內 Argo CD 就 refresh</span>
+<span class="tk-cm">#    polling 仍然在跑（fallback），但 webhook 是主要觸發路徑</span></code></pre>
+      </div>
+
+      <h3>四種 Application 狀態的解讀</h3>
+      <table>
+        <thead>
+          <tr><th>狀態</th><th>意思</th><th>怎麼處理</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>OutOfSync</code></td>
+            <td>Git desired 跟 cluster live 有差異，但 cluster 上的東西還活著</td>
+            <td>看 diff，大多時候 sync 一下就好。如果是 HPA 之類的合理 drift → 加進 <code>ignoreDifferences</code></td>
+          </tr>
+          <tr>
+            <td><code>Degraded</code></td>
+            <td>套用了，但運行不健康（Pod CrashLoop、readinessProbe 一直失敗）</td>
+            <td>點進去看 Pod logs / events（接 Lesson 02 的 <code>kubectl logs</code> / <code>describe</code> 知識）</td>
+          </tr>
+          <tr>
+            <td><code>Missing</code></td>
+            <td>Git 預期存在的資源 cluster 沒有</td>
+            <td>多半是新建 App 還沒 sync 過。手動 sync 即可</td>
+          </tr>
+          <tr>
+            <td><code>Unknown</code></td>
+            <td>比對失敗，連 desired state 都算不出來</td>
+            <td>看 <code>argocd-application-controller</code> Pod 的 logs。常見：helm template 渲染錯（values 缺東西）、targetRevision 指到不存在的 branch</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="rollback">
+      <span class="section-eyebrow">08 — Rollback</span>
+      <h2>Rollback 兩種做法 — 但只有一種是 durable</h2>
+
+      <h3>UI：Application → History → 選舊 revision</h3>
+      <p>UI 點 <strong>History and Rollback</strong>，會列出最近 N 筆 sync 紀錄（含對應的 Git SHA）。選一筆按 <strong>Rollback</strong>，Argo CD 會用那筆 SHA 重新 sync。</p>
+
+      <h3>CLI：精準腳本化</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 1. 看歷史，找回想要的版本 ID</span>
+<span class="tk-pn">$</span> <span class="tk-fn">argocd</span> app history example-app
+ID  DATE                  REVISION
+3   2026-04-25 10:14:02   d4e5f6a  (latest)
+2   2026-04-24 18:30:11   a1b2c3d
+1   2026-04-23 09:05:48   8f9e0c1
+
+<span class="tk-cm"># 2. 滾回 ID=2 (a1b2c3d)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">argocd</span> app rollback example-app 2</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>auto-sync + rollback 是個陷阱</strong>
+          假設 <code>automated.enabled: true</code>，你 UI rollback 到舊版 → cluster 暫時回到舊狀態 → 但 Git 還是新版 → 下一次 reconcile（最多 3 分鐘）就把它 sync 回新版了。<strong>UI rollback 在 auto-sync App 上是「臨時」的。</strong>真正想 durable rollback 要在 manifest repo 跑 <code>git revert</code>，讓 Git 也回到舊版。
+        </div>
+      </div>
+
+      <h3>真正正確的 rollback 流程</h3>
+      <ol>
+        <li>線上有問題 → UI 先按 rollback 把 cluster 拉回上一版（<strong>救火</strong>）</li>
+        <li>同時在 manifest repo <code>git revert &lt;bad-commit&gt;</code> 並 push（<strong>讓 Git 也回到正確狀態</strong>）</li>
+        <li>之後 Argo CD reconcile 看 Git 跟 cluster 已經一致，OutOfSync 消失</li>
+        <li>事後再去查 root cause、決定要不要 forward-fix</li>
+      </ol>
+
+      <p>這樣 Git 仍然是 single source of truth，git log 看得到「我們在 X 點 revert 了 Y commit 因為 Z」。<strong>這條紀錄一年後翻還看得懂，是 GitOps 的真正價值。</strong></p>
+    </section>
+
+    <section id="argocd-cli">
+      <span class="section-eyebrow">09 — argocd CLI</span>
+      <h2>argocd CLI：腳本化、CI gate、debug 利器</h2>
+      <p>UI 適合人類偶爾看，但批量操作、CI 整合都要靠 CLI。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 安裝</span>
+<span class="tk-pn">$</span> <span class="tk-fn">brew</span> install argocd                  <span class="tk-cm"># macOS</span>
+<span class="tk-pn">$</span> <span class="tk-fn">scoop</span> install argocd                  <span class="tk-cm"># Windows</span>
+
+<span class="tk-cm"># 登入 (--grpc-web 是穿過 ingress 必加)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">argocd</span> login argocd.example.com \
+    <span class="tk-op">--grpc-web</span> \
+    <span class="tk-op">--username</span> admin \
+    <span class="tk-op">--password</span> &lt;your-password&gt;
+
+<span class="tk-cm"># 也支援 SSO 流程</span>
+<span class="tk-pn">$</span> <span class="tk-fn">argocd</span> login argocd.example.com <span class="tk-op">--sso</span> <span class="tk-op">--grpc-web</span></code></pre>
+      </div>
+
+      <h3>七個你會天天用的指令</h3>
+      <table>
+        <thead>
+          <tr><th>指令</th><th>用途</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>argocd app list -p &lt;project&gt;</code></td>
+            <td>列出某 project 下所有 App 的健康/sync 狀態</td>
+          </tr>
+          <tr>
+            <td><code>argocd app get &lt;app&gt;</code></td>
+            <td>看單一 App 的細節：source、destination、最近 sync、resource tree</td>
+          </tr>
+          <tr>
+            <td><code>argocd app diff &lt;app&gt;</code></td>
+            <td>顯示 Git desired 跟 cluster live 的差異。<strong>有差異時 exit code = 1，超適合接 CI gate</strong></td>
+          </tr>
+          <tr>
+            <td><code>argocd app sync &lt;app&gt; --prune --dry-run</code></td>
+            <td>dry-run 整個 sync 流程，看會做什麼但不真的做</td>
+          </tr>
+          <tr>
+            <td><code>argocd app history &lt;app&gt;</code></td>
+            <td>列出歷史 sync 紀錄與對應 Git SHA</td>
+          </tr>
+          <tr>
+            <td><code>argocd app rollback &lt;app&gt; &lt;id&gt;</code></td>
+            <td>rollback 到 history 裡的某一筆（注意 auto-sync 陷阱）</td>
+          </tr>
+          <tr>
+            <td><code>argocd app set &lt;app&gt; --sync-policy none</code></td>
+            <td>暫時關閉自動 sync（事故處理時很有用）</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># CI gate 範例：PR 階段檢查這次的 manifest 改動會造成什麼 diff</span>
+<span class="tk-pn">$</span> <span class="tk-fn">argocd</span> app diff example-app <span class="tk-op">--revision</span> <span class="tk-st">"$GITHUB_SHA"</span>
+<span class="tk-cm"># exit 0 → 沒差異；exit 1 → 有差異，CI 印出 diff、人類審查</span>
+
+<span class="tk-cm"># 強制重新從 Git 抓最新 (跳過快取)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">argocd</span> app get example-app <span class="tk-op">--refresh</span>
+<span class="tk-pn">$</span> <span class="tk-fn">argocd</span> app get example-app <span class="tk-op">--hard-refresh</span>      <span class="tk-cm"># 連 Helm/Kustomize 渲染快取也丟</span></code></pre>
+      </div>
+    </section>
+
+    <section id="advanced">
+      <span class="section-eyebrow">10 — 進階主題</span>
+      <h2>ApplicationSet、AppProject、Notifications</h2>
+
+      <h3>ApplicationSet — 一份 template 產 N 個 App</h3>
+      <p>當你要在 dev / staging / prod 三個 cluster 各佈一份同個 App，手寫三份 Application 很笨。<code>ApplicationSet</code> 用 generator 模板化：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">apiVersion</span>: argoproj.io/v1alpha1
+<span class="tk-kw">kind</span>: ApplicationSet
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: example-app-envs
+  <span class="tk-kw">namespace</span>: argocd
+<span class="tk-kw">spec</span>:
+  <span class="tk-kw">generators</span>:
+    <span class="tk-op">-</span> <span class="tk-kw">list</span>:
+        <span class="tk-kw">elements</span>:
+          <span class="tk-op">-</span> <span class="tk-kw">env</span>: dev
+            <span class="tk-kw">cluster</span>: https://dev-cluster.example.com
+            <span class="tk-kw">valueFile</span>: values-dev.yaml
+          <span class="tk-op">-</span> <span class="tk-kw">env</span>: prod
+            <span class="tk-kw">cluster</span>: https://prod-cluster.example.com
+            <span class="tk-kw">valueFile</span>: values-prod.yaml
+  <span class="tk-kw">template</span>:
+    <span class="tk-kw">metadata</span>:
+      <span class="tk-kw">name</span>: <span class="tk-st">'example-app-{{env}}'</span>     <span class="tk-cm"># 變數插值</span>
+    <span class="tk-kw">spec</span>:
+      <span class="tk-kw">project</span>: default
+      <span class="tk-kw">source</span>:
+        <span class="tk-kw">repoURL</span>: https://github.com/&lt;your-org&gt;/&lt;repo&gt;.git
+        <span class="tk-kw">targetRevision</span>: HEAD
+        <span class="tk-kw">path</span>: deploy/example-app
+        <span class="tk-kw">helm</span>:
+          <span class="tk-kw">valueFiles</span>: [<span class="tk-st">'{{valueFile}}'</span>]
+      <span class="tk-kw">destination</span>:
+        <span class="tk-kw">server</span>: <span class="tk-st">'{{cluster}}'</span>
+        <span class="tk-kw">namespace</span>: <span class="tk-st">'example-{{env}}'</span>
+      <span class="tk-kw">syncPolicy</span>:
+        <span class="tk-kw">automated</span>:
+          <span class="tk-kw">selfHeal</span>: <span class="tk-num">true</span></code></pre>
+      </div>
+
+      <p>除了 <code>list</code> 之外還有：</p>
+      <ul>
+        <li><code>cluster</code> generator — 自動依 Argo CD 註冊的所有 cluster 各產一份 App</li>
+        <li><code>git</code> generator — 看 Git repo 裡有哪些子目錄就產對應的 App（適合「每個微服務一個資料夾」）</li>
+        <li><code>matrix</code> / <code>merge</code> generator — 兩兩組合（cluster × env）</li>
+        <li><code>scm</code> generator — 自動掃描 GitHub org / GitLab group 的所有 repo</li>
+      </ul>
+
+      <h3>AppProject — 多租戶權限隔離</h3>
+      <p><code>AppProject</code> 是 Argo CD 的安全邊界。設一個 project 給某個 team，限制他們能用哪些 repo、佈到哪些 cluster、創哪些 cluster-scoped 資源。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">apiVersion</span>: argoproj.io/v1alpha1
+<span class="tk-kw">kind</span>: AppProject
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: team-platform
+  <span class="tk-kw">namespace</span>: argocd
+<span class="tk-kw">spec</span>:
+  <span class="tk-kw">description</span>: Platform team owns shared infra
+  <span class="tk-kw">sourceRepos</span>:
+    <span class="tk-op">-</span> https://github.com/&lt;your-org&gt;/platform-manifests.git
+  <span class="tk-kw">destinations</span>:
+    <span class="tk-op">-</span> <span class="tk-kw">namespace</span>: <span class="tk-st">'platform-*'</span>
+      <span class="tk-kw">server</span>: https://kubernetes.default.svc
+  <span class="tk-kw">clusterResourceWhitelist</span>:
+    <span class="tk-op">-</span> <span class="tk-kw">group</span>: <span class="tk-st">''</span>
+      <span class="tk-kw">kind</span>: Namespace
+    <span class="tk-op">-</span> <span class="tk-kw">group</span>: rbac.authorization.k8s.io
+      <span class="tk-kw">kind</span>: ClusterRole
+  <span class="tk-kw">namespaceResourceBlacklist</span>:
+    <span class="tk-op">-</span> <span class="tk-kw">group</span>: <span class="tk-st">''</span>
+      <span class="tk-kw">kind</span>: ResourceQuota</code></pre>
+      </div>
+
+      <h3>Notifications — sync 失敗自動發 Slack</h3>
+      <p>Argo CD 有獨立的 notifications-controller。設好 service（Slack webhook、Discord、email、Teams）、寫一個 trigger（什麼條件觸發）、加 template（訊息內容），最後在 Application 的 annotation 訂閱。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 在 Application metadata.annotations 訂閱想收的事件</span>
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: example-app
+  <span class="tk-kw">annotations</span>:
+    notifications.argoproj.io/subscribe.on-sync-failed.slack: deploys
+    notifications.argoproj.io/subscribe.on-health-degraded.slack: oncall
+    notifications.argoproj.io/subscribe.on-deployed.slack: deploys</code></pre>
+      </div>
+
+      <p>內建的 trigger 有 <code>on-sync-running</code>、<code>on-sync-succeeded</code>、<code>on-sync-failed</code>、<code>on-sync-status-unknown</code>、<code>on-deployed</code>、<code>on-health-degraded</code> 等。<strong>強烈建議至少訂 <code>on-sync-failed</code> 和 <code>on-health-degraded</code> 到 oncall channel</strong>。</p>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>下一堂</strong>
+          Lesson 04 會講 Prometheus + Grafana — Argo CD 自己也 expose metrics（sync 次數、失敗率、reconcile 延遲），可以接進你的監控系統。
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "Application 的 <code>spec.syncPolicy.automated.selfHeal: true</code> 會造成什麼行為？",
+    "options": [
+      "Argo CD 偵測到 Pod CrashLoop 時會自動重新部署上一版",
+      "任何手動 <code>kubectl edit</code> 改的欄位都會被 Argo CD 改回 Git 上的值",
+      "sync 失敗時自動 retry 直到成功",
+      "Argo CD 會幫忙修復 Helm chart 渲染錯誤"
+    ],
+    "answer": 1,
+    "explain": "<code>selfHeal</code> 的核心行為是「cluster live state 偏離 Git desired state 時，強制改回 Git」。任何人手動改的東西（不論是 hotfix 還是亂搞）都會被 revert。這就是為什麼 HPA 跟 selfHeal 會打架，需要用 <code>ignoreDifferences</code> 排除 <code>/spec/replicas</code>。"
+  },
+  {
+    "question": "為什麼 HPA 會跟 Argo CD 的 <code>selfHeal</code> 打架？正確的解法是什麼？",
+    "options": [
+      "HPA 改 <code>spec.replicas</code>，Argo CD 看 Git 是預設值就改回去；解法是設 <code>ignoreDifferences</code> 排除 <code>/spec/replicas</code>",
+      "HPA 不能跟 Argo CD 一起用，必須二選一",
+      "HPA 改的是 status，Argo CD 不會碰；不會打架",
+      "把 <code>selfHeal</code> 整個關掉"
+    ],
+    "answer": 0,
+    "explain": "HPA 改的是 <code>spec.replicas</code>（不是 status），Argo CD selfHeal 看 Git 寫的是 2、cluster 是 8 就會把它改回 2，然後 HPA 又把它改成 8，兩邊無限 ping-pong。標準解法是在 Application 寫 <code>ignoreDifferences</code> 用 jsonPointer 排除 <code>/spec/replicas</code>，selfHeal 仍然能保護其他欄位（image、env、resources），不要為了這個就把 selfHeal 整個關掉。"
+  },
+  {
+    "question": "設好 GitHub webhook 之後，從 push commit 到 Argo CD 開始 sync 大概多久？沒設 webhook 時呢？",
+    "options": [
+      "兩種情況都是即時",
+      "有 webhook 是秒級延遲；沒設 webhook 時預設每 3 分鐘 polling 一次",
+      "有 webhook 30 秒；沒 webhook 是 30 分鐘",
+      "都是 1 小時，因為 Argo CD 有快取"
+    ],
+    "answer": 1,
+    "explain": "預設 <code>timeout.reconciliation: 180s</code>（在 ConfigMap <code>argocd-cm</code>），每 3 分鐘 polling Git。設 webhook 後 GitHub push 事件會直接 POST 到 <code>/api/webhook</code>，refresh + reconcile 在幾秒內就會跑。Polling 仍然在跑當作 fallback，避免 webhook 漏單導致永遠不 sync。"
+  },
+  {
+    "question": "Argo CD UI 看到某個 Application 狀態 = <code>Unknown</code>，下列哪些是合理的排查步驟？(多選)",
+    "options": [
+      "看 <code>argocd-application-controller</code> Pod 的 logs",
+      "在本機跑 <code>helm template</code> 試渲染那個 chart，看是不是 values 缺東西",
+      "確認 Application 的 <code>spec.source.targetRevision</code> 指到的 branch / tag / SHA 真的存在",
+      "馬上把 Application 砍掉重建"
+    ],
+    "answer": [0, 1, 2],
+    "explain": "<code>Unknown</code> 代表 Argo CD 連 desired state 都算不出來，最常見三個原因：(1) controller 本身有問題 → 看 controller logs；(2) helm/kustomize 渲染失敗（缺 values、template 語法錯）→ 本機 <code>helm template</code> 重現；(3) <code>targetRevision</code> 指到不存在的 branch（手滑打錯字）→ 確認 Git。砍掉重建是最後手段，會讓你失去 history、debug 線索全部消失，先排查再說。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://argo-cd.readthedocs.io/en/stable/getting_started/" target="_blank" rel="noopener">Argo CD Docs: Getting Started</a><span class="ref-meta">安裝 + 第一個 App</span></li>
+        <li><a href="https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/" target="_blank" rel="noopener">Auto-Sync Policy</a><span class="ref-meta">prune / selfHeal / allowEmpty</span></li>
+        <li><a href="https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/" target="_blank" rel="noopener">Sync Options</a><span class="ref-meta">CreateNamespace / PruneLast 等</span></li>
+        <li><a href="https://argo-cd.readthedocs.io/en/stable/user-guide/sync-waves/" target="_blank" rel="noopener">Sync Waves</a><span class="ref-meta">控制 apply 順序</span></li>
+        <li><a href="https://argo-cd.readthedocs.io/en/stable/user-guide/resource_hooks/" target="_blank" rel="noopener">Resource Hooks</a><span class="ref-meta">PreSync / PostSync / SyncFail</span></li>
+        <li><a href="https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#applications" target="_blank" rel="noopener">Application CRD Reference</a><span class="ref-meta">spec 完整欄位</span></li>
+        <li><a href="https://argo-cd.readthedocs.io/en/stable/operator-manual/webhook/" target="_blank" rel="noopener">Webhook Configuration</a><span class="ref-meta">秒級 sync</span></li>
+        <li><a href="https://argo-cd.readthedocs.io/en/stable/operator-manual/notifications/" target="_blank" rel="noopener">Notifications</a><span class="ref-meta">Slack / Discord / email</span></li>
+        <li><a href="https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/" target="_blank" rel="noopener">ApplicationSet</a><span class="ref-meta">多 cluster 模板化</span></li>
+        <li><a href="https://argo-cd.readthedocs.io/en/stable/operator-manual/project-specification/" target="_blank" rel="noopener">AppProject</a><span class="ref-meta">多租戶權限</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="02_kubernetes_practical.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 02 · Kubernetes 日常操作實務</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="04_prometheus_grafana.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 04 · Prometheus + Grafana</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">5 堂 DevOps 系列 <span class="progress-pill">3 / 5</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="01_azure_devops.html"><span class="course-nav-num">01</span><span>Azure DevOps</span></a></li>
+        <li><a class="course-nav-item" href="02_kubernetes_practical.html"><span class="course-nav-num">02</span><span>Kubernetes</span></a></li>
+        <li><a class="course-nav-item current" href="03_argocd_gitops.html"><span class="course-nav-num">03</span><span>Argo CD</span></a></li>
+        <li><a class="course-nav-item" href="04_prometheus_grafana.html"><span class="course-nav-num">04</span><span>Prometheus + Grafana</span></a></li>
+        <li><a class="course-nav-item" href="05_elk_log_analysis.html"><span class="course-nav-num">05</span><span>ELK</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 DevOps 實務課程系列 · Lesson 03
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

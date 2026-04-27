@@ -111,6 +111,31 @@ Automation utilities + ChatGPT bot
 
 ---
 
+## 📚 Blog & Courses  
+
+🌐 **[jason0411202.github.io](https://jason0411202.github.io)** — 技術筆記入口
+
+🎓 **開源協作課程系列** — 12 堂實務導向 HTML 互動式課程  
+   從 Git 進階、PR/Code Review、測試 CI、到第一次貢獻全流程。  
+   業界與開源社群實際使用、附官方參考資料的標準做法。
+
+| # | 課程主題 |
+|---|---|
+| 01 | Git 日常實務速成 |
+| 02 | Git 進階操作 (rebase / cherry-pick / bisect) |
+| 03 | 分支策略選擇 (Git Flow / GitHub Flow / Trunk-Based) |
+| 04 | Fork、Upstream、PR 完整流程 |
+| 05 | Code Review 文化與技巧 |
+| 06 | Commit Message、SemVer、Changelog |
+| 07 | Issue 撰寫與專案管理 |
+| 08 | 測試金字塔與 TDD |
+| 09 | CI/CD、Git Hooks、Lint/Format |
+| 10 | RFC、ADR、Release Management |
+| 11 | 依賴管理與供應鏈安全 |
+| 12 | 第一次貢獻實戰 Checklist |
+
+---
+
 ## 📫 Connect with Me  
 
 <p align="center">

@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 04｜Prometheus + Grafana 指標監控與儀表板 — DevOps 實務</title>
+<meta name="description" content="掌握 Prometheus pull-based 抓取模型、四種 metric type、PromQL 入門五式、Grafana 自製 dashboard 與 dashboard-as-code、PrometheusRule 與 Grafana Unified Alerting 告警系統,以及在程式碼裡新增業務指標的完整流程。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 04 · DevOps 實務篇</div>
+    <h1 class="hero-title">Prometheus + Grafana <span>指標監控與儀表板</span></h1>
+    <p class="hero-desc">從 pull-based 心智模型出發,把 metric type、PromQL、Grafana dashboard、告警規則一次串起來。<strong>不是逐字唸 doc,是讓你今天就能在 cluster 裡看到自家服務的 p95 latency。</strong></p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 4 / 5 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 75 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>DevOps</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#prom-mental-model">Pull 心智模型</a></li>
+      <li><a class="toc-link" href="#metric-types">四種指標類型</a></li>
+      <li><a class="toc-link" href="#promql-five">PromQL 五式</a></li>
+      <li><a class="toc-link" href="#prom-ui">Prometheus UI</a></li>
+      <li><a class="toc-link" href="#grafana-orientation">Grafana 全景</a></li>
+      <li><a class="toc-link" href="#build-dashboard">自製 Dashboard</a></li>
+      <li><a class="toc-link" href="#dashboard-as-code">Dashboard as Code</a></li>
+      <li><a class="toc-link" href="#alerting">告警系統</a></li>
+      <li><a class="toc-link" href="#custom-metrics">自訂業務指標</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="prom-mental-model">
+      <span class="section-eyebrow">01 — Pull-based 心智模型</span>
+      <h2>Prometheus 是「主動去抓」,不是「被動等送」</h2>
+      <p>所有監控系統的第一個分歧點,就是<strong>誰負責把 metric 搬到後端</strong>。Prometheus 選的是 <em>pull-based</em> — Prometheus server 自己定期去 HTTP GET 每個 target 的 <code>/metrics</code>,把純文字格式的指標抓回來。理解這件事之後,後面所有「為什麼我新加的 metric 看不到」的問題都會變得很簡單。</p>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>Push-based(StatsD / DataDog Agent 派)</div>
+          <div class="compare-body">
+            <ul style="margin:0 0 0 1rem;font-size:13px;line-height:1.7;">
+              <li>App 主動往 collector 送資料</li>
+              <li>需要在每個 service 維護 endpoint 與 credential</li>
+              <li>autoscaling 時要有 graceful 結束邏輯,否則丟 sample</li>
+              <li>難從監控端判斷「服務還活著嗎」 — 沒送 = 死了還是沒事做?</li>
+              <li>Cardinality 由 client 隨意決定,後端難收斂</li>
+            </ul>
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>Pull-based(Prometheus 派)</div>
+          <div class="compare-body">
+            <ul style="margin:0 0 0 1rem;font-size:13px;line-height:1.7;">
+              <li>Prometheus server 主動去抓 <code>/metrics</code></li>
+              <li>抓不到 = target down,直接看得出來</li>
+              <li>scrape interval、timeout、retention 都在 server 側集中管理</li>
+              <li>app 只要 expose 一個 HTTP endpoint,沒有後端依賴</li>
+              <li>K8s 環境配合 service discovery 自動找 target</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <h3>K8s + Prometheus Operator 的轉換流程</h3>
+      <p>在 K8s 裡,你不會直接編輯 Prometheus 的 <code>scrape_configs</code>。Prometheus Operator 把這件事抽象成 CRD,你寫的是 <strong>ServiceMonitor</strong>,Operator 自動幫你翻成 Prometheus 內部的 scrape config。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" aria-label="ServiceMonitor 到 Prometheus 流向圖">
+          <defs>
+            <marker id="arrPP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+            <marker id="arrPR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#ff3d1f"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="12">
+            <text x="380" y="30" text-anchor="middle" font-family="Syne, sans-serif" font-size="18" font-weight="700" fill="#0a0a0f">Prometheus pull-based 抓取流程</text>
+            <text x="380" y="52" text-anchor="middle" fill="#6b6b7e" font-size="11">紫色 = 設定流向(誰告訴誰要抓什麼); 橘色 = 資料流向(metric 怎麼流到 dashboard)</text>
+
+            <rect x="30"  y="90"  width="160" height="80" rx="10" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="110" y="120" text-anchor="middle" font-weight="700" fill="#0a0a0f">Your App</text>
+            <text x="110" y="140" text-anchor="middle" fill="#6b6b7e" font-size="10">expose /metrics</text>
+            <text x="110" y="156" text-anchor="middle" fill="#6b6b7e" font-size="10">port: 8080</text>
+
+            <rect x="220" y="90"  width="160" height="80" rx="10" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="300" y="120" text-anchor="middle" font-weight="700" fill="#0a0a0f">Service</text>
+            <text x="300" y="140" text-anchor="middle" fill="#6b6b7e" font-size="10">selector → app pod</text>
+            <text x="300" y="156" text-anchor="middle" fill="#6b6b7e" font-size="10">port name: web</text>
+
+            <rect x="220" y="210" width="160" height="80" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="300" y="240" text-anchor="middle" font-weight="700" fill="#4c1d95">ServiceMonitor</text>
+            <text x="300" y="258" text-anchor="middle" fill="#6b6b7e" font-size="10">selector → Service</text>
+            <text x="300" y="274" text-anchor="middle" fill="#6b6b7e" font-size="10">labels.release: kps</text>
+
+            <rect x="410" y="150" width="160" height="80" rx="10" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="490" y="180" text-anchor="middle" font-weight="700" fill="#0a0a0f">Prometheus</text>
+            <text x="490" y="200" text-anchor="middle" fill="#6b6b7e" font-size="10">scrape job</text>
+            <text x="490" y="216" text-anchor="middle" fill="#6b6b7e" font-size="10">TSDB</text>
+
+            <rect x="600" y="150" width="130" height="80" rx="10" fill="#0a0a0f" stroke="#0a0a0f"/>
+            <text x="665" y="180" text-anchor="middle" font-weight="700" fill="#fafaf8">Grafana</text>
+            <text x="665" y="200" text-anchor="middle" fill="#a8a8b8" font-size="10">PromQL query</text>
+            <text x="665" y="216" text-anchor="middle" fill="#a8a8b8" font-size="10">dashboard</text>
+
+            <line x1="190" y1="130" x2="220" y2="130" stroke="#ff3d1f" stroke-width="1.8" marker-end="url(#arrPR)"/>
+            <line x1="380" y1="130" x2="408" y2="170" stroke="#ff3d1f" stroke-width="1.8" marker-end="url(#arrPR)"/>
+            <line x1="570" y1="190" x2="600" y2="190" stroke="#ff3d1f" stroke-width="1.8" marker-end="url(#arrPR)"/>
+            <text x="540" y="180" text-anchor="middle" fill="#ff3d1f" font-size="10">PromQL</text>
+
+            <line x1="380" y1="240" x2="430" y2="220" stroke="#7c3aed" stroke-width="1.8" stroke-dasharray="4 3" marker-end="url(#arrPP)"/>
+            <text x="425" y="245" text-anchor="middle" fill="#7c3aed" font-size="10">selector match</text>
+
+            <line x1="300" y1="170" x2="300" y2="210" stroke="#7c3aed" stroke-width="1.8" stroke-dasharray="4 3" marker-end="url(#arrPP)"/>
+
+            <text x="195" y="306" font-size="10" fill="#6b6b7e">Operator 監聽 ServiceMonitor → 翻成 scrape_configs → reload Prometheus</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 1.1 — App 暴露 /metrics → ServiceMonitor 描述要抓誰 → Prometheus 抓回來 → Grafana 拉出來畫</div>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>「我加了 ServiceMonitor 但 Prometheus 看不到」9 成是 label 沒對到</strong>
+          Prometheus CR 有一個欄位 <code>serviceMonitorSelector</code>,只挑帶有特定 label(通常是 <code>release: &lt;helm-release-name&gt;</code>)的 ServiceMonitor。kube-prometheus-stack 預設只認 <code>release: kube-prometheus-stack</code> 這類 label,你的 ServiceMonitor 漏寫就會被 Operator 忽略。<strong>第一個排查步驟永遠是 <code>kubectl get prometheus -A -o yaml | grep -A5 serviceMonitorSelector</code>。</strong>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># ServiceMonitor 範例 — 注意 metadata.labels.release 一定要對到 Prometheus CR</span>
+<span class="tk-kw">apiVersion</span>: monitoring.coreos.com/v1
+<span class="tk-kw">kind</span>: ServiceMonitor
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: example-app
+  <span class="tk-kw">namespace</span>: <span class="tk-st">&lt;your-namespace&gt;</span>
+  <span class="tk-kw">labels</span>:
+    <span class="tk-kw">release</span>: kube-prometheus-stack   <span class="tk-cm"># ← 對齊 Prometheus CR 的 serviceMonitorSelector</span>
+<span class="tk-kw">spec</span>:
+  <span class="tk-kw">selector</span>:
+    <span class="tk-kw">matchLabels</span>:
+      <span class="tk-kw">app</span>: example-app                <span class="tk-cm"># ← 對齊 Service 的 metadata.labels</span>
+  <span class="tk-kw">namespaceSelector</span>:
+    <span class="tk-kw">matchNames</span>:
+      - <span class="tk-st">&lt;your-namespace&gt;</span>
+  <span class="tk-kw">endpoints</span>:
+    - <span class="tk-kw">port</span>: web                       <span class="tk-cm"># ← 對齊 Service.spec.ports[].name</span>
+      <span class="tk-kw">path</span>: /metrics
+      <span class="tk-kw">interval</span>: 30s</code></pre>
+      </div>
+    </section>
+
+    <section id="metric-types">
+      <span class="section-eyebrow">02 — 四種指標類型</span>
+      <h2>Counter、Gauge、Histogram、Summary 各管什麼</h2>
+      <p>Prometheus 規格只承認四種 metric type。挑錯型別不只是 dashboard 不好看,連 <code>rate()</code> 這類函式都會給出錯誤結果。先把這張表記熟。</p>
+
+      <table>
+        <thead>
+          <tr><th>類型</th><th>數值特性</th><th>典型用途</th><th>常用函式</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Counter</strong></td>
+            <td>單調遞增,只會 reset 為 0(process restart)</td>
+            <td>請求總數、錯誤總數、處理過的 byte 數</td>
+            <td><code>rate()</code> / <code>increase()</code></td>
+          </tr>
+          <tr>
+            <td><strong>Gauge</strong></td>
+            <td>可上可下的瞬時值</td>
+            <td>當前連線數、queue 長度、記憶體使用、CPU 使用率</td>
+            <td><code>avg_over_time()</code> / <code>max_over_time()</code></td>
+          </tr>
+          <tr>
+            <td><strong>Histogram</strong></td>
+            <td>cumulative buckets + <code>_sum</code> + <code>_count</code></td>
+            <td>request duration、response size 等需算分位數的觀測值</td>
+            <td><code>histogram_quantile()</code></td>
+          </tr>
+          <tr>
+            <td><strong>Summary</strong></td>
+            <td>client 預先算好 quantile</td>
+            <td>跨多 instance 不需聚合的 latency(少用)</td>
+            <td>直接讀 <code>{quantile="0.95"}</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>實務上 95% 的場景:Counter + Gauge + Histogram 三人組</strong>
+          Summary 看似方便,但 client-side 算好的 quantile <strong>無法跨 instance 聚合</strong>(你不能把 5 台 pod 的 p95 平均成整個服務的 p95)。所以新案幾乎都用 Histogram,讓 Prometheus 端在 query 時用 <code>histogram_quantile()</code> 算。
+        </div>
+      </div>
+
+      <h3>讀懂 <code>/metrics</code> 的純文字格式</h3>
+      <p>實際打開一個 app 的 <code>/metrics</code> 看到的東西大概長這樣 — 每個 metric 前都有 <code># HELP</code> 文字說明、<code># TYPE</code> 註明型別:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">prom</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># HELP http_requests_total Total HTTP requests processed.</span>
+<span class="tk-cm"># TYPE http_requests_total counter</span>
+<span class="tk-fn">http_requests_total</span>{<span class="tk-kw">method</span>=<span class="tk-st">"GET"</span>,<span class="tk-kw">path</span>=<span class="tk-st">"/api/orders"</span>,<span class="tk-kw">status</span>=<span class="tk-st">"200"</span>} <span class="tk-num">14823</span>
+<span class="tk-fn">http_requests_total</span>{<span class="tk-kw">method</span>=<span class="tk-st">"POST"</span>,<span class="tk-kw">path</span>=<span class="tk-st">"/api/orders"</span>,<span class="tk-kw">status</span>=<span class="tk-st">"201"</span>} <span class="tk-num">3219</span>
+<span class="tk-fn">http_requests_total</span>{<span class="tk-kw">method</span>=<span class="tk-st">"GET"</span>,<span class="tk-kw">path</span>=<span class="tk-st">"/api/orders"</span>,<span class="tk-kw">status</span>=<span class="tk-st">"500"</span>} <span class="tk-num">17</span>
+
+<span class="tk-cm"># HELP active_connections Current number of active connections.</span>
+<span class="tk-cm"># TYPE active_connections gauge</span>
+<span class="tk-fn">active_connections</span> <span class="tk-num">42</span>
+
+<span class="tk-cm"># HELP http_request_duration_seconds Request latency.</span>
+<span class="tk-cm"># TYPE http_request_duration_seconds histogram</span>
+<span class="tk-fn">http_request_duration_seconds_bucket</span>{<span class="tk-kw">path</span>=<span class="tk-st">"/api/orders"</span>,<span class="tk-kw">le</span>=<span class="tk-st">"0.1"</span>} <span class="tk-num">12011</span>
+<span class="tk-fn">http_request_duration_seconds_bucket</span>{<span class="tk-kw">path</span>=<span class="tk-st">"/api/orders"</span>,<span class="tk-kw">le</span>=<span class="tk-st">"0.5"</span>} <span class="tk-num">14500</span>
+<span class="tk-fn">http_request_duration_seconds_bucket</span>{<span class="tk-kw">path</span>=<span class="tk-st">"/api/orders"</span>,<span class="tk-kw">le</span>=<span class="tk-st">"1"</span>}   <span class="tk-num">14800</span>
+<span class="tk-fn">http_request_duration_seconds_bucket</span>{<span class="tk-kw">path</span>=<span class="tk-st">"/api/orders"</span>,<span class="tk-kw">le</span>=<span class="tk-st">"+Inf"</span>} <span class="tk-num">14823</span>
+<span class="tk-fn">http_request_duration_seconds_sum</span>{<span class="tk-kw">path</span>=<span class="tk-st">"/api/orders"</span>}   <span class="tk-num">3217.45</span>
+<span class="tk-fn">http_request_duration_seconds_count</span>{<span class="tk-kw">path</span>=<span class="tk-st">"/api/orders"</span>} <span class="tk-num">14823</span></code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>Histogram 的 <code>le</code> 是 cumulative</strong>
+          <code>le="0.5"</code> 的值代表「<code>≤ 0.5 秒</code>的累積請求數」,所以 <code>le</code> 越大數字越大,最後 <code>+Inf</code> 等於 <code>_count</code>。這是 <code>histogram_quantile()</code> 能用插值算出 p95 的關鍵。
+        </div>
+      </div>
+    </section>
+
+    <section id="promql-five">
+      <span class="section-eyebrow">03 — PromQL 入門五式</span>
+      <h2>會這五種寫法,能應付 80% 的 dashboard</h2>
+      <p>PromQL 看起來很可怕,但實務上 dashboard 跟 alert 反覆出現的就那幾個 pattern。我們依照「先建立 vector 心智 → 學 rate → 學 histogram_quantile → 學聚合 → 學 recording rule」的順序串起來。</p>
+
+      <h3>第 1 式 — Instant vector vs range vector</h3>
+      <p>這是 PromQL 最容易卡住的地方。一個 metric name 寫法不同,代表的東西完全不一樣:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">promql</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># Instant vector — 「現在這個瞬間」每個 series 的最新值</span>
+http_requests_total
+
+<span class="tk-cm"># Range vector — 「過去 5 分鐘內」每個 series 的所有取樣點(一陣列)</span>
+http_requests_total[5m]</code></pre>
+      </div>
+
+      <p>Instant vector 可以直接畫圖,因為每個時間點都有值;range vector <strong>不能</strong>直接畫(它是「一段時間的歷史快照」),必須丟給 <code>rate()</code>、<code>avg_over_time()</code> 這類函式才能轉回 instant vector。</p>
+
+      <h3>第 2 式 — <code>rate()</code> 算 counter 的每秒平均</h3>
+      <p>Counter 永遠遞增,單看數字沒意義(那只是「服務啟動後總共處理多少」)。實務上要的是<strong>每秒速率</strong>:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">promql</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 過去 5 分鐘平均每秒請求數(QPS)</span>
+rate(http_requests_total[5m])
+
+<span class="tk-cm"># 想看一整段時間的累積增量,用 increase()</span>
+increase(http_requests_total[1h])
+
+<span class="tk-cm"># 錯誤率(用同樣的時間窗才合理)</span>
+sum(rate(http_requests_total{status=~<span class="tk-st">"5.."</span>}[5m]))
+  /
+sum(rate(http_requests_total[5m]))</code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong><code>rate()</code> 只能套在 counter 上,而且只能套在 range vector 上</strong>
+          <code>rate(my_gauge[5m])</code> 不會報錯但結果是垃圾 — gauge 不是單調的,Prometheus 仍會嘗試做差分,得出毫無意義的數字。<strong>看到 gauge 想要平均,用 <code>avg_over_time(my_gauge[5m])</code>。</strong>
+        </div>
+      </div>
+
+      <h3>第 3 式 — <code>histogram_quantile()</code> 算 p95 latency</h3>
+      <p>這是面試出現率最高的 PromQL,也是新手最容易寫錯的:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">promql</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># p95 latency by path</span>
+histogram_quantile(
+  <span class="tk-num">0.95</span>,
+  sum by (le, path) (
+    rate(http_request_duration_seconds_bucket{job=<span class="tk-st">"&lt;app&gt;"</span>}[5m])
+  )
+)</code></pre>
+      </div>
+
+      <p>三個關鍵點:</p>
+      <ul style="margin:0.4rem 0 1rem 1.4rem;font-size:14px;line-height:1.85;">
+        <li><strong>必須先 <code>rate(..._bucket[5m])</code></strong> — 把 cumulative counter 轉成「每秒落入該 bucket 的速率」。</li>
+        <li><strong><code>sum by (le, ...)</code> 一定要保留 <code>le</code></strong>,不然 <code>histogram_quantile</code> 沒辦法計算分位數(它是用 bucket 邊界做線性插值)。</li>
+        <li><strong>聚合層級決定 p95 的意義</strong> — <code>by (le, path)</code> 是「每個 path 各自的 p95」;<code>by (le)</code> 才是整個服務的 p95。</li>
+      </ul>
+
+      <h3>第 4 式 — 聚合與標籤過濾</h3>
+      <table>
+        <thead>
+          <tr><th>運算子 / 函式</th><th>用途</th><th>範例</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>sum by (label)</code></td><td>依 label 分群加總,丟掉其他 label</td><td><code>sum by (status) (rate(http_requests_total[5m]))</code></td></tr>
+          <tr><td><code>sum without (label)</code></td><td>聚掉指定 label,保留其他</td><td><code>sum without (instance) (...)</code></td></tr>
+          <tr><td><code>topk(N, ...)</code></td><td>挑前 N 大</td><td><code>topk(5, sum by (path) (rate(http_requests_total[5m])))</code></td></tr>
+          <tr><td><code>=~</code></td><td>label 用 regex 匹配</td><td><code>{status=~"5.."}</code></td></tr>
+          <tr><td><code>!~</code></td><td>label regex 不匹配</td><td><code>{path!~"/health.*"}</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>第 5 式 — Recording Rule 預先聚合</h3>
+      <p>有些 query 算起來很重(跨幾百個 series 算 p95),每次 dashboard 重畫都重算太浪費。Recording rule 讓 Prometheus 定時把結果算好存成新的 metric。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">apiVersion</span>: monitoring.coreos.com/v1
+<span class="tk-kw">kind</span>: PrometheusRule
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: example-app-recording
+  <span class="tk-kw">namespace</span>: <span class="tk-st">&lt;your-namespace&gt;</span>
+  <span class="tk-kw">labels</span>:
+    <span class="tk-kw">release</span>: kube-prometheus-stack
+<span class="tk-kw">spec</span>:
+  <span class="tk-kw">groups</span>:
+    - <span class="tk-kw">name</span>: example-app.rules
+      <span class="tk-kw">interval</span>: 30s
+      <span class="tk-kw">rules</span>:
+        - <span class="tk-kw">record</span>: job:http_request_duration_seconds:p95_5m
+          <span class="tk-kw">expr</span>: |
+            histogram_quantile(0.95,
+              sum by (le, job) (
+                rate(http_request_duration_seconds_bucket[5m])
+              )
+            )
+        - <span class="tk-kw">record</span>: job:http_requests:error_rate_5m
+          <span class="tk-kw">expr</span>: |
+            sum by (job) (rate(http_requests_total{status=~"5.."}[5m]))
+            / sum by (job) (rate(http_requests_total[5m]))</code></pre>
+      </div>
+
+      <details class="collapse">
+        <summary>進階:offset、subquery、@ modifier 三招少見但很救命 <span class="collapse-tag">深入</span></summary>
+        <div class="collapse-body">
+<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># 1) offset — 跟一週前同時段比</span>
+sum(rate(http_requests_total[5m]))
+  /
+sum(rate(http_requests_total[5m] offset 1w))
+
+<span class="tk-cm"># 2) subquery — 在 instant vector 上「再回看一段時間」</span>
+max_over_time(
+  rate(http_requests_total[5m])[1h:1m]   <span class="tk-cm"># 過去 1 小時、每分鐘取一次 rate,然後取最大</span>
+)
+
+<span class="tk-cm"># 3) @ modifier — 鎖定某個絕對時間點(對 alerting 反查很有用)</span>
+http_requests_total @ 1700000000</code></pre>
+        </div>
+      </details>
+    </section>
+
+    <section id="prom-ui">
+      <span class="section-eyebrow">04 — Prometheus UI</span>
+      <h2>Prometheus 原生 UI:三個頁面要熟</h2>
+      <p>Grafana 雖然漂亮,但排查問題時 Prometheus 自己的 UI 才是真相之地。<code>kubectl port-forward</code> 過去就能用:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> <span class="tk-op">-n</span> monitoring port-forward svc/prometheus-operated <span class="tk-num">9090</span>:<span class="tk-num">9090</span>
+<span class="tk-cm"># 之後瀏覽器開 http://localhost:9090</span></code></pre>
+      </div>
+
+      <h3><code>/targets</code> — 「我要抓的 endpoint 都活著嗎」</h3>
+      <p>頁面把每個 ServiceMonitor 翻譯出來的 scrape job 列出來,每個 endpoint 的狀態欄位有三個顏色:</p>
+
+      <table>
+        <thead>
+          <tr><th>狀態</th><th>含義</th><th>第一步排查</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="color:#15803d;font-weight:600;">UP (綠)</span></td><td>最近一次 scrape 成功</td><td>看 scrape duration 有沒有逐漸變慢</td></tr>
+          <tr><td><span style="color:#b91c1c;font-weight:600;">DOWN (紅)</span></td><td>scrape 失敗,旁邊會有原因</td><td>看 Last Error:connection refused / 4xx / timeout</td></tr>
+          <tr><td><span style="color:#92400e;font-weight:600;">UNKNOWN</span></td><td>還沒 scrape 過</td><td>剛建立的 target,等 scrape interval 過去</td></tr>
+        </tbody>
+      </table>
+
+      <p>右上角的 filter 可以用 <code>job=</code>、<code>namespace=</code> 或 ServiceMonitor 名稱搜尋,當你的 cluster 有上百個 target 時是救命功能。</p>
+
+      <h3><code>/graph</code> — Expression browser</h3>
+      <p>輸入 PromQL 後可以切兩種 view:</p>
+      <ul style="margin:0.4rem 0 1rem 1.4rem;font-size:14px;line-height:1.85;">
+        <li><strong>Table</strong> — 列出所有匹配的 series 與最新值,排查 cardinality / 標籤錯誤時用這個。</li>
+        <li><strong>Graph</strong> — 畫成時間序列,用來確認 query 邏輯是否合理。</li>
+      </ul>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>Dashboard 出問題時,先回 Prometheus 跑同樣的 query</strong>
+          Grafana panel 沒資料 ≠ 沒 metric。也可能是 dashboard 的 variable 套錯了,或 time range 抓不到。先用 Prometheus <code>/graph</code> 跑一次「不帶任何 variable」的 query,確認 metric 真的存在,再回 Grafana 比對哪一段套錯。
+        </div>
+      </div>
+
+      <h3><code>/alerts</code> — 告警一覽</h3>
+      <ul style="margin:0.4rem 0 1rem 1.4rem;font-size:14px;line-height:1.85;">
+        <li><strong>inactive(灰)</strong> — 規則存在,目前沒匹配。</li>
+        <li><strong>pending(黃)</strong> — 已經滿足條件,但還沒撐過 <code>for:</code> 時間窗。</li>
+        <li><strong>firing(紅)</strong> — 已轉 firing,正在通知 AlertManager。</li>
+      </ul>
+    </section>
+
+    <section id="grafana-orientation">
+      <span class="section-eyebrow">05 — Grafana 全景</span>
+      <h2>Grafana 第一次登入要做的四件事</h2>
+
+      <h3>1) 拿到 admin password</h3>
+      <p>kube-prometheus-stack 預設不會把 password 印出來,要從 Secret 撈:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 預設帳號 admin,密碼從 Secret 取</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> <span class="tk-op">-n</span> monitoring get secret prometheus-grafana \
+    <span class="tk-op">-o</span> jsonpath=<span class="tk-st">'{.data.admin-password}'</span> | base64 <span class="tk-op">-d</span><span class="tk-pn">;</span> <span class="tk-fn">echo</span>
+
+<span class="tk-cm"># Grafana port-forward</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> <span class="tk-op">-n</span> monitoring port-forward svc/prometheus-grafana <span class="tk-num">3000</span>:<span class="tk-num">80</span>
+<span class="tk-cm"># http://localhost:3000  →  admin / &lt;上面那串&gt;</span></code></pre>
+      </div>
+
+      <h3>2) 確認 Data source 連得上 Prometheus</h3>
+      <p>Connections → Data sources → Prometheus → 拉到底按 <strong>Save &amp; test</strong>。kube-prometheus-stack 預載的設定值 URL 通常是 <code>http://prometheus-operated.monitoring:9090</code> 之類的 cluster-internal DNS,看到綠色 "Successfully queried the Prometheus API." 就 ok。</p>
+
+      <h3>3) Explore 模式試打 query</h3>
+      <p>左側 Explore 是 dashboard 之外最常用的功能,等於 Grafana 內建的 PromQL playground。兩種編輯模式:</p>
+      <ul style="margin:0.4rem 0 1rem 1.4rem;font-size:14px;line-height:1.85;">
+        <li><strong>Code</strong> — 直接打 PromQL(熟手用這個)。</li>
+        <li><strong>Builder</strong> — UI 拖拉 metric / label / function,適合不熟 PromQL 時用,送出時會把對應的 PromQL 寫在下方。</li>
+      </ul>
+
+      <h3>4) 翻一下 kube-prometheus-stack 預載 dashboard</h3>
+      <p>Dashboards 頁面裡會看到一堆 <em>Kubernetes / Compute Resources / *</em>、<em>Node Exporter / *</em>、<em>Prometheus / *</em>。這些是社群維護的「即開即用」dashboard,在你寫自家 dashboard 之前,<strong>先把這些看一輪</strong> — 很多時候你想做的東西它已經做好了。</p>
+
+      <h3>Dashboard variables 設計</h3>
+      <p>變數是 dashboard 從「特定服務專用」變成「通用模板」的關鍵。常見三層:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">promql</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># Variable 定義時用 label_values() 從 Prometheus 撈出選單</span>
+
+<span class="tk-cm"># $cluster — 只有多 cluster federation 時才需要</span>
+label_values(up, cluster)
+
+<span class="tk-cm"># $namespace — kube_pod_info 是 kube-state-metrics 提供的</span>
+label_values(kube_pod_info{cluster=<span class="tk-st">"$cluster"</span>}, namespace)
+
+<span class="tk-cm"># $pod — 依賴上面兩層</span>
+label_values(kube_pod_info{cluster=<span class="tk-st">"$cluster"</span>,namespace=<span class="tk-st">"$namespace"</span>}, pod)</code></pre>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong><code>$__rate_interval</code> 比寫死 <code>[5m]</code> 聰明</strong>
+          Grafana 會根據 dashboard 的 <em>Min interval</em> 與 scrape interval 自動算出最佳 rate window。直接寫 <code>rate(metric[5m])</code> 在 zoom out 看 1 個月時會非常稀疏甚至是空白;<code>rate(metric[$__rate_interval])</code> 在不同時間範圍下都能保持有效取樣。
+        </div>
+      </div>
+    </section>
+
+    <section id="build-dashboard">
+      <span class="section-eyebrow">06 — 自製 Dashboard</span>
+      <h2>從零寫一個服務的 dashboard:標準七步</h2>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">建立空 dashboard</div>
+            <div class="timeline-desc">Dashboards → New → New dashboard。先進 dashboard settings 設好 <code>Title</code> 與 <code>Tags</code>(放對 folder 之後找得到)。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">建 variables</div>
+            <div class="timeline-desc">先把 <code>$namespace</code> / <code>$pod</code> 等定義好,後面所有 panel 都吃這些變數,改一次全 dashboard 跟著動。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">加第一個 panel + 寫 query</div>
+            <div class="timeline-desc">Add panel → 在 Query 區塊輸入 PromQL,先在 Explore 試過再貼進來最穩。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">選對 visualization</div>
+            <div class="timeline-desc">右側 Visualization 切 Time series / Stat / Gauge / Bar gauge / Table / Heatmap,選錯比沒畫還糟。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">5</div>
+          <div class="timeline-content">
+            <div class="timeline-title">設定 axis / unit / legend</div>
+            <div class="timeline-desc">latency 設 unit = seconds (s)、QPS 設 ops/sec、% 設 percent (0-100 或 0-1.0)。Legend 用 <code>{{label}}</code> 模板。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">6</div>
+          <div class="timeline-content">
+            <div class="timeline-title">加 thresholds 與 alert annotation</div>
+            <div class="timeline-desc">Thresholds 讓「超過 1s 變紅」這類視覺化標誌一目了然;Annotations 可以把 PrometheusRule 觸發的 firing alert 直接畫在圖上。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">7</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Save → Share</div>
+            <div class="timeline-desc">右上 Save dashboard,寫個 commit message。Share 拿到的 link 帶 time range,丟 PR review 用很方便。</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>範例 panel 1 — 請求率依 status 分群</h3>
+      <p>適合放在 dashboard 最上面當 traffic overview。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">promql</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># Query</span>
+sum by (status) (
+  rate(http_requests_total{namespace=<span class="tk-st">"$namespace"</span>}[$__rate_interval])
+)
+
+<span class="tk-cm"># Visualization     : Time series</span>
+<span class="tk-cm"># Stack series      : Normal (堆疊看流量組成)</span>
+<span class="tk-cm"># Legend            : {{status}}</span>
+<span class="tk-cm"># Unit              : reqps  (requests / second)</span>
+<span class="tk-cm"># Color (override)  : status=200 綠 / status=4.. 黃 / status=5.. 紅</span></code></pre>
+      </div>
+
+      <h3>範例 panel 2 — p95 latency by path</h3>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">promql</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># Query</span>
+histogram_quantile(<span class="tk-num">0.95</span>,
+  sum by (le, path) (
+    rate(http_request_duration_seconds_bucket{namespace=<span class="tk-st">"$namespace"</span>}[$__rate_interval])
+  )
+)
+
+<span class="tk-cm"># Visualization     : Time series</span>
+<span class="tk-cm"># Unit              : seconds (s)</span>
+<span class="tk-cm"># Legend            : {{path}}</span>
+<span class="tk-cm"># Threshold         : 1s 變紅、0.5s 變黃</span>
+<span class="tk-cm"># Y-axis            : Log scale (差距大時更可讀)</span></code></pre>
+      </div>
+
+      <h3>視覺化選擇對照表</h3>
+      <table>
+        <thead>
+          <tr><th>類型</th><th>適合</th><th>什麼時候別用</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Time series</strong></td><td>大部分 metric — QPS、latency、CPU、記憶體隨時間變化</td><td>只有單一瞬時值時(用 Stat)</td></tr>
+          <tr><td><strong>Stat</strong></td><td>SLO 達成率、目前在線 pod 數等「一個大數字」</td><td>需要看趨勢時</td></tr>
+          <tr><td><strong>Gauge</strong></td><td>有上限的百分比(disk usage 80% / 100%)</td><td>沒有「滿格」概念的 metric(QPS)</td></tr>
+          <tr><td><strong>Bar gauge</strong></td><td>同類比較(各 pod 記憶體使用排名)</td><td>時間序列趨勢</td></tr>
+          <tr><td><strong>Table</strong></td><td>一次看多個 label 維度的最新值</td><td>連續變化的 metric</td></tr>
+          <tr><td><strong>Heatmap</strong></td><td>histogram 全分布視覺化(latency 隨時間的分布)</td><td>只關心 p95 一個值時</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Transformations — 在前端進一步處理結果</h3>
+      <p>有時 PromQL 已經寫到極限,還需要再做點微調。Grafana 有 Transformations 把多個 query 結果在前端 join、reduce、改名:</p>
+      <ul style="margin:0.4rem 0 1rem 1.4rem;font-size:14px;line-height:1.85;">
+        <li><strong>Reduce</strong> — 把時間序列縮成一個值(min / max / mean / last),通常配 Stat panel。</li>
+        <li><strong>Organize fields</strong> — 改欄位顯示名稱、隱藏欄位、調整順序,Table panel 必備。</li>
+        <li><strong>Merge / Join by field</strong> — 把多支 query 合併成一張 table。</li>
+      </ul>
+
+      <h3>Library panels — 跨 dashboard 重複用</h3>
+      <p>「服務 SLO 概覽」這類 panel 你可能要放在五六個 dashboard。把 panel 改成 library panel 後,所有引用點會跟著主版本同步,不用一個一個改。</p>
+    </section>
+
+    <section id="dashboard-as-code">
+      <span class="section-eyebrow">07 — Dashboard as Code</span>
+      <h2>把 dashboard 放進 Git,而不是只存在 Grafana DB 裡</h2>
+
+      <p>UI 點得開心,然後一次升級或重建 cluster,所有 dashboard 全消失 — 這是新團隊都會踩到的雷。Dashboard as code 的解法是把 JSON Model 包進 ConfigMap,kube-prometheus-stack 的 Grafana sidecar 會自動載入。</p>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">在 Grafana UI 把 dashboard 調好</div>
+            <div class="timeline-desc">先在 UI 試到滿意。直接寫 JSON 雖然可以,但效率非常差。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Export → JSON Model</div>
+            <div class="timeline-desc">Dashboard 設定 → JSON Model → 全選複製。注意 <strong>勾掉</strong> "Export for sharing externally" — 那個會把 datasource 變數化,本機載入時要再手動接。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">包成 ConfigMap,加上 sidecar 認得的 label</div>
+            <div class="timeline-desc">關鍵 label:<code>grafana_dashboard: "1"</code>,sidecar 看到才會掛載。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Apply → 自動上線</div>
+            <div class="timeline-desc"><code>kubectl apply</code> 後 sidecar 幾秒內偵測到、自動載入到 Grafana。同步 Argo CD 上 GitOps repo,所有變更可審查可回滾。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">apiVersion</span>: v1
+<span class="tk-kw">kind</span>: ConfigMap
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: example-app-dashboard
+  <span class="tk-kw">namespace</span>: monitoring
+  <span class="tk-kw">labels</span>:
+    <span class="tk-kw">grafana_dashboard</span>: <span class="tk-st">"1"</span>            <span class="tk-cm"># ← sidecar 認這個 label</span>
+<span class="tk-kw">data</span>:
+  <span class="tk-kw">example-app.json</span>: |
+    {
+      "title": "Example App Overview",
+      "uid": "example-app-overview",
+      "tags": ["app", "&lt;your-namespace&gt;"],
+      "schemaVersion": 39,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Request rate by status",
+          "targets": [{
+            "expr": "sum by (status) (rate(http_requests_total{namespace=\"$namespace\"}[$__rate_interval]))",
+            "legendFormat": "{{status}}"
+          }],
+          "fieldConfig": { "defaults": { "unit": "reqps" } }
+        },
+        {
+          "type": "timeseries",
+          "title": "p95 latency by path",
+          "targets": [{
+            "expr": "histogram_quantile(0.95, sum by (le, path) (rate(http_request_duration_seconds_bucket{namespace=\"$namespace\"}[$__rate_interval])))",
+            "legendFormat": "{{path}}"
+          }],
+          "fieldConfig": { "defaults": { "unit": "s" } }
+        }
+      ],
+      "templating": {
+        "list": [{
+          "name": "namespace",
+          "type": "query",
+          "datasource": "Prometheus",
+          "query": "label_values(http_requests_total, namespace)"
+        }]
+      }
+    }</code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>搭配 Argo CD = 全自動</strong>
+          把上面的 ConfigMap 放進 manifests repo,讓 Argo CD 監聽該路徑(Lesson 03 教過)。這樣 dashboard 改動經 PR review、merge、Argo CD sync,一條龍上線。<strong>所有 dashboard 都有 Git history,誰在哪個 commit 改了什麼一清二楚。</strong>
+        </div>
+      </div>
+    </section>
+
+    <section id="alerting">
+      <span class="section-eyebrow">08 — 告警系統</span>
+      <h2>兩條告警路徑:選一條走完,別兩邊都設</h2>
+
+      <p>Prometheus 生態有兩種告警方式並存,新人最常見的錯誤是<strong>兩邊都設</strong>,結果同一件事連 Slack 兩次。</p>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">A</span>路徑 A:Prometheus + AlertManager</div>
+          <div class="compare-body">
+            <ul style="margin:0 0 0 1rem;font-size:13px;line-height:1.7;">
+              <li>Alert 在 <strong>Prometheus</strong> 評估(<code>PrometheusRule</code> CRD)</li>
+              <li>路由由 <strong>AlertManager</strong> 處理</li>
+              <li>config 全部 GitOps 化、純 YAML</li>
+              <li>最佳場景:大團隊、多服務、規則複雜</li>
+            </ul>
+          </div>
+        </div>
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">B</span>路徑 B:Grafana Unified Alerting</div>
+          <div class="compare-body">
+            <ul style="margin:0 0 0 1rem;font-size:13px;line-height:1.7;">
+              <li>Alert 在 <strong>Grafana</strong> 評估</li>
+              <li>路由由 <strong>Grafana-managed AlertManager</strong> 處理</li>
+              <li>UI 友善,可即時看到觸發歷史</li>
+              <li>最佳場景:小團隊、想看 dashboard 同時建 alert</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>選一條路就好</strong>
+          兩個系統都會 fire alert,如果同一條 metric 兩邊都寫了,on-call 會在凌晨三點被同一件事吵兩次。團隊一進駐就要約定:「我們選 PrometheusRule + AlertManager」(GitOps 派)或「我們選 Grafana Unified Alerting」(UI 派)二擇一。
+        </div>
+      </div>
+
+      <h3>Grafana Alert Rule 建立流程(路徑 B)</h3>
+      <ol style="margin:0.4rem 0 1rem 1.4rem;font-size:14px;line-height:1.85;">
+        <li><strong>Query</strong> — 打 PromQL 算出要監控的數值。</li>
+        <li><strong>Threshold condition</strong> — 設定「IS ABOVE 0.5」之類的比較。</li>
+        <li><strong>Evaluate every / for</strong> — 每 1m 評估一次、需連續滿足 5m 才轉 firing。</li>
+        <li><strong>Labels</strong> — <code>severity: warning</code>、<code>team: platform</code> 等,用於 routing。</li>
+        <li><strong>Folder</strong> — 放對 folder 才有對應的 notification policy 套用。</li>
+      </ol>
+
+      <h3>Pending → Firing 生命週期</h3>
+      <p><code>for: 5m</code> 是新手忽略的最大救星。少了它,任何瞬間 spike 都會立刻 fire,on-call 一晚幾十封郵件。加上 <code>for: 5m</code> 後,規則進入 <strong>pending</strong> 狀態,只有連續滿足 5 分鐘才轉 <strong>firing</strong>。短暫尖峰自動消化掉。</p>
+
+      <h3>Contact points + Notification policies + Silences</h3>
+      <table>
+        <thead>
+          <tr><th>概念</th><th>負責什麼</th><th>實際例子</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Contact point</strong></td><td>告警送到哪</td><td>Slack #alerts、Discord webhook、email、PagerDuty</td></tr>
+          <tr><td><strong>Notification policy</strong></td><td>哪些 alert 走哪個 contact</td><td>label <code>severity=critical</code> → PagerDuty;<code>severity=warning</code> → Slack</td></tr>
+          <tr><td><strong>Silence</strong></td><td>暫時消音</td><td>維護期(如 DB 升級窗口)前先建 silence,事後自動到期</td></tr>
+        </tbody>
+      </table>
+
+      <h3>範例 PrometheusRule(路徑 A 的 alert 寫法)</h3>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">apiVersion</span>: monitoring.coreos.com/v1
+<span class="tk-kw">kind</span>: PrometheusRule
+<span class="tk-kw">metadata</span>:
+  <span class="tk-kw">name</span>: example-app-alerts
+  <span class="tk-kw">namespace</span>: <span class="tk-st">&lt;your-namespace&gt;</span>
+  <span class="tk-kw">labels</span>:
+    <span class="tk-kw">release</span>: kube-prometheus-stack
+<span class="tk-kw">spec</span>:
+  <span class="tk-kw">groups</span>:
+    - <span class="tk-kw">name</span>: example-app.alerts
+      <span class="tk-kw">rules</span>:
+        - <span class="tk-kw">alert</span>: HighErrorRate
+          <span class="tk-kw">expr</span>: |
+            sum(rate(http_requests_total{status=~"5.."}[5m])) > 0.5
+          <span class="tk-kw">for</span>: 5m                          <span class="tk-cm"># ← 連續 5 分鐘才轉 firing</span>
+          <span class="tk-kw">labels</span>:
+            <span class="tk-kw">severity</span>: warning
+            <span class="tk-kw">team</span>: platform
+          <span class="tk-kw">annotations</span>:
+            <span class="tk-kw">summary</span>: <span class="tk-st">"5xx error rate &gt; 0.5/sec for 5 minutes"</span>
+            <span class="tk-kw">description</span>: <span class="tk-st">"namespace=&#123;&#123; $labels.namespace &#125;&#125;, value=&#123;&#123; $value &#125;&#125;"</span>
+            <span class="tk-kw">runbook_url</span>: <span class="tk-st">"https://wiki.example.com/runbooks/high-error-rate"</span>
+
+        - <span class="tk-kw">alert</span>: HighP95Latency
+          <span class="tk-kw">expr</span>: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(http_request_duration_seconds_bucket[5m]))
+            ) > 1
+          <span class="tk-kw">for</span>: 10m
+          <span class="tk-kw">labels</span>:
+            <span class="tk-kw">severity</span>: warning
+          <span class="tk-kw">annotations</span>:
+            <span class="tk-kw">summary</span>: <span class="tk-st">"p95 latency over 1s for 10 minutes"</span></code></pre>
+      </div>
+    </section>
+
+    <section id="custom-metrics">
+      <span class="section-eyebrow">09 — 自訂業務指標</span>
+      <h2>在程式碼裡新增 metric:從註冊到上線</h2>
+
+      <p>infra metric(CPU、記憶體、網路)是基本盤,但真正能告訴你「業務有沒有問題」的是<strong>業務指標</strong> — 訂單成功率、付款失敗率、簽到使用者數。這些必須在程式碼裡自己埋。</p>
+
+      <h3>Go 範例(其他語言對應 client lib 見下)</h3>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">package</span> metrics
+
+<span class="tk-kw">import</span> (
+    <span class="tk-st">"net/http"</span>
+    <span class="tk-st">"time"</span>
+
+    <span class="tk-st">"github.com/prometheus/client_golang/prometheus"</span>
+    <span class="tk-st">"github.com/prometheus/client_golang/prometheus/promhttp"</span>
+)
+
+<span class="tk-cm">// 1) Counter — 訂單總數,依 status 分群</span>
+<span class="tk-kw">var</span> ordersTotal = prometheus.NewCounterVec(
+    prometheus.CounterOpts{
+        Name: <span class="tk-st">"orders_total"</span>,
+        Help: <span class="tk-st">"Total number of orders processed."</span>,
+    },
+    []<span class="tk-kw">string</span>{<span class="tk-st">"status"</span>},
+)
+
+<span class="tk-cm">// 2) Gauge — 當前等待付款訂單數</span>
+<span class="tk-kw">var</span> ordersPending = prometheus.NewGauge(
+    prometheus.GaugeOpts{
+        Name: <span class="tk-st">"orders_pending"</span>,
+        Help: <span class="tk-st">"Number of orders currently awaiting payment."</span>,
+    },
+)
+
+<span class="tk-cm">// 3) Histogram — 付款處理時間</span>
+<span class="tk-kw">var</span> paymentDuration = prometheus.NewHistogramVec(
+    prometheus.HistogramOpts{
+        Name:    <span class="tk-st">"payment_duration_seconds"</span>,
+        Help:    <span class="tk-st">"Time spent processing payment, in seconds."</span>,
+        Buckets: prometheus.DefBuckets, <span class="tk-cm">// 0.005 ~ 10s 標準分桶</span>
+    },
+    []<span class="tk-kw">string</span>{<span class="tk-st">"provider"</span>},
+)
+
+<span class="tk-kw">func</span> init() {
+    prometheus.MustRegister(ordersTotal, ordersPending, paymentDuration)
+}
+
+<span class="tk-cm">// 在 handler 內使用</span>
+<span class="tk-kw">func</span> CreateOrder(w http.ResponseWriter, r *http.Request) {
+    start := time.Now()
+    ordersPending.Inc()
+    <span class="tk-kw">defer</span> ordersPending.Dec()
+
+    <span class="tk-cm">// ... 真實業務 ...</span>
+    err := chargePayment(r.Context())
+
+    <span class="tk-kw">if</span> err != nil {
+        ordersTotal.WithLabelValues(<span class="tk-st">"failed"</span>).Inc()
+        http.Error(w, <span class="tk-st">"payment failed"</span>, http.StatusBadGateway)
+        <span class="tk-kw">return</span>
+    }
+    ordersTotal.WithLabelValues(<span class="tk-st">"success"</span>).Inc()
+    paymentDuration.WithLabelValues(<span class="tk-st">"stripe"</span>).Observe(time.Since(start).Seconds())
+}
+
+<span class="tk-cm">// 主程式 expose endpoint</span>
+<span class="tk-kw">func</span> RegisterMetricsEndpoint(mux *http.ServeMux) {
+    mux.Handle(<span class="tk-st">"/metrics"</span>, promhttp.Handler())
+}</code></pre>
+      </div>
+
+      <h3>其他語言的 client library</h3>
+      <table>
+        <thead>
+          <tr><th>語言</th><th>套件</th><th>備註</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Go</td><td><code>github.com/prometheus/client_golang</code></td><td>官方,事實標準</td></tr>
+          <tr><td>Python</td><td><code>prometheus_client</code> (pip)</td><td>Flask / FastAPI 都有 middleware</td></tr>
+          <tr><td>Node.js</td><td><code>prom-client</code> (npm)</td><td>express-prom-bundle 自動裝 HTTP 指標</td></tr>
+          <tr><td>Java</td><td><code>micrometer</code> + Prometheus registry</td><td>Spring Boot Actuator 內建</td></tr>
+          <tr><td>Rust</td><td><code>prometheus</code> 或 <code>metrics</code> crate</td><td>axum / actix 都有 middleware</td></tr>
+        </tbody>
+      </table>
+
+      <h3>從程式上線到 dashboard 看到資料的流程</h3>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 1. 改 code、commit、build image、push registry</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> build <span class="tk-op">-t</span> registry.example.com/example-app:v1.4 <span class="tk-pn">.</span>
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> push registry.example.com/example-app:v1.4
+
+<span class="tk-cm"># 2. rollout(走 Argo CD GitOps 或 kubectl set image)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> <span class="tk-op">-n</span> <span class="tk-st">&lt;your-namespace&gt;</span> set image deployment/example-app \
+    app=registry.example.com/example-app:v1.4
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> <span class="tk-op">-n</span> <span class="tk-st">&lt;your-namespace&gt;</span> rollout status deployment/example-app
+
+<span class="tk-cm"># 3. 直接打 /metrics 確認新 metric 出現</span>
+<span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> <span class="tk-op">-n</span> <span class="tk-st">&lt;your-namespace&gt;</span> port-forward svc/example-app <span class="tk-num">8080</span>:<span class="tk-num">80</span>
+<span class="tk-pn">$</span> <span class="tk-fn">curl</span> <span class="tk-op">-s</span> http://localhost:8080/metrics | <span class="tk-fn">grep</span> orders_
+
+<span class="tk-cm"># 4. 等 30 秒(scrape interval),回 Prometheus /graph 確認</span>
+<span class="tk-cm">#    打 orders_total → 看到資料 = 成功</span>
+
+<span class="tk-cm"># 5. Grafana 加 panel 視覺化</span></code></pre>
+      </div>
+
+      <div class="callout callout-danger">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>Cardinality 紀律 — 這是把整個 Prometheus 拖垮的最常見原因</strong>
+          <p style="margin:0.4rem 0;">「Cardinality」= 一個 metric 名稱下的 series 數量。每多一個 label 值就多一條 series。Prometheus 的記憶體跟 series 數成正比,寫錯一行能讓記憶體從 2GB 飆到 32GB 然後 OOM。</p>
+          <p style="margin:0.4rem 0;font-weight:700;">絕對不要把以下東西放進 label:</p>
+          <ul style="margin:0.4rem 0 0.6rem 1.2rem;font-size:13px;line-height:1.7;">
+            <li><code>user_id</code> / <code>email</code> — 每個用戶一條 series,百萬用戶 = 百萬 series</li>
+            <li><code>request_id</code> / <code>trace_id</code> / <code>session_id</code> — 每個請求一條,直接爆炸</li>
+            <li>完整 URL 含 query string 或 path 變數(<code>/users/12345</code>) — 應改成 route pattern <code>/users/:id</code></li>
+            <li>使用者輸入的字串(搜尋詞、自由文字)</li>
+            <li>IP address(雖然有限,但常見有上萬個)</li>
+          </ul>
+          <p style="margin:0.4rem 0;">經驗法則:<strong>label 的可能值要在 100 以內,1000 以上一定要重新想。</strong>需要每個 user 的細節時請用 logs(下一課 ELK)或 tracing,不是 metric。</p>
+        </div>
+      </div>
+
+      <h3>自我檢查 cardinality</h3>
+      <p>定期跑這個 query,看自家的指標族有多少 series:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">promql</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 數一下 orders_* 一共有多少條 series</span>
+count({__name__=~<span class="tk-st">"orders_.*"</span>})
+
+<span class="tk-cm"># 看 cluster 內 series 最多的前 10 個 metric — 排查爆炸源</span>
+topk(<span class="tk-num">10</span>, count by (__name__) ({__name__!=<span class="tk-st">""</span>}))
+
+<span class="tk-cm"># 看每個 job 的 series 量 — 哪個服務貢獻最多</span>
+topk(<span class="tk-num">10</span>, count by (job) ({__name__!=<span class="tk-st">""</span>}))</code></pre>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 5</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "Counter 跟 Gauge 最關鍵的差別是什麼?",
+    "options": [
+      "Counter 是浮點、Gauge 是整數",
+      "Counter 單調遞增(只升不降,process restart 才歸零);Gauge 可上可下",
+      "Counter 跨 instance 不能聚合,Gauge 可以",
+      "Counter 是 Prometheus 內建、Gauge 要自己寫"
+    ],
+    "answer": 1,
+    "explain": "Counter 的本質是「累積計數」,只能增加(或 process 重啟歸零),所以對 counter 才能用 <code>rate()</code> / <code>increase()</code>。Gauge 是「當前的瞬時值」,例如記憶體使用、queue 長度,可上可下,要看趨勢用 <code>avg_over_time()</code> 之類。"
+  },
+  {
+    "question": "你新加了一個 ServiceMonitor,但 Prometheus <code>/targets</code> 完全看不到它,最可能的原因?",
+    "options": [
+      "Prometheus 還沒 reload,等 5 分鐘",
+      "ServiceMonitor 的 <code>metadata.labels.release</code> 沒對到 Prometheus CR 的 <code>serviceMonitorSelector</code>",
+      "Service 沒開 NodePort",
+      "ServiceMonitor 必須跟 Prometheus 在同一個 namespace"
+    ],
+    "answer": 1,
+    "explain": "Prometheus Operator 不會把 cluster 內所有 ServiceMonitor 都吃進來,Prometheus CR 的 <code>serviceMonitorSelector</code> 只挑特定 label。kube-prometheus-stack 預設要求 <code>release: kube-prometheus-stack</code>(或對應的 helm release 名),漏寫就會被忽略。第一個排查指令永遠是 <code>kubectl get prometheus -A -o yaml | grep -A5 serviceMonitorSelector</code>。"
+  },
+  {
+    "question": "為什麼算 p95 latency 一定要 <code>sum by (le, ...)</code>?",
+    "options": [
+      "<code>le</code> 是 Prometheus 保留字,不寫會語法錯",
+      "為了減少 cardinality,讓 query 更快",
+      "<code>histogram_quantile()</code> 必須保留 <code>le</code> 標籤,它靠 bucket 邊界做線性插值算分位數",
+      "<code>by</code> 只是美化 legend,實際上不影響結果"
+    ],
+    "answer": 2,
+    "explain": "Histogram 的 bucket 是 cumulative,以 <code>le</code> 標籤標示「≤ X 秒」。<code>histogram_quantile()</code> 透過比較相鄰 bucket 的累積數來估算分位數,所以聚合時必須保留 <code>le</code>。聚掉 <code>le</code> 等於把所有 bucket 加成一個值,quantile 自然算不出來。"
+  },
+  {
+    "question": "在 kube-prometheus-stack 裡,要怎麼讓自製的 dashboard JSON 自動進 Grafana?",
+    "options": [
+      "把 JSON 放進 PVC,重啟 Grafana",
+      "用 Grafana API token 寫 CI script 推上去",
+      "包成 ConfigMap、加 label <code>grafana_dashboard: \"1\"</code>,Grafana sidecar 會自動載入",
+      "只能手動在 UI Import"
+    ],
+    "answer": 2,
+    "explain": "kube-prometheus-stack 內建的 Grafana sidecar 會監聽帶有 <code>grafana_dashboard: \"1\"</code> label 的 ConfigMap,把裡面的 JSON 自動掛載成 dashboard。配合 GitOps(Lesson 03 的 Argo CD)就能達到「PR merge → dashboard 上線」全自動。"
+  },
+  {
+    "question": "下列哪些 label 是「cardinality 災難」、絕對<strong>不</strong>該放進 metric label?(多選)",
+    "options": [
+      "<code>user_id</code> — 每個使用者的 ID",
+      "<code>request_id</code> — 每筆請求的 trace ID",
+      "<code>method</code> — HTTP method (GET / POST / DELETE 等)",
+      "完整 URL 路徑(含 path 變數,如 <code>/users/12345</code>)",
+      "<code>status</code> — HTTP 狀態碼",
+      "client IP address"
+    ],
+    "answer": [0, 1, 3, 5],
+    "explain": "Cardinality 爆炸的根源都是「值的可能組合趨近無限」:user_id / request_id 完全不重複,完整 URL 含路徑變數同樣每筆都不一樣,IP 雖有限但常見上萬。<strong>method 跟 status 是固定 enum,可放心當 label。</strong>需要 user_id / request_id 等細節請用 logs 與 tracing 系統(Lesson 05 ELK 會講),metric 只放低 cardinality 的維度。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://prometheus.io/docs/concepts/metric_types/" target="_blank" rel="noopener">Prometheus Docs — Metric Types</a><span class="ref-meta">Counter / Gauge / Histogram / Summary 定義</span></li>
+        <li><a href="https://prometheus.io/docs/prometheus/latest/querying/basics/" target="_blank" rel="noopener">PromQL Basics</a><span class="ref-meta">vector / selector 入門</span></li>
+        <li><a href="https://prometheus.io/docs/prometheus/latest/querying/functions/" target="_blank" rel="noopener">PromQL Functions</a><span class="ref-meta"><code>rate()</code> / <code>histogram_quantile()</code> 等</span></li>
+        <li><a href="https://prometheus.io/docs/practices/histograms/" target="_blank" rel="noopener">Histograms and Summaries — Best Practices</a><span class="ref-meta">分位數計算的正確姿勢</span></li>
+        <li><a href="https://prometheus.io/docs/practices/naming/" target="_blank" rel="noopener">Metric and Label Naming</a><span class="ref-meta">命名規範與 cardinality 建議</span></li>
+        <li><a href="https://prometheus-operator.dev/docs/user-guides/getting-started/" target="_blank" rel="noopener">Prometheus Operator — Getting Started</a><span class="ref-meta">ServiceMonitor / PrometheusRule CRD</span></li>
+        <li><a href="https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/create-dashboard/" target="_blank" rel="noopener">Grafana Docs — Create a dashboard</a><span class="ref-meta">官方 dashboard 建置流程</span></li>
+        <li><a href="https://grafana.com/docs/grafana/latest/datasources/prometheus/" target="_blank" rel="noopener">Grafana Docs — Prometheus data source</a><span class="ref-meta">資料源設定</span></li>
+        <li><a href="https://grafana.com/docs/grafana/latest/datasources/prometheus/template-variables/" target="_blank" rel="noopener">Grafana Docs — Prometheus template variables</a><span class="ref-meta"><code>label_values()</code> 用法</span></li>
+        <li><a href="https://grafana.com/docs/grafana/latest/alerting/" target="_blank" rel="noopener">Grafana Alerting</a><span class="ref-meta">Unified Alerting 全貌</span></li>
+        <li><a href="https://grafana.com/docs/grafana/latest/alerting/alerting-rules/create-grafana-managed-rule/" target="_blank" rel="noopener">Create a Grafana-managed alert rule</a><span class="ref-meta">Alert rule 建立步驟</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="03_argocd_gitops.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 03 · Argo CD GitOps</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="05_elk_log_analysis.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 05 · ELK 日誌分析</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">5 堂 DevOps 系列 <span class="progress-pill">4 / 5</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="01_azure_devops.html"><span class="course-nav-num">01</span><span>Azure DevOps</span></a></li>
+        <li><a class="course-nav-item" href="02_kubernetes_practical.html"><span class="course-nav-num">02</span><span>Kubernetes</span></a></li>
+        <li><a class="course-nav-item" href="03_argocd_gitops.html"><span class="course-nav-num">03</span><span>Argo CD</span></a></li>
+        <li><a class="course-nav-item current" href="04_prometheus_grafana.html"><span class="course-nav-num">04</span><span>Prometheus + Grafana</span></a></li>
+        <li><a class="course-nav-item" href="05_elk_log_analysis.html"><span class="course-nav-num">05</span><span>ELK</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 DevOps 實務課程系列 · Lesson 04
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

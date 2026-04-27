@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 08｜測試金字塔與 TDD — 開源貢獻課程</title>
+<meta name="description" content="測試金字塔/獎盃/蜂巢、TDD Red-Green-Refactor、F.I.R.S.T、AAA 模式、Coverage 何時 80% 才合理 — 業界測試實務一次學完。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 08 · 自動化與測試篇</div>
+    <h1 class="hero-title">測試金字塔<span> 與 TDD</span></h1>
+    <p class="hero-desc">測試不是「為了 coverage 數字」，是<strong>讓改動安全的安全網</strong>。這堂建立你對測試類型、TDD 流程、覆蓋率的正確直覺。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 8 / 12 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 13 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>中階</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#pyramid">測試金字塔</a></li>
+      <li><a class="toc-link" href="#shapes">獎盃 / 蜂巢</a></li>
+      <li><a class="toc-link" href="#types">測試類型</a></li>
+      <li><a class="toc-link" href="#tdd">TDD 三步驟</a></li>
+      <li><a class="toc-link" href="#first">F.I.R.S.T</a></li>
+      <li><a class="toc-link" href="#aaa">AAA 模式</a></li>
+      <li><a class="toc-link" href="#coverage">Coverage 迷思</a></li>
+      <li><a class="toc-link" href="#frameworks">主流框架</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="pyramid">
+      <span class="section-eyebrow">01 — 測試金字塔</span>
+      <h2>Mike Cohn 的測試金字塔 (2009)</h2>
+
+      <p>金字塔的中心思想：<strong>越底層的測試越多、越快、越穩定；越頂層的測試越少、越慢、越容易壞</strong>。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 600 320" xmlns="http://www.w3.org/2000/svg" aria-label="測試金字塔">
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <!-- 金字塔三層 -->
+            <polygon points="200,80 400,80 460,180 140,180" fill="#fee2e2" stroke="#b91c1c" stroke-width="2"/>
+            <polygon points="140,180 460,180 510,260 90,260" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+            <polygon points="90,260 510,260 550,310 50,310" fill="#dcfce7" stroke="#15803d" stroke-width="2"/>
+
+            <text x="300" y="135" text-anchor="middle" font-weight="700" fill="#7f1d1d" font-size="14">E2E (10%)</text>
+            <text x="300" y="155" text-anchor="middle" fill="#6b6b7e" font-size="10">慢、易壞、貴</text>
+
+            <text x="300" y="215" text-anchor="middle" font-weight="700" fill="#78350f" font-size="14">Integration (20%)</text>
+            <text x="300" y="235" text-anchor="middle" fill="#6b6b7e" font-size="10">中速、串接幾個元件</text>
+
+            <text x="300" y="290" text-anchor="middle" font-weight="700" fill="#14532d" font-size="14">Unit (70%)</text>
+            <text x="300" y="305" text-anchor="middle" fill="#6b6b7e" font-size="10">超快、孤立、便宜</text>
+
+            <!-- 兩側標註 -->
+            <text x="50" y="60" fill="#6b6b7e" font-size="10">↑ 慢 / 貴</text>
+            <text x="500" y="60" fill="#6b6b7e" font-size="10">少 (10%)</text>
+            <text x="50" y="320" fill="#6b6b7e" font-size="10">↓ 快 / 便宜</text>
+            <text x="500" y="320" fill="#6b6b7e" font-size="10">多 (70%)</text>
+
+            <text x="300" y="40" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">傳統測試金字塔</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 8.1 — Mike Cohn 測試金字塔</div>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>反金字塔 (倒三角) 是反模式</strong>
+          只有 E2E、沒有 unit test = test suite 跑半小時、隨機壞、debug 困難。是新手團隊最常踩的測試陷阱。
+        </div>
+      </div>
+    </section>
+
+    <section id="shapes">
+      <span class="section-eyebrow">02 — 其他形狀</span>
+      <h2>獎盃、蜂巢 — 金字塔不是唯一答案</h2>
+
+      <table>
+        <thead>
+          <tr><th>形狀</th><th>提倡者</th><th>核心觀點</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>金字塔</strong></td>
+            <td>Mike Cohn (2009)</td>
+            <td>多 unit、少 E2E (傳統)</td>
+          </tr>
+          <tr>
+            <td><strong>獎盃 (Trophy)</strong></td>
+            <td>Kent C. Dodds (2018)</td>
+            <td>整合測試最重要，加上靜態檢查 (TypeScript) 為基底</td>
+          </tr>
+          <tr>
+            <td><strong>蜂巢 (Honeycomb)</strong></td>
+            <td>Spotify Engineering</td>
+            <td>後端微服務環境下，整合測試 (服務間) 才有最高價值</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>選哪個形狀？看你做什麼</strong>
+          <strong>前端</strong>：獎盃 (UI 變化快，unit 容易過度耦合 DOM；用 React Testing Library + 整合測試 + Playwright)。<br>
+          <strong>後端 monolith</strong>：金字塔仍然是好預設。<br>
+          <strong>後端微服務</strong>：蜂巢 — 服務內邏輯測整合，服務間測 contract。
+        </div>
+      </div>
+    </section>
+
+    <section id="types">
+      <span class="section-eyebrow">03 — 測試類型</span>
+      <h2>實務常見的測試類型</h2>
+
+      <table>
+        <thead>
+          <tr><th>類型</th><th>測什麼</th><th>速度</th><th>典型工具</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Unit</strong></td>
+            <td>單一函式 / 元件，外部依賴 mock 掉</td>
+            <td>毫秒</td>
+            <td>Jest / Vitest / pytest / JUnit</td>
+          </tr>
+          <tr>
+            <td><strong>Integration</strong></td>
+            <td>多個模組串接，例如 API + DB</td>
+            <td>幾十毫秒 ~ 秒</td>
+            <td>Supertest / Testcontainers</td>
+          </tr>
+          <tr>
+            <td><strong>Contract</strong></td>
+            <td>服務 API 的契約 (consumer/provider)</td>
+            <td>秒</td>
+            <td>Pact / OpenAPI schema</td>
+          </tr>
+          <tr>
+            <td><strong>E2E</strong></td>
+            <td>真的開瀏覽器，從使用者角度測整套流程</td>
+            <td>秒 ~ 分鐘</td>
+            <td>Playwright / Cypress / Selenium</td>
+          </tr>
+          <tr>
+            <td><strong>Smoke</strong></td>
+            <td>「冒煙測試」— 部署後跑幾個關鍵 path 確認沒整個炸</td>
+            <td>秒</td>
+            <td>少量精選 E2E</td>
+          </tr>
+          <tr>
+            <td><strong>Regression</strong></td>
+            <td>確保以前修好的 bug 沒回來</td>
+            <td>—</td>
+            <td>所有上述類型 + 持續累積</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="tdd">
+      <span class="section-eyebrow">04 — TDD</span>
+      <h2>TDD 三步驟：Red → Green → Refactor</h2>
+
+      <p>由 Kent Beck 在《Test-Driven Development: By Example》(2002) 系統化的方法。一個無限循環：</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 600 240" xmlns="http://www.w3.org/2000/svg" aria-label="TDD 循環">
+          <defs>
+            <marker id="td-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <circle cx="150" cy="120" r="55" fill="#fee2e2" stroke="#b91c1c" stroke-width="2"/>
+            <text x="150" y="115" text-anchor="middle" font-weight="700" fill="#7f1d1d" font-size="16">RED</text>
+            <text x="150" y="135" text-anchor="middle" fill="#6b6b7e" font-size="10">寫一個失敗的測試</text>
+
+            <circle cx="300" cy="120" r="55" fill="#dcfce7" stroke="#15803d" stroke-width="2"/>
+            <text x="300" y="115" text-anchor="middle" font-weight="700" fill="#14532d" font-size="16">GREEN</text>
+            <text x="300" y="135" text-anchor="middle" fill="#6b6b7e" font-size="10">最少改動讓它通過</text>
+
+            <circle cx="450" cy="120" r="55" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+            <text x="450" y="115" text-anchor="middle" font-weight="700" fill="#4c1d95" font-size="16">REFACTOR</text>
+            <text x="450" y="135" text-anchor="middle" fill="#6b6b7e" font-size="10">整理 code 但測試不變</text>
+
+            <line x1="205" y1="120" x2="245" y2="120" stroke="#7c3aed" stroke-width="2" marker-end="url(#td-arr)"/>
+            <line x1="355" y1="120" x2="395" y2="120" stroke="#7c3aed" stroke-width="2" marker-end="url(#td-arr)"/>
+
+            <!-- 回到 RED -->
+            <path d="M 450 175 Q 300 220 150 175" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#td-arr)"/>
+            <text x="300" y="220" text-anchor="middle" fill="#7c3aed" font-size="11">下一個測試</text>
+
+            <text x="300" y="40" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">無限循環直到功能完整</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 8.2 — TDD 三步驟循環</div>
+      </div>
+
+      <h3>實戰範例：實作一個 <code>add</code> 函式</h3>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">typescript</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm">// 步驟 1 (RED): 先寫測試</span>
+test(<span class="tk-st">'add: 兩個數相加'</span>, () =&gt; {
+  expect(add(<span class="tk-num">1</span>, <span class="tk-num">2</span>)).toBe(<span class="tk-num">3</span>);
+});
+
+<span class="tk-cm">// 跑測試 → 失敗 (add 還沒實作) ← RED</span>
+
+<span class="tk-cm">// 步驟 2 (GREEN): 寫最少實作</span>
+<span class="tk-kw">function</span> <span class="tk-fn">add</span>(a: <span class="tk-fn">number</span>, b: <span class="tk-fn">number</span>) {
+  <span class="tk-kw">return</span> a + b;
+}
+
+<span class="tk-cm">// 跑測試 → 通過 ← GREEN</span>
+
+<span class="tk-cm">// 步驟 3 (REFACTOR): 整理程式碼</span>
+<span class="tk-cm">// 這次太簡單沒得 refactor，但複雜情境會在這步抽函式 / 改命名</span>
+
+<span class="tk-cm">// 然後回到步驟 1 寫下一個測試 (例如負數相加)</span></code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>TDD 真正的價值不是「寫測試」</strong>
+          是<strong>「先想清楚要做什麼」</strong>。寫測試的當下，你被迫思考：「這個函式的 input/output 是什麼？邊界情況是什麼？」這個思考過程比測試本身更值錢。
+        </div>
+      </div>
+    </section>
+
+    <section id="first">
+      <span class="section-eyebrow">05 — F.I.R.S.T</span>
+      <h2>好測試的 F.I.R.S.T 原則</h2>
+
+      <p>Robert C. Martin (Uncle Bob) 提出，每個字母代表一個原則：</p>
+
+      <table>
+        <thead>
+          <tr><th>字母</th><th>原則</th><th>實務含義</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>F</strong>ast</td><td>快</td><td>整套 unit test 應該秒殺，否則開發者就不會常跑</td></tr>
+          <tr><td><strong>I</strong>solated</td><td>孤立</td><td>每個測試獨立、測試間不依賴順序、不互相影響</td></tr>
+          <tr><td><strong>R</strong>epeatable</td><td>可重複</td><td>同樣 input 永遠同樣結果，不依賴時間、亂數、外部服務</td></tr>
+          <tr><td><strong>S</strong>elf-validating</td><td>自我驗證</td><td>跑完直接告訴你成功/失敗，不需要人類去看 log 判斷</td></tr>
+          <tr><td><strong>T</strong>imely</td><td>及時</td><td>測試應該緊鄰 production code 寫，最好就是 TDD 的 R-G-R</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>flaky test (不穩定測試) 是違反 Repeatable 的元兇</strong>
+          有時候過、有時候掛 — 通常是依賴時間、依賴順序、依賴網路。<strong>flaky test 比沒測試更糟</strong> — 它會訓練團隊忽略 CI 紅燈，最後真的 bug 也被當 flaky 重跑。發現 flaky 立刻修，修不好就先 skip + 開 issue 排修。
+        </div>
+      </div>
+    </section>
+
+    <section id="aaa">
+      <span class="section-eyebrow">06 — AAA 模式</span>
+      <h2>AAA — Arrange / Act / Assert</h2>
+
+      <p>每個測試在結構上明顯分三段，閱讀性大增：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">typescript</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>test(<span class="tk-st">'logout: clears all user state'</span>, () =&gt; {
+  <span class="tk-cm">// Arrange — 設定情境</span>
+  <span class="tk-kw">const</span> store = createStore({ user: { id: <span class="tk-num">42</span>, name: <span class="tk-st">'Jason'</span> } });
+
+  <span class="tk-cm">// Act — 觸發行為</span>
+  store.dispatch(logout());
+
+  <span class="tk-cm">// Assert — 驗證結果</span>
+  expect(store.getState().user).toBeNull();
+  expect(store.getState().token).toBeNull();
+});</code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>一個測試只測一件事</strong>
+          一個 test 內最好只有一個邏輯上的 assert (可以多個 expect 但都驗證同一件事)。如果你發現要寫第二個 act → assert，那是新測試了。
+        </div>
+      </div>
+    </section>
+
+    <section id="coverage">
+      <span class="section-eyebrow">07 — Coverage</span>
+      <h2>Coverage 80% 的真相</h2>
+
+      <h3>四種 coverage 指標</h3>
+
+      <table>
+        <thead>
+          <tr><th>指標</th><th>意義</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Line</strong></td><td>程式碼有多少 % 的<strong>行</strong>被執行過</td></tr>
+          <tr><td><strong>Statement</strong></td><td>多少 % 的<strong>語句</strong>被執行 (一行可能有多個 statement)</td></tr>
+          <tr><td><strong>Branch</strong></td><td>多少 % 的<strong>分支</strong> (if-else / switch) 走過 — 通常是最重要的指標</td></tr>
+          <tr><td><strong>Function</strong></td><td>多少 % 的<strong>函式</strong>至少被呼叫過一次</td></tr>
+        </tbody>
+      </table>
+
+      <h3>為什麼 80% 是常見目標</h3>
+      <ul>
+        <li>低於 60% — 太多區域沒被測試保護，重構很危險</li>
+        <li>60-80% — 健康，重要邏輯都被覆蓋</li>
+        <li>80-90% — 高品質開源專案的水準</li>
+        <li>追求 100% — <strong>邊際效益急速下降</strong>，且容易出現「為了 coverage 而寫的低價值測試」</li>
+      </ul>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>Coverage 高不代表測試好</strong>
+          下面這個測試 coverage 100%，但毫無價值：
+<pre style="background:#fff;padding:0.6rem;border-radius:6px;font-size:12px;margin-top:0.4rem;line-height:1.5;"><code>test('add', () =&gt; {
+  add(1, 2);  // 沒有 assert，純執行
+});</code></pre>
+          <strong>Coverage 是「測試覆蓋多少行」，不是「邏輯正確性多少」</strong>。覆蓋率高的同時要看：是否有清楚 assert、是否測了邊界情況、是否有 mutation testing 驗證測試強度。
+        </div>
+      </div>
+
+      <h3>不該追求高 coverage 的場景</h3>
+      <ul>
+        <li><strong>Prototype / spike code</strong> — 探索性程式碼丟掉就好</li>
+        <li><strong>純呼叫第三方 API 的 wrapper</strong> — 測試只會 mock 自己寫的東西</li>
+        <li><strong>複雜的 UI 微互動</strong> — 視覺回歸 (visual regression) 比 unit test 有效</li>
+      </ul>
+
+      <details class="collapse">
+        <summary>Mutation Testing — 測試你的測試 <span class="collapse-tag">進階</span></summary>
+        <div class="collapse-body">
+          <p>Mutation testing 工具會故意改你的 production code (例如 <code>&gt;</code> 改成 <code>&gt;=</code>、刪掉 <code>!</code>)，然後跑你的測試。如果測試還通過 = 你的測試<strong>沒抓到這個 mutation</strong> = 測試強度不夠。</p>
+          <p style="margin-top:0.5rem;">JS 工具：<a class="inline-link" href="https://stryker-mutator.io" target="_blank" rel="noopener">Stryker</a>。Java：PIT。Python：mutmut。比 coverage 更精確衡量測試強度，但跑得慢，通常不會每次 CI 都跑。</p>
+        </div>
+      </details>
+
+      <details class="collapse">
+        <summary>Property-Based Testing — 用隨機輸入找邊界 <span class="collapse-tag">進階</span></summary>
+        <div class="collapse-body">
+          <p>傳統測試：你寫 <code>add(1, 2) === 3</code>。Property-based 測試：你定義屬性 <code>∀ a, b: add(a, b) === add(b, a)</code> (交換律)，框架自動生成數百組隨機輸入測試。</p>
+          <p style="margin-top:0.5rem;">JS：<a class="inline-link" href="https://github.com/dubzzz/fast-check" target="_blank" rel="noopener">fast-check</a>。Haskell 的 QuickCheck 是這個概念的源頭。發現邊界 bug 的能力遠超人工寫測試。</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="frameworks">
+      <span class="section-eyebrow">08 — 主流框架</span>
+      <h2>各語言主流測試框架</h2>
+
+      <table>
+        <thead>
+          <tr><th>語言</th><th>主流框架</th><th>備註</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>JavaScript / TypeScript</td><td><strong>Vitest</strong> (新) / Jest</td><td>Vitest 在 Vite 生態系幾乎已取代 Jest，速度快很多</td></tr>
+          <tr><td>Python</td><td><strong>pytest</strong></td><td>幾乎是業界標準，超越 unittest</td></tr>
+          <tr><td>Go</td><td>內建 <code>testing</code></td><td>無外部框架，table-driven test 為主流</td></tr>
+          <tr><td>Java</td><td><strong>JUnit 5</strong> + AssertJ</td><td>Spring 生態系預設</td></tr>
+          <tr><td>Rust</td><td>內建 <code>cargo test</code></td><td>單元測試寫在 source 同檔案 <code>#[cfg(test)]</code> 區塊</td></tr>
+          <tr><td>C++</td><td>GoogleTest</td><td>Google 維護的事實標準</td></tr>
+          <tr><td>E2E (前端)</td><td><strong>Playwright</strong> (新) / Cypress</td><td>Playwright 跨瀏覽器、無 iframe 限制，2024 後快速取代 Cypress</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 5</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "Mike Cohn 測試金字塔的中心思想是什麼？",
+    "options": [
+      "三種測試類型都要剛好 33%",
+      "越底層的測試越多 (Unit) 因為快、便宜、穩定；越頂層越少 (E2E) 因為慢、貴、易壞",
+      "E2E 測試最重要應該佔最多",
+      "金字塔只是裝飾，實際比例不重要"
+    ],
+    "answer": 1,
+    "explain": "Unit 多 (70%)、Integration 中 (20%)、E2E 少 (10%) 是金字塔的核心。反過來 (倒三角) 是最常見的反模式 — test suite 跑半小時又隨機壞。"
+  },
+  {
+    "question": "TDD 的 Red-Green-Refactor 順序中，Red 步驟做什麼？",
+    "options": [
+      "寫好的程式碼讓測試通過",
+      "<strong>先寫一個會失敗的測試</strong> (因為要測的功能還沒實作)",
+      "把舊測試標紅刪掉",
+      "重構但保持測試通過"
+    ],
+    "answer": 1,
+    "explain": "Red = 寫好失敗的測試。這一步逼你思考「我要做什麼，input/output 是什麼」。再用最少改動讓測試通過 (Green)，最後整理程式碼 (Refactor)。"
+  },
+  {
+    "question": "F.I.R.S.T 原則中，<code>Repeatable</code> 的意思是？",
+    "options": [
+      "測試可以複製貼上",
+      "同樣輸入永遠同樣結果，不依賴時間/亂數/網路/順序",
+      "測試碼可以重複使用",
+      "測試可以無限次跑"
+    ],
+    "answer": 1,
+    "explain": "違反 Repeatable 的最常見原因是 flaky test — 依賴時間、亂數、外部服務、執行順序。flaky test 比沒測試更糟，會訓練團隊忽略 CI 紅燈。"
+  },
+  {
+    "question": "下列哪個 coverage 指標<strong>最重要</strong>？",
+    "options": [
+      "Line coverage",
+      "Branch coverage",
+      "Function coverage",
+      "Statement coverage"
+    ],
+    "answer": 1,
+    "explain": "Branch coverage (分支覆蓋率) 衡量 if-else / switch / 三元運算子的所有分支是否都被測試走過。它比 line coverage 嚴格 — 一行的 if 條件可能 line 看起來覆蓋但只走過一邊。"
+  },
+  {
+    "question": "下列哪些情境<strong>不該</strong>追求高測試覆蓋率？(多選)",
+    "options": [
+      "Prototype / spike 探索性程式碼",
+      "純包裝第三方 API 的 wrapper",
+      "正在 production 跑的核心商業邏輯",
+      "複雜 UI 微互動 (用視覺回歸更有效)"
+    ],
+    "answer": [0, 1, 3],
+    "explain": "覆蓋率不是越高越好。探索碼丟掉就好；wrapper 只能 mock 自己；UI 互動視覺回歸更有效。<strong>核心商業邏輯</strong>絕對該高覆蓋率 — 這是 production 的安全網。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://martinfowler.com/articles/practical-test-pyramid.html" target="_blank" rel="noopener">Martin Fowler — The Practical Test Pyramid</a><span class="ref-meta">最被引用的金字塔詳解</span></li>
+        <li><a href="https://kentcdodds.com/blog/write-tests" target="_blank" rel="noopener">Kent C. Dodds — The Testing Trophy</a><span class="ref-meta">獎盃形狀提倡者</span></li>
+        <li><a href="https://www.amazon.com/Test-Driven-Development-Kent-Beck/dp/0321146530" target="_blank" rel="noopener">Kent Beck《Test-Driven Development: By Example》</a><span class="ref-meta">TDD 創始人著作</span></li>
+        <li><a href="https://github.com/goldbergyoni/javascript-testing-best-practices" target="_blank" rel="noopener">JavaScript Testing Best Practices</a><span class="ref-meta">35k+ stars 業界共識</span></li>
+        <li><a href="https://stryker-mutator.io" target="_blank" rel="noopener">Stryker — Mutation testing</a><span class="ref-meta">JS mutation testing 工具</span></li>
+        <li><a href="https://github.com/dubzzz/fast-check" target="_blank" rel="noopener">fast-check — Property-based testing</a><span class="ref-meta">JS PBT 工具</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="07_issues_project_mgmt.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 07 · Issue 與專案管理</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="09_ci_cd_hooks.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 09 · CI/CD、Hooks、Lint</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">12 堂課程系列 <span class="progress-pill">8 / 12</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
+        <li><a class="course-nav-item" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
+        <li><a class="course-nav-item" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇</span></a></li>
+        <li><a class="course-nav-item" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
+        <li><a class="course-nav-item" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
+        <li><a class="course-nav-item" href="06_commits_versioning.html"><span class="course-nav-num">06</span><span>Commit、SemVer、Changelog</span></a></li>
+        <li><a class="course-nav-item" href="07_issues_project_mgmt.html"><span class="course-nav-num">07</span><span>Issue 與專案管理</span></a></li>
+        <li><a class="course-nav-item current" href="08_testing_tdd.html"><span class="course-nav-num">08</span><span>測試金字塔與 TDD</span></a></li>
+        <li><a class="course-nav-item" href="09_ci_cd_hooks.html"><span class="course-nav-num">09</span><span>CI/CD、Hooks、Lint</span></a></li>
+        <li><a class="course-nav-item" href="10_rfc_adr_release.html"><span class="course-nav-num">10</span><span>RFC、ADR、Release</span></a></li>
+        <li><a class="course-nav-item" href="11_dependencies_supply_chain.html"><span class="course-nav-num">11</span><span>依賴管理與供應鏈安全</span></a></li>
+        <li><a class="course-nav-item" href="12_first_contribution.html"><span class="course-nav-num">12</span><span>第一次貢獻實戰</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的開源協作課程系列 · Lesson 08
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

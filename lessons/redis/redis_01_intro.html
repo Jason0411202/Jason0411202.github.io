@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redis 01｜Redis 是什麼、何時用 — Redis 課程</title>
+<meta name="description" content="Redis 不是「只是 cache」，是個資料結構服務。從 single-threaded event loop 出發，理解它為什麼簡單卻快，並比較 Memcached / Valkey / DragonflyDB / KeyDB。含 Docker 動手玩。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Redis 01 · 概念入門</div>
+    <h1 class="hero-title">Redis 是<span>資料結構服務</span>，不是「只是 cache」</h1>
+    <p class="hero-desc">用 single-threaded event loop 當主線，把 Redis 為什麼簡單卻快、五大基礎資料結構、與 Memcached / Valkey / DragonflyDB 怎麼分一次說清楚。<strong>所有版本資訊以 Redis 8.6（2026/03 GA）為準。</strong></p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 1 / 6 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 13 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>初階 · 概念 + 實作</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#why">為何記憶體 DB</a></li>
+      <li><a class="toc-link" href="#position">資料結構服務</a></li>
+      <li><a class="toc-link" href="#single-thread">單緒事件迴圈</a></li>
+      <li><a class="toc-link" href="#five-ds">五大資料結構</a></li>
+      <li><a class="toc-link" href="#compare">vs 同類專案</a></li>
+      <li><a class="toc-link" href="#fit">何時該用 / 不該用</a></li>
+      <li><a class="toc-link" href="#hands-on">Docker 動手玩</a></li>
+      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="why">
+      <span class="section-eyebrow">01 — 起點</span>
+      <h2>為什麼會出現記憶體型資料庫</h2>
+      <p>在 Redis 出現以前（2009 年），網站要做以下事情都很痛：</p>
+      <ul>
+        <li><strong>cache 一個熱資料</strong>：要嘛自己包 Memcached（純 KV、沒結構），要嘛去 hit 資料庫，每次 5–50ms。</li>
+        <li><strong>排行榜</strong>：MySQL 排序 1000 萬筆每秒幾百次？硬碟跟 index 都會冒煙。</li>
+        <li><strong>輕量級訊息佇列</strong>：用 RabbitMQ 太重、用 MySQL polling 太慢。</li>
+        <li><strong>分散式 lock</strong>：自己用 DB 的 row lock 寫，慘不忍睹。</li>
+      </ul>
+      <p>Redis（<strong>RE</strong>mote <strong>DI</strong>ctionary <strong>S</strong>erver）由 Salvatore Sanfilippo 創造、Antirez 為其代名。它的「驚人」之處不是「把資料放在記憶體」（這個 Memcached 早就做了），而是 — </p>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>一句話定位</strong>
+          Redis = <em>把資料結構當 server 開出來</em>。它不只給你 KV，還給你 List、Hash、Set、Sorted Set、Stream、HLL、Bitmap、Geo、Vector Set，全部以原生指令操作，<strong>亞毫秒延遲</strong>。它是「在網路另一端的 std::map / std::set」。
+        </div>
+      </div>
+    </section>
+
+    <section id="position">
+      <span class="section-eyebrow">02 — 心智模型</span>
+      <h2>「資料結構服務」這個說法的真正意思</h2>
+      <p>大多數人第一次聽到 Redis 都被告知「Redis 是 cache」。這不是錯，但只說對 30%。Cache 只是 Redis 最常用的場景，它真正的能力是：</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" aria-label="Redis 資料結構服務概念">
+          <g font-family="JetBrains Mono, monospace" font-size="13">
+            <text x="360" y="30" text-anchor="middle" font-family="Syne, sans-serif" font-size="18" font-weight="700" fill="#0a0a0f">Redis 是「網路另一端的 std::map」</text>
+
+            <rect x="40" y="60" width="280" height="200" rx="14" fill="#fafaf8" stroke="#d4d3cc" stroke-width="1.5"/>
+            <text x="180" y="90" text-anchor="middle" font-weight="700" fill="#0a0a0f">App Server (Go / Python / JS)</text>
+            <text x="180" y="115" text-anchor="middle" fill="#6b6b7e" font-size="11">myMap[key] = value</text>
+            <text x="180" y="135" text-anchor="middle" fill="#6b6b7e" font-size="11">mySet.add(item)</text>
+            <text x="180" y="155" text-anchor="middle" fill="#6b6b7e" font-size="11">myZSet.zadd(score, item)</text>
+            <text x="180" y="175" text-anchor="middle" fill="#6b6b7e" font-size="11">myList.lpush(value)</text>
+            <text x="180" y="200" text-anchor="middle" fill="#3a3a4a" font-size="12">↑ 你在程式裡常做的事</text>
+            <text x="180" y="225" text-anchor="middle" fill="#3a3a4a" font-size="12">但只在「這台機器」內</text>
+
+            <rect x="400" y="60" width="280" height="200" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="540" y="90" text-anchor="middle" font-weight="700" fill="#4c1d95">Redis Server</text>
+            <text x="540" y="115" text-anchor="middle" fill="#7c3aed" font-size="11">SET key value</text>
+            <text x="540" y="135" text-anchor="middle" fill="#7c3aed" font-size="11">SADD set item</text>
+            <text x="540" y="155" text-anchor="middle" fill="#7c3aed" font-size="11">ZADD zset score item</text>
+            <text x="540" y="175" text-anchor="middle" fill="#7c3aed" font-size="11">LPUSH list value</text>
+            <text x="540" y="200" text-anchor="middle" fill="#3a3a4a" font-size="12">↑ 完全一樣的概念</text>
+            <text x="540" y="225" text-anchor="middle" fill="#3a3a4a" font-size="12"><strong>但跨進程 / 跨節點共享</strong></text>
+
+            <line x1="320" y1="130" x2="400" y2="130" stroke="#ff3d1f" stroke-width="2" stroke-dasharray="4 4"/>
+            <text x="360" y="125" text-anchor="middle" fill="#ff3d1f" font-size="10">TCP</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 R1.1 — Redis 把記憶體中的資料結構搬到網路另一端，多進程共享</div>
+      </div>
+
+      <p>所以「cache 一個 user object」只是 Redis 能做的最簡單一件事。看到「排行榜」就用 Sorted Set；看到「最近 100 筆事件」就用 Stream；看到「附近 1km 的店家」就用 Geo；看到「使用者連續 30 天簽到」就用 Bitmap — 這些都是<strong>原生指令直接搞定，不用拉資料回來自己算</strong>。</p>
+    </section>
+
+    <section id="single-thread">
+      <span class="section-eyebrow">03 — 為何快</span>
+      <h2>單緒事件迴圈：簡單卻快的祕密</h2>
+      <p>Redis 處理使用者指令的部分是 <strong>single-threaded</strong>（單一執行緒）。這是 Redis 從第一天就決定的設計，至今沒變（雖然 6.0+ 已加 I/O threads 處理網路收送、8.x 持續優化，但<strong>命令的執行</strong>仍是單緒）。為什麼選這個反直覺的設計？</p>
+
+      <ul>
+        <li><strong>沒有 lock 競爭</strong>：所有指令依序執行，每個指令都是原子的。你要做一個原子計數器？<code>INCR counter</code>。要原子地拿出最舊的訊息？<code>LPOP list</code>。完全不需要自己處理 race condition。</li>
+        <li><strong>記憶體比 CPU 慢得多</strong>：對 KV 操作來說，瓶頸是 RAM access、不是 CPU。多緒能加多少？實測加 4 倍 thread 只快 1.5 倍，但複雜度爆炸。</li>
+        <li><strong>I/O multiplexing</strong>：用 epoll / kqueue 在單一 thread 處理數萬條連線。網路是非同步的，CPU 永遠不會閒著。</li>
+      </ul>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>單緒的代價：慢指令會卡住所有人</strong>
+          因為命令是依序執行，<strong>一個 <code>KEYS *</code> 跑 10 秒，就是<em>所有 client</em> 卡 10 秒</strong>。Lua script 跑太久也一樣。這是 Redis 最常見的生產事故，R-06 會專門講。先記住一句：<em>「Redis 的指令必須是 sub-ms。」</em>
+        </div>
+      </div>
+    </section>
+
+    <section id="five-ds">
+      <span class="section-eyebrow">04 — 五大資料結構</span>
+      <h2>必背的五個資料結構（基礎）</h2>
+      <p>八成的 Redis 用法都繞著這五個。R-02 會展開到 Streams、HLL、Geo、Bitmap、Vector Set。</p>
+
+      <table>
+        <thead>
+          <tr><th>結構</th><th>類比</th><th>常用指令</th><th>典型場景</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>String</strong></td>
+            <td><code>str / int / bytes</code></td>
+            <td><code>SET</code>, <code>GET</code>, <code>INCR</code>, <code>EXPIRE</code></td>
+            <td>cache、計數器、SESSION token</td>
+          </tr>
+          <tr>
+            <td><strong>List</strong></td>
+            <td><code>deque</code></td>
+            <td><code>LPUSH</code>, <code>RPUSH</code>, <code>LPOP</code>, <code>BLPOP</code></td>
+            <td>輕量訊息佇列、最新 N 筆</td>
+          </tr>
+          <tr>
+            <td><strong>Hash</strong></td>
+            <td><code>map&lt;str, str&gt;</code></td>
+            <td><code>HSET</code>, <code>HGET</code>, <code>HGETALL</code>, <code>HINCRBY</code></td>
+            <td>儲存物件（user / product）</td>
+          </tr>
+          <tr>
+            <td><strong>Set</strong></td>
+            <td><code>set&lt;str&gt;</code></td>
+            <td><code>SADD</code>, <code>SISMEMBER</code>, <code>SUNION</code>, <code>SINTER</code></td>
+            <td>tag、好友、IP 黑名單</td>
+          </tr>
+          <tr>
+            <td><strong>Sorted Set</strong></td>
+            <td><code>map&lt;str, score&gt;</code> 排序</td>
+            <td><code>ZADD</code>, <code>ZRANGE</code>, <code>ZINCRBY</code>, <code>ZRANGEBYSCORE</code></td>
+            <td><strong>排行榜、延遲佇列、滑動窗口 rate limiter</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>Sorted Set 是 Redis 最被低估的結構</strong>
+          多數初學者只用前四個。實際上 Sorted Set 解決了 <em>排行榜</em>、<em>滑動視窗 rate limiter</em>、<em>延遲佇列</em>、<em>有序事件流</em> 等一拖拉庫進階場景。R-02 + R-06 會展開。
+        </div>
+      </div>
+    </section>
+
+    <section id="compare">
+      <span class="section-eyebrow">05 — 跟同類比較</span>
+      <h2>Redis 旁邊有哪些選項</h2>
+
+      <table>
+        <thead>
+          <tr><th>專案</th><th>定位</th><th>Redis 比較</th><th>取捨</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Memcached</strong></td>
+            <td>純 KV cache</td>
+            <td>沒有資料結構、沒有持久化、沒有複寫</td>
+            <td>更簡單，記憶體用得稍少；其餘輸 Redis</td>
+          </tr>
+          <tr>
+            <td><strong>Valkey</strong></td>
+            <td>Redis 7.2 fork（Linux Foundation）</td>
+            <td>API 100% 相容到 7.2，由 AWS / Google / Oracle 主導</td>
+            <td>Redis 7.4 改 license 後的「OSS 版本」；很多雲商正在移轉</td>
+          </tr>
+          <tr>
+            <td><strong>DragonflyDB</strong></td>
+            <td>多緒重寫的 Redis 替代</td>
+            <td>API 大致相容；單機吞吐宣稱 25× Redis</td>
+            <td>授權商業友好；少數高階指令仍未支援</td>
+          </tr>
+          <tr>
+            <td><strong>KeyDB</strong></td>
+            <td>多緒 Redis fork（已被 Snap 收購）</td>
+            <td>API 相容，多 thread</td>
+            <td>社群活躍度走低，慎選</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>關於 license 與 Valkey</strong>
+          Redis 7.4 開始改成 RSALv2 / SSPL（限制雲廠商重打包）。Linux Foundation 因此 fork 了 Valkey，採 BSD license。目前 Redis 仍是主流且 Redis 8.x 的新模組（Search / Vector Sets）功能領先；本系列以 Redis 8.6 為準，但 API 大致也適用於 Valkey。
+        </div>
+      </div>
+    </section>
+
+    <section id="fit">
+      <span class="section-eyebrow">06 — 適用判斷</span>
+      <h2>什麼時候該用 Redis？什麼時候別用？</h2>
+
+      <div class="compare-grid">
+        <div class="compare-card compare-good">
+          <div class="compare-label"><span class="compare-icon">✓</span>適合</div>
+          <div class="compare-body">
+            <ul>
+              <li><strong>快取</strong>：DB 查詢結果、HTML 片段、API response。</li>
+              <li><strong>session / token store</strong>：分散式 web app 的 session。</li>
+              <li><strong>排行榜</strong>：Sorted Set 一條指令。</li>
+              <li><strong>rate limiter / 限流</strong>：滑動窗、token bucket。</li>
+              <li><strong>輕量訊息佇列</strong>：Stream（reliable）或 Pub/Sub（fire-and-forget）。</li>
+              <li><strong>分散式 lock</strong>：`SET NX PX`。</li>
+              <li><strong>計數 / 統計</strong>：INCR、HyperLogLog 算 UV。</li>
+              <li><strong>向量相似度搜尋（小規模）</strong>：8.x 的 Vector Sets。</li>
+            </ul>
+          </div>
+        </div>
+        <div class="compare-card compare-bad">
+          <div class="compare-label"><span class="compare-icon">✗</span>不適合</div>
+          <div class="compare-body">
+            <ul>
+              <li><strong>當主要資料庫</strong>：記憶體成本貴。雖能持久化但複雜場景仍不如 PostgreSQL。</li>
+              <li><strong>儲存大物件（單一 value &gt; 100KB）</strong>：阻塞單緒、複寫變慢。</li>
+              <li><strong>需要強一致 + 高可用</strong>：Redis 主從是非同步複製，failover 可能掉資料（R-03 會講）。</li>
+              <li><strong>需要複雜查詢 / 全文搜尋（大規模）</strong>：可用 RediSearch，但 ElasticSearch 仍是更好的選項。</li>
+              <li><strong>非常大的 dataset</strong>（&gt; 100GB）：記憶體成本爆炸。考慮 KV on-disk 解（如 RocksDB）或加 Cluster。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="hands-on">
+      <span class="section-eyebrow">07 — 動手玩</span>
+      <h2>3 分鐘起一個 Redis 並敲指令</h2>
+
+      <h3>終端 ① 起 Redis 8.6</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">docker</span> run --rm --name redis8 \
+    <span class="tk-op">-p</span> 6379:6379 \
+    redis:8.6
+
+<span class="tk-cm"># 看到 "Ready to accept connections tcp" 即可
+# Redis 開機 1 秒以內，幾乎沒有等待</span></code></pre>
+      </div>
+
+      <h3>終端 ② 用 redis-cli</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it redis8 redis-cli
+
+127.0.0.1:6379&gt; <span class="tk-fn">PING</span>
+PONG
+
+<span class="tk-cm"># 五大結構各一範例</span>
+127.0.0.1:6379&gt; <span class="tk-fn">SET</span> user:1:name <span class="tk-st">"Jason"</span>
+OK
+127.0.0.1:6379&gt; <span class="tk-fn">GET</span> user:1:name
+<span class="tk-st">"Jason"</span>
+
+127.0.0.1:6379&gt; <span class="tk-fn">INCR</span> page:home:views
+<span class="tk-num">(integer) 1</span>
+127.0.0.1:6379&gt; <span class="tk-fn">INCR</span> page:home:views
+<span class="tk-num">(integer) 2</span>
+
+127.0.0.1:6379&gt; <span class="tk-fn">HSET</span> user:1 name <span class="tk-st">"Jason"</span> age <span class="tk-num">28</span> city <span class="tk-st">"Taipei"</span>
+<span class="tk-num">(integer) 3</span>
+127.0.0.1:6379&gt; <span class="tk-fn">HGETALL</span> user:1
+1) <span class="tk-st">"name"</span>
+2) <span class="tk-st">"Jason"</span>
+3) <span class="tk-st">"age"</span>
+4) <span class="tk-st">"28"</span>
+
+127.0.0.1:6379&gt; <span class="tk-fn">LPUSH</span> events <span class="tk-st">"login"</span> <span class="tk-st">"view-product"</span> <span class="tk-st">"add-cart"</span>
+<span class="tk-num">(integer) 3</span>
+127.0.0.1:6379&gt; <span class="tk-fn">LRANGE</span> events <span class="tk-num">0</span> <span class="tk-num">-1</span>
+1) <span class="tk-st">"add-cart"</span>
+2) <span class="tk-st">"view-product"</span>
+3) <span class="tk-st">"login"</span>
+
+127.0.0.1:6379&gt; <span class="tk-fn">ZADD</span> leaderboard <span class="tk-num">1500</span> <span class="tk-st">"alice"</span> <span class="tk-num">2300</span> <span class="tk-st">"bob"</span> <span class="tk-num">1800</span> <span class="tk-st">"carol"</span>
+<span class="tk-num">(integer) 3</span>
+127.0.0.1:6379&gt; <span class="tk-fn">ZREVRANGE</span> leaderboard <span class="tk-num">0</span> <span class="tk-num">-1</span> <span class="tk-op">WITHSCORES</span>
+1) <span class="tk-st">"bob"</span>     2) <span class="tk-st">"2300"</span>
+3) <span class="tk-st">"carol"</span>   4) <span class="tk-st">"1800"</span>
+5) <span class="tk-st">"alice"</span>   6) <span class="tk-st">"1500"</span>
+
+<span class="tk-cm"># EXPIRE：5 秒後自動消失</span>
+127.0.0.1:6379&gt; <span class="tk-fn">SET</span> short:msg <span class="tk-st">"hi"</span> EX <span class="tk-num">5</span>
+OK
+127.0.0.1:6379&gt; <span class="tk-fn">TTL</span> short:msg
+<span class="tk-num">(integer) 4</span>
+
+<span class="tk-cm"># 觀察延遲</span>
+127.0.0.1:6379&gt; <span class="tk-fn">DEBUG</span> SLEEP <span class="tk-num">0</span>
+OK</code></pre>
+      </div>
+
+      <h3>看一筆指令的真實延遲</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it redis8 redis-cli --latency
+min: 0, max: 1, avg: 0.18 (1245 samples)  <span class="tk-cm"># 0.18 ms 平均延遲</span>
+
+<span class="tk-pn">$</span> <span class="tk-fn">docker</span> exec -it redis8 redis-cli MONITOR
+<span class="tk-cm"># 看到所有指令即時印出 — 但 production 千萬不要開,會慢死</span></code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>所有指令都是同步阻塞的</strong>
+          Redis 沒有「async 指令」這種東西（除了 client 端的 pipeline）。你發一個指令、收到回應，這之間 server 一定處理完。簡單到不可思議。
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="quiz-section">
+      <div class="quiz-header">
+        <div class="quiz-title">章末測驗</div>
+        <div class="quiz-progress">已答 <span>0 / 4</span></div>
+      </div>
+      <div class="quiz-list"></div>
+      <script type="application/json" id="quiz-data">
+[
+  {
+    "question": "下列哪一個敘述<strong>最準確</strong>地描述 Redis 的核心定位？",
+    "options": [
+      "Redis 是高效能的 cache 層，主要解決 DB 讀取慢的問題",
+      "Redis 是把資料結構當 server 開出來的服務，cache 只是其中一種用法",
+      "Redis 是 NewSQL 資料庫，支援交易與 join",
+      "Redis 是分散式檔案系統，用記憶體模擬硬碟"
+    ],
+    "answer": 1,
+    "explain": "「資料結構服務」是 Redis 的精準定位。Cache 只是它最常見的應用之一，更核心的能力是讓你跨進程共享 List / Set / Sorted Set / Hash / Stream 等結構，且每個操作都是 sub-ms 原子指令。其他選項都不準確。"
+  },
+  {
+    "question": "為什麼 Redis 採用「single-threaded 命令執行」反而能很快？(多選)",
+    "options": [
+      "對 KV 操作而言瓶頸是記憶體 access 而非 CPU，多緒收益不高",
+      "單緒就沒有 lock 競爭，所有指令天然原子",
+      "搭配 epoll / kqueue 的 I/O multiplexing,單緒就能服務上萬連線",
+      "因為 Redis 不需要處理網路 I/O,所以可以單緒"
+    ],
+    "answer": [0, 1, 2],
+    "explain": "(0)(1)(2) 是 Redis 單緒設計的真正理由。(3) 錯：Redis 當然要處理大量網路 I/O，做法就是 (2) 用 I/O multiplexing；6.0+ 還加了 I/O threads 處理網路收送，但<em>命令執行</em>仍是單緒。"
+  },
+  {
+    "question": "下列哪一個情境<strong>應該避免</strong>用 Redis 解？",
+    "options": [
+      "需要排行榜（每秒數百次更新和查詢前 100 名）",
+      "存放使用者上傳的 5MB 圖片二進位資料",
+      "限制每個使用者每分鐘 60 次 API 呼叫",
+      "暫存 30 分鐘內未完成的訂單資料"
+    ],
+    "answer": 1,
+    "explain": "<strong>大物件（&gt;100KB）不該放 Redis</strong>。單一指令處理一個 5MB value 會阻塞單緒（其他 client 全部卡住），複寫流量也爆炸。圖片應該放 S3 / 物件儲存，Redis 只存 URL。其他三個（排行榜 / rate limiter / 暫存）都是 Redis 經典場景。"
+  },
+  {
+    "question": "關於 Redis vs Memcached vs Valkey 的關係，下列哪一項<strong>正確</strong>？",
+    "options": [
+      "Valkey 是 Redis 的 enterprise 加強版，由 Redis 公司維護",
+      "Memcached 跟 Redis 一樣支援 Sorted Set 與 Streams，差別僅在效能",
+      "Valkey 是 Redis 7.2 的 BSD 授權 fork，由 Linux Foundation 主導，因 Redis 7.4 改成限制性授權而出現",
+      "DragonflyDB 不相容 Redis API，需要重寫所有 client"
+    ],
+    "answer": 2,
+    "explain": "(2) 正確：Redis 7.4 改成 RSALv2 / SSPL 限制雲商重打包，Linux Foundation 因此 fork 出 Valkey（BSD）。(0) 錯：Valkey 不是 Redis 公司產品。(1) 錯：Memcached 是純 KV，沒有任何結構化指令。(3) 錯：DragonflyDB 大致相容 Redis API。"
+  }
+]
+      </script>
+    </section>
+
+    <section class="references">
+      <h2>官方參考資料</h2>
+      <ul class="ref-list">
+        <li><a href="https://redis.io/docs/latest/develop/whats-new/8-0/" target="_blank" rel="noopener">Redis 8.0 What's New</a><span class="ref-meta">8.0 GA</span></li>
+        <li><a href="https://redis.io/blog/announcing-redis-86-performance-improvements-streams/" target="_blank" rel="noopener">Announcing Redis 8.6</a><span class="ref-meta">2026/03 公告</span></li>
+        <li><a href="https://redis.io/docs/latest/develop/data-types/" target="_blank" rel="noopener">Redis Data types</a><span class="ref-meta">官方資料結構列表</span></li>
+        <li><a href="https://redis.io/topics/faq" target="_blank" rel="noopener">Redis FAQ — Why is single-threaded?</a><span class="ref-meta">單緒設計原因</span></li>
+        <li><a href="https://valkey.io/" target="_blank" rel="noopener">valkey.io</a><span class="ref-meta">Linux Foundation fork</span></li>
+        <li><a href="https://hub.docker.com/_/redis" target="_blank" rel="noopener">redis Docker Hub</a><span class="ref-meta">官方 image</span></li>
+      </ul>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev disabled" aria-disabled="true">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">這是 Redis 系列第一堂</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="redis_02_advanced_ds.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Redis 02 · 進階資料結構與真實場景</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">6 堂 Redis 系列 <span class="progress-pill">1 / 6</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item current" href="redis_01_intro.html"><span class="course-nav-num">01</span><span>Redis 是什麼</span></a></li>
+        <li><a class="course-nav-item" href="redis_02_advanced_ds.html"><span class="course-nav-num">02</span><span>進階資料結構</span></a></li>
+        <li><a class="course-nav-item" href="redis_03_persistence_replication.html"><span class="course-nav-num">03</span><span>持久化與複製</span></a></li>
+        <li><a class="course-nav-item" href="redis_04_ha_cluster.html"><span class="course-nav-num">04</span><span>Sentinel vs Cluster</span></a></li>
+        <li><a class="course-nav-item" href="redis_05_v8_modules.html"><span class="course-nav-num">05</span><span>Redis 8 新特性</span></a></li>
+        <li><a class="course-nav-item" href="redis_06_patterns_antipatterns.html"><span class="course-nav-num">06</span><span>實戰模式與反模式</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 Redis 課程系列 · Lesson 01
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>
