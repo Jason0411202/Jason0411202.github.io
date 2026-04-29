@@ -120,7 +120,7 @@
           <div class="timeline-num">1</div>
           <div class="timeline-content">
             <div class="timeline-title">開始前先同步主分支</div>
-            <div class="timeline-desc">避免在過時的程式碼上開發。<code>--rebase</code> 讓本地 commit 接在最新主分支後面，歷史更乾淨。</div>
+            <div class="timeline-desc">避免在過時的程式碼上開發,把遠端最新進度拉下來再開工。</div>
           </div>
         </div>
         <div class="timeline-step">
@@ -160,7 +160,7 @@
         </div>
 <pre><code><span class="tk-cm"># 1. 同步主分支</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> checkout main
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> pull <span class="tk-op">--rebase</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> pull
 
 <span class="tk-cm"># 2. 開新分支做事</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> checkout <span class="tk-op">-b</span> feat/user-profile
@@ -190,50 +190,54 @@
         </tbody>
       </table>
 
-      <div class="callout callout-warn">
-        <div class="callout-icon">!</div>
-        <div class="callout-body">
-          <strong>不要養成 <code>git add .</code> + <code>commit -am</code> 的習慣</strong>
-          這條黃金組合是業界 PR 被退件的常見原因 —— 你會把暫時 print、TODO 註解、本地實驗檔一起 commit 上去。<code>git add -p</code> 是真正的進階使用者習慣。
+      <p>執行 <code>git add -p</code> 後,Git 會把改動切成一塊塊「hunk」依序問你要不要 stage,長得像這樣:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">output</span>
+          <button class="code-copy-btn" type="button">複製</button>
         </div>
+<pre><code>diff --git a/src/auth.ts b/src/auth.ts
+@@ -10,3 +10,5 @@ export function login(user) {
+   if (!user.password) {
+     throw new Error(<span class="tk-st">"password required"</span>);
+   }
++  if (!user.email) {
++    throw new Error(<span class="tk-st">"email required"</span>);
++  }
+(1/2) Stage this hunk [y,n,q,a,d,s,e,?]?</code></pre>
       </div>
+
+      <p>看完這塊改動後,輸入單一字母按 Enter 即可。常用的有:</p>
+
+      <ul>
+        <li><code>y</code> (yes):stage 這塊。</li>
+        <li><code>n</code> (no):跳過這塊,不 stage。</li>
+        <li><code>s</code> (split):把這塊拆成更小塊再問一次,適合「同一塊裡有想要的也有不想要的」。</li>
+        <li><code>e</code> (edit):用編輯器手動挑要 stage 的行 —— 留下要的、把不要的行刪掉再存檔。</li>
+        <li><code>a</code> (all) / <code>d</code> (done):一次接受/略過剩下所有 hunk。</li>
+        <li><code>q</code> (quit):立刻結束。<code>?</code> 隨時叫出說明。</li>
+      </ul>
+
+      <p>實務最常用的就是 <code>y</code>、<code>n</code>、<code>s</code> 三個鍵。例如同一個檔案裡同時改了「正式功能」跟「順手修的 typo」,可以用 <code>git add -p</code> 把功能部分先 stage、commit;剩下 typo 再 commit 一筆,做出兩個各司其職的 commit。</p>
     </section>
 
     <section id="log">
       <span class="section-eyebrow">03 — 看歷史</span>
-      <h2>看 commit 歷史的四個工具</h2>
+      <h2>看 commit 歷史的三個工具</h2>
 
-      <h3>git log — 看時間線</h3>
-      <p>原始的 <code>git log</code> 太囉嗦。實務上幾乎都用這個別名：</p>
+      <h3>Git Graph (VSCode 擴充套件) — 視覺化分支與 commit</h3>
+      <p>原始的 <code>git log</code> 在 terminal 裡看起來又長又難讀。實務上,大多數開發者會直接在 VSCode 裝 <a class="inline-link" href="https://marketplace.visualstudio.com/items?itemName=mhutchie.git-graph" target="_blank" rel="noopener">Git Graph</a> 擴充套件,用視覺化介面看歷史。</p>
 
-      <div class="code-block">
-        <div class="code-block-header">
-          <span class="code-block-lang">bash</span>
-          <button class="code-copy-btn" type="button">複製</button>
-        </div>
-<pre><code><span class="tk-cm"># 一行一個 commit + 分支圖 + 全部分支</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> log <span class="tk-op">--oneline</span> <span class="tk-op">--graph</span> <span class="tk-op">--all</span> <span class="tk-op">--decorate</span>
-
-<span class="tk-cm"># 設成永久別名 (推薦)</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> config <span class="tk-op">--global</span> alias.lg <span class="tk-st">"log --oneline --graph --all --decorate"</span>
-
-<span class="tk-cm"># 之後就只要打</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> lg</code></pre>
-      </div>
-
-      <h3>git show — 看單個 commit 的完整內容</h3>
-      <div class="code-block">
-        <div class="code-block-header">
-          <span class="code-block-lang">bash</span>
-          <button class="code-copy-btn" type="button">複製</button>
-        </div>
-<pre><code><span class="tk-pn">$</span> <span class="tk-fn">git</span> show a1b2c3d                <span class="tk-cm"># 看那個 commit 改了什麼</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> show HEAD                   <span class="tk-cm"># 看最新的 commit</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> show HEAD~3                 <span class="tk-cm"># 看 3 個 commit 之前那個</span></code></pre>
-      </div>
+      <ul>
+        <li>裝完後在 VSCode 左下角狀態列、或 Source Control 面板上方點 <strong>View Git Graph</strong>,整個倉庫的分支圖一目了然。</li>
+        <li>點任一個 commit:右側會顯示 commit message、作者、被改的檔案清單,點檔案就能直接看 diff。</li>
+        <li>右鍵 commit:可以直接做 <code>checkout</code>、<code>cherry-pick</code>、<code>revert</code>、<code>reset</code> 等操作,不用記指令。</li>
+        <li>分支合併、rebase、tag 的關係用線條畫出來,比 <code>git log --graph --all</code> 直觀十倍。</li>
+      </ul>
 
       <h3>git blame — 看每一行是誰改的</h3>
-      <p>不是用來找戰犯，是用來找「為什麼這行寫成這樣」的線索。</p>
+      <p>不是用來找戰犯,是用來找「為什麼這行寫成這樣」的線索。</p>
 
       <div class="code-block">
         <div class="code-block-header">
@@ -244,6 +248,21 @@
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> blame <span class="tk-op">-L</span> 42,55 src/auth.ts    <span class="tk-cm"># 只看 42 ~ 55 行</span></code></pre>
       </div>
 
+      <p>輸出每一行有四個欄位,從左到右是 <strong>commit SHA</strong>、<strong>作者</strong>、<strong>提交時間</strong>、<strong>(行號) 該行內容</strong>:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">output</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>^a1b2c3d (Alice  2024-08-12 14:32:01 +0800  42) export function login(user) {
+e4f5a6b7 (Bob    2025-02-03 09:11:45 +0800  43)   if (!user.email) {
+e4f5a6b7 (Bob    2025-02-03 09:11:45 +0800  44)     throw new Error(<span class="tk-st">"email required"</span>);
+^a1b2c3d (Alice  2024-08-12 14:32:01 +0800  45)   }</code></pre>
+      </div>
+
+      <p>找到可疑那行的 SHA 後,直接 <code>git show e4f5a6b7</code> 就能看到當時整筆 commit 的 message 跟改了什麼,線索就接起來了。SHA 開頭的 <code>^</code> 代表這行從專案最早的 commit 就存在、沒被改過。</p>
+
       <h3>git log -p — 看歷史 + 每筆 diff</h3>
       <div class="code-block">
         <div class="code-block-header">
@@ -253,13 +272,34 @@
 <pre><code><span class="tk-pn">$</span> <span class="tk-fn">git</span> log <span class="tk-op">-p</span> <span class="tk-op">--follow</span> src/auth.ts   <span class="tk-cm"># 這個檔案歷年來的所有改動 + 內容</span></code></pre>
       </div>
 
-      <div class="callout callout-tip">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong><code>--follow</code> 為什麼重要</strong>
-          檔案被改名後，預設的 <code>git log</code> 只看得到改名後的歷史。<code>--follow</code> 會追溯改名前的內容，看到完整故事。
+      <p>輸出會「一筆 commit 配一段 diff」往下排。每段 diff 開頭的 <code>@@ -10,3 +12,5 @@</code> 叫 <strong>hunk header</strong>,意思是「舊版第 10 行起的 3 行,對應新版第 12 行起的 5 行」;之後 <code>-</code> 開頭是被刪掉的、<code>+</code> 開頭是新加的、沒符號的是上下文沒動的行:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">output</span>
+          <button class="code-copy-btn" type="button">複製</button>
         </div>
+<pre><code>commit e4f5a6b7c8d9...
+Author: Bob &lt;bob@example.com&gt;
+Date:   Mon Feb 3 09:11:45 2025 +0800
+
+    feat(auth): require email on login
+
+diff --git a/src/auth.ts b/src/auth.ts
+index 1a2b3c4..5d6e7f8 100644
+--- a/src/auth.ts
++++ b/src/auth.ts
+@@ -42,3 +42,6 @@ export function login(user) {
+   if (!user.password) {
+     throw new Error(<span class="tk-st">"password required"</span>);
+   }
++  if (!user.email) {
++    throw new Error(<span class="tk-st">"email required"</span>);
++  }
+ }</code></pre>
       </div>
+
+      <p>整個檔案的故事從最新到最舊一筆筆往下卷,適合用來追「這段邏輯是哪一次改成現在這樣的」。預設的 <code>git log</code> 在檔案被改名後只看得到改名後的歷史,加 <code>--follow</code> 會追溯改名前的內容。</p>
     </section>
 
     <section id="diff">
@@ -299,9 +339,43 @@
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong><code>--staged</code> vs <code>--cached</code></strong>
-          兩者完全等價，<code>--staged</code> 是新版的別名。看到任何文章混用不必擔心。
+          兩者完全等價,<code>--staged</code> 是新版的別名。看到任何文章混用不必擔心。
         </div>
       </div>
+
+      <h3>讀懂 diff 輸出</h3>
+      <p>四種模式產生的格式都長一樣,看懂一次就能看懂全部。下面是執行 <code>git diff</code> 的典型輸出:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">output</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>diff --git a/src/auth.ts b/src/auth.ts
+index 1a2b3c4..5d6e7f8 100644
+--- a/src/auth.ts
++++ b/src/auth.ts
+@@ -10,6 +10,8 @@ export function login(user) {
+   if (!user.password) {
+     throw new Error(<span class="tk-st">"password required"</span>);
+   }
+-  return authenticate(user);
++  if (!user.email) {
++    throw new Error(<span class="tk-st">"email required"</span>);
++  }
++  return authenticate(user.email, user.password);
+ }</code></pre>
+      </div>
+
+      <ul>
+        <li><code>diff --git a/... b/...</code>:被比較的檔案路徑,<code>a/</code> 是舊版、<code>b/</code> 是新版。</li>
+        <li><code>index 1a2b3c4..5d6e7f8 100644</code>:兩邊的內部物件 SHA 與檔案權限 (<code>100644</code> 是一般檔案),平常不用管。</li>
+        <li><code>--- a/...</code> / <code>+++ b/...</code>:標示哪個是舊、哪個是新,接下來 <code>-</code> 對應這個舊檔、<code>+</code> 對應那個新檔。</li>
+        <li><code>@@ -10,6 +10,8 @@</code>:稱為 <strong>hunk header</strong>,意思是「舊版第 10 行起的 6 行,對應新版第 10 行起的 8 行」;後面跟著的是該函式或區塊的 context (例如 <code>export function login(user) {</code>)。</li>
+        <li><code>-</code> 開頭:被刪掉的行;<code>+</code> 開頭:新加的行;<strong>沒符號的行</strong>:沒動,只是上下文方便閱讀。</li>
+      </ul>
+
+      <p>如果改的是同一行 (修改 = 刪一行 + 加一行),預設輸出看起來會是兩塊紅綠分開的整行。想看「同一行內哪幾個字改了」可以加 <code>--word-diff</code>:<code>git diff --word-diff src/auth.ts</code>,變動會直接 inline 用 <code>[-舊-]{+新+}</code> 標示,改變數名或文字時特別好用。</p>
     </section>
 
     <section id="amend">
@@ -337,95 +411,170 @@
       <span class="section-eyebrow">06 — 暫存</span>
       <h2><code>stash</code>：手邊改一半，但要切去別處救火</h2>
 
-      <p>主管丟一個線上 bug 過來，你手邊有 30% 沒 commit 的工作不想丟掉，這時候就用 stash。</p>
+      <p>主管丟一個線上 bug 過來,你手邊有 30% 沒 commit 的工作不想丟掉,這時候就用 stash。</p>
+
+      <h3>最基本的用法</h3>
+      <p><code>git stash</code> 預設只會暫存<strong>已被 Git 追蹤的檔案</strong>(也就是 working tree 改過的、或已 stage 的)。<strong>新建的 untracked 檔案不會被收進去</strong> —— 這是初學者最容易踩到的坑。如果你想把新檔案也一起暫存,要加上 <code>-u</code> (或 <code>--include-untracked</code>)。</p>
 
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 把當前所有沒 commit 的改動暫存起來 (連未 stage 的都收)</span>
+<pre><code><span class="tk-cm"># 最簡單的寫法,Git 會自動產生 message,例如</span>
+<span class="tk-cm">#   "WIP on feat/user-profile: a1b2c3d feat: add login"</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash
+
+<span class="tk-cm"># 加上 -m 自己取個有意義的名字 (推薦,在 stash list 裡好認)</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> stash push <span class="tk-op">-m</span> <span class="tk-st">"WIP: profile avatar upload"</span>
 
-<span class="tk-cm"># 切去主分支處理線上 bug</span>
+<span class="tk-cm"># 連 untracked 新檔案也一起收進去 (預設不收!)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash push <span class="tk-op">-u</span> <span class="tk-op">-m</span> <span class="tk-st">"WIP with new files"</span></code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong><code>-m</code> 不是必須,但強烈建議加</strong>
+          沒加 <code>-m</code> 時 Git 會用「<code>WIP on &lt;branch&gt;: &lt;last commit&gt;</code>」自動產 message,所有 stash 看起來長一個樣。一旦 stash 累積到三、四筆就分不清哪個是哪個。<code>git stash</code> (不帶 push) 跟 <code>git stash push</code> 不加 <code>-m</code> 行為相同,都會用自動 message。
+        </div>
+      </div>
+
+      <h3>切去別處、回來拿回改動</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 切去主分支處理線上 bug</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> checkout main
 <span class="tk-cm"># ... 修 bug、push、merge ...</span>
 
-<span class="tk-cm"># 回來，把暫存的改動拿回來</span>
+<span class="tk-cm"># 回來看看 stash 列表</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> checkout feat/user-profile
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> stash list
 stash@{0}: On feat/user-profile: WIP: profile avatar upload
+stash@{1}: On feat/user-profile: WIP with new files
 
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash pop                 <span class="tk-cm"># 拿回來並從 stash 列表移除</span>
-<span class="tk-cm"># 如果不確定要不要拿回來，用 git stash apply (套用但不刪)</span></code></pre>
+<span class="tk-cm"># 拿回最新一筆 stash,並從列表移除</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash pop</code></pre>
+      </div>
+
+      <h3><code>apply</code> vs <code>pop</code>:差在會不會刪</h3>
+      <p>兩個指令都會把 stash 的改動套用回 working tree,差別只有一個:<strong><code>pop</code> 套用後會把那筆 stash 從列表刪掉,<code>apply</code> 則保留</strong>。</p>
+
+      <table>
+        <thead>
+          <tr><th>情境</th><th>用哪個</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>確定這次套用會成功、之後再也不需要這筆暫存</td>
+            <td><code>git stash pop</code></td>
+          </tr>
+          <tr>
+            <td>不確定會不會衝突、想保留一份備份</td>
+            <td><code>git stash apply</code></td>
+          </tr>
+          <tr>
+            <td>想把同一筆 stash 套用到多個分支</td>
+            <td><code>git stash apply</code> (可以重複用)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 套用最新一筆 stash@{0},stash 仍保留在列表</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash apply
+
+<span class="tk-cm"># 套用指定編號的 stash</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash apply stash@{2}
+
+<span class="tk-cm"># 套用後確認沒問題,再手動刪掉</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash drop stash@{0}
+
+<span class="tk-cm"># 一次清掉所有 stash (謹慎使用)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash clear</code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>新手建議養成 <code>apply</code> + <code>drop</code> 的習慣</strong>
+          <code>pop</code> 在套用過程如果發生衝突,stash 還是會被刪掉,你需要靠 <code>git stash show -p stash@{0}</code> 從 reflog 找回來,很麻煩。<code>apply</code> 確認沒問題後再 <code>drop</code> 是更穩的流程。
+
+        </div>
       </div>
 
       <details class="collapse">
-        <summary>進階：stash 只暫存一部分檔案 / 包含 untracked 檔 <span class="collapse-tag">深入</span></summary>
+        <summary>進階:stash 只暫存一部分檔案 <span class="collapse-tag">深入</span></summary>
         <div class="collapse-body">
-<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># 只 stash 已 stage 的部分</span>
+<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># 只 stash 已 stage 的部分,working tree 的改動留著繼續寫</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> stash push <span class="tk-op">--staged</span> <span class="tk-op">-m</span> <span class="tk-st">"only staged"</span>
 
-<span class="tk-cm"># 連 untracked 新檔案也一起收 (預設不收)</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash push <span class="tk-op">-u</span> <span class="tk-op">-m</span> <span class="tk-st">"with untracked"</span>
+<span class="tk-cm"># 指定要 stash 哪幾個檔案</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash push <span class="tk-op">-m</span> <span class="tk-st">"only profile"</span> src/profile.ts src/profile.test.ts
 
-<span class="tk-cm"># 指定要 stash 哪些檔案</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash push <span class="tk-op">-m</span> <span class="tk-st">"only profile"</span> src/profile.ts</code></pre>
+<span class="tk-cm"># 看某筆 stash 改了什麼</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash show <span class="tk-op">-p</span> stash@{0}</code></pre>
         </div>
       </details>
     </section>
 
     <section id="restore">
       <span class="section-eyebrow">07 — 取消改動</span>
-      <h2>取消改動：用新的 <code>restore</code>，不要再用 <code>checkout --</code></h2>
+      <h2>用 <code>restore</code> 取消改動</h2>
 
-      <p>Git 2.23 (2019) 後，把以前 <code>checkout</code> 一個指令做太多事拆成兩個：</p>
+      <p>不小心改錯檔案、想把已 stage 的取消、想還原檔案到上一次 commit 的狀態 —— 全都用 <code>git restore</code>。指令名稱直接告訴你它在做什麼,不用記一堆參數。</p>
 
       <table>
         <thead>
-          <tr><th>想做什麼</th><th>新指令 (推薦)</th><th>舊指令 (避免)</th></tr>
+          <tr><th>想做什麼</th><th>指令</th></tr>
         </thead>
         <tbody>
           <tr>
-            <td>放棄 working tree 的改動</td>
+            <td>放棄 working tree 的改動,還原到上次 commit</td>
             <td><code>git restore &lt;file&gt;</code></td>
-            <td><code>git checkout -- &lt;file&gt;</code></td>
           </tr>
           <tr>
-            <td>把已 stage 的取消 stage (改動還在)</td>
+            <td>把已 stage 的取消 stage (改動仍保留在 working tree)</td>
             <td><code>git restore --staged &lt;file&gt;</code></td>
-            <td><code>git reset HEAD &lt;file&gt;</code></td>
           </tr>
           <tr>
-            <td>切分支</td>
-            <td><code>git switch &lt;branch&gt;</code></td>
-            <td><code>git checkout &lt;branch&gt;</code></td>
+            <td>把整個資料夾的改動全部還原</td>
+            <td><code>git restore .</code></td>
+          </tr>
+          <tr>
+            <td>從特定 commit 還原某個檔案</td>
+            <td><code>git restore --source=&lt;commit&gt; &lt;file&gt;</code></td>
           </tr>
         </tbody>
       </table>
 
-      <div class="callout callout-tip">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>為什麼新指令值得學</strong>
-          <code>checkout</code> 既能切分支又能還原檔案，新手常常不小心打錯就把檔案救不回來。<code>restore</code> 和 <code>switch</code> 各司其職，誤操作風險小很多。新團隊現在都建議用新版。
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
         </div>
+<pre><code><span class="tk-cm"># 改錯檔案,想丟掉所有未 commit 的改動</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> restore src/auth.ts
+
+<span class="tk-cm"># 不小心 add 錯檔案,把它從 staging 拿出來</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> restore <span class="tk-op">--staged</span> src/secret.env
+
+<span class="tk-cm"># 整個資料夾的改動全部丟掉</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> restore .</code></pre>
       </div>
 
-      <div class="compare-grid">
-        <div class="compare-card compare-bad">
-          <div class="compare-label"><span class="compare-icon">✗</span>舊寫法</div>
-          <div class="compare-body">
-            <code>git checkout -- src/auth.ts</code>
-            一個指令切分支也是 checkout，還原檔案也是 checkout，新人一直搞混。
-          </div>
-        </div>
-        <div class="compare-card compare-good">
-          <div class="compare-label"><span class="compare-icon">✓</span>新寫法</div>
-          <div class="compare-body">
-            <code>git restore src/auth.ts</code>
-            指令名稱直接告訴你它在做什麼。
-          </div>
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong><code>git restore &lt;file&gt;</code> 會直接覆蓋 working tree,改動<strong>救不回來</strong></strong>
+          確認真的不要這些改動再執行。如果只是想暫時收起來,用前面教的 <code>git stash</code>。
         </div>
       </div>
     </section>
@@ -465,20 +614,6 @@ stash@{0}: On feat/user-profile: WIP: profile avatar upload
         </div>
       </div>
 
-      <h3>從 GitHub 官方範本起手</h3>
-      <p>不用自己一行一行寫，<a class="inline-link" href="https://github.com/github/gitignore" target="_blank" rel="noopener">github/gitignore</a> 倉庫收錄了主流語言/框架的官方 <code>.gitignore</code> 範本，直接複製過來再改。</p>
-
-      <details class="collapse">
-        <summary>已經不小心 commit 進去 .env 怎麼辦？ <span class="collapse-tag">救命</span></summary>
-        <div class="collapse-body">
-          <p style="margin-bottom:0.5rem;">兩件事必須馬上做：</p>
-          <ol style="margin-left:1rem;font-size:14px;">
-            <li><strong>立刻把所有可能洩漏的 key、密碼換掉</strong>。Git 歷史上的東西就算 force push 移除，也可能已被人 clone / fork / scrape。</li>
-            <li>用 <a class="inline-link" href="https://github.com/newren/git-filter-repo" target="_blank" rel="noopener">git-filter-repo</a> (官方推薦工具，取代舊的 <code>filter-branch</code>) 從歷史中移除該檔案。</li>
-          </ol>
-          <p style="margin-top:0.6rem;font-size:13px;color:var(--muted);">細節請見 GitHub Docs：<em>Removing sensitive data from a repository</em>。</p>
-        </div>
-      </details>
     </section>
 
     <section id="quiz" class="quiz-section">
