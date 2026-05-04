@@ -38,7 +38,6 @@
       <li><a class="toc-link" href="#pipeline">Pipelining</a></li>
       <li><a class="toc-link" href="#tx">Transactions</a></li>
       <li><a class="toc-link" href="#lua">Lua Scripting</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -331,62 +330,6 @@ errors: <span class="tk-num">0</span>, replies: <span class="tk-num">100000</spa
           Lua 在單緒內跑 — script 執行多久，<em>所有 client 就卡多久</em>。生產環境的 script 應該 &lt; 1 ms。複雜邏輯該往 application 層放。
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "你正在做一個訂單系統，每秒約 5000 筆，要求「至少一次」、消費端可水平擴展。下列選哪個最合適？",
-    "options": [
-      "Redis Pub/Sub：簡單、好用",
-      "Redis Streams + consumer group：有持久化、有 ACK、有重試",
-      "Redis List + LPUSH/BRPOP：最輕量",
-      "Redis Sorted Set 模擬延遲佇列"
-    ],
-    "answer": 1,
-    "explain": "Streams 是專為「可靠訊息佇列」設計，consumer group 確保訊息只被一個 worker 收到，未 ACK 留在 PEL 可重試。Pub/Sub 沒持久化、subscriber 離線就漏；List+BRPOP 沒 ACK 機制（worker 中途死亡就漏）；Sorted Set 是延遲佇列場景。"
-  },
-  {
-    "question": "下列關於 HyperLogLog 的敘述，哪些<strong>正確</strong>？(多選)",
-    "options": [
-      "用 12 KB 記憶體可估算到 2^64 級別的不重複個數",
-      "可以列出所有元素",
-      "標準誤差約 0.81%",
-      "可以用 PFMERGE 合併多個 HLL"
-    ],
-    "answer": [0, 2, 3],
-    "explain": "(0)(2)(3) 都是 HLL 的特性。(1) 錯：HLL <strong>只能算個數</strong>，無法列舉元素。要列舉請用 Set 或 Bitmap。"
-  },
-  {
-    "question": "下列哪個敘述描述了 Pipeline 與 Transaction 的<strong>關鍵差異</strong>？",
-    "options": [
-      "Pipeline 一次送多條指令省 RTT，但中間可能被其他 client 指令穿插；Transaction（MULTI/EXEC）才能保證連續執行",
-      "Transaction 一定比 Pipeline 慢",
-      "Pipeline 是原子的，Transaction 不是",
-      "兩者完全等同"
-    ],
-    "answer": 0,
-    "explain": "Pipeline 只解決「網路 RTT」，server 端仍可能在你 pipeline 的指令之間執行別人的指令（雖然每條本身原子）。MULTI/EXEC 才保證「這一串指令連續執行不被穿插」。"
-  },
-  {
-    "question": "為什麼 Lua script 不該寫得太複雜（執行時間長）？",
-    "options": [
-      "因為 Lua 不支援迴圈",
-      "Lua script 在單緒內執行,跑越久,所有 client 就卡越久",
-      "Lua 會佔用記憶體",
-      "Lua 無法呼叫 Redis 指令"
-    ],
-    "answer": 1,
-    "explain": "Redis 的命令執行是單緒的。Lua script 在 server 端執行期間，<em>所有其他 client 都被阻塞</em>。複雜邏輯應該放在 application 層；Lua 用來保證「幾條 Redis 指令的原子性」。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

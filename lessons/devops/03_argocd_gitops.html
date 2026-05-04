@@ -40,7 +40,6 @@
       <li><a class="toc-link" href="#rollback">Rollback</a></li>
       <li><a class="toc-link" href="#argocd-cli">argocd CLI</a></li>
       <li><a class="toc-link" href="#advanced">進階主題</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -577,12 +576,18 @@
         <summary>進階：cluster-wide 預設 ignoreDifferences <span class="collapse-tag">深入</span></summary>
         <div class="collapse-body">
           <p>Argo CD 的 <code>argocd-cm</code> ConfigMap 可以設一份全 cluster 預設的 <code>resource.customizations.ignoreDifferences.&lt;group&gt;_&lt;kind&gt;</code>，這樣不用每個 Application 都重寫一次：</p>
-<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code>resource.customizations.ignoreDifferences.apps_Deployment: |
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="code-block-lang">yaml</span>
+              <button class="code-copy-btn" type="button">複製</button>
+            </div>
+<pre><code>resource.customizations.ignoreDifferences.apps_Deployment: |
   jsonPointers:
     - /spec/replicas
 resource.customizations.ignoreDifferences.all: |
   jqPathExpressions:
     - '.metadata.annotations."deployment.kubernetes.io/revision"'</code></pre>
+          </div>
           <p style="margin-top:0.6rem;font-size:13px;color:var(--muted);">寫在 ConfigMap 裡時改完要 restart <code>argocd-application-controller</code> Pod 才會生效。</p>
         </div>
       </details>
@@ -928,62 +933,6 @@ ID  DATE                  REVISION
           Lesson 04 會講 Prometheus + Grafana — Argo CD 自己也 expose metrics（sync 次數、失敗率、reconcile 延遲），可以接進你的監控系統。
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "Application 的 <code>spec.syncPolicy.automated.selfHeal: true</code> 會造成什麼行為？",
-    "options": [
-      "Argo CD 偵測到 Pod CrashLoop 時會自動重新部署上一版",
-      "任何手動 <code>kubectl edit</code> 改的欄位都會被 Argo CD 改回 Git 上的值",
-      "sync 失敗時自動 retry 直到成功",
-      "Argo CD 會幫忙修復 Helm chart 渲染錯誤"
-    ],
-    "answer": 1,
-    "explain": "<code>selfHeal</code> 的核心行為是「cluster live state 偏離 Git desired state 時，強制改回 Git」。任何人手動改的東西（不論是 hotfix 還是亂搞）都會被 revert。這就是為什麼 HPA 跟 selfHeal 會打架，需要用 <code>ignoreDifferences</code> 排除 <code>/spec/replicas</code>。"
-  },
-  {
-    "question": "為什麼 HPA 會跟 Argo CD 的 <code>selfHeal</code> 打架？正確的解法是什麼？",
-    "options": [
-      "HPA 改 <code>spec.replicas</code>，Argo CD 看 Git 是預設值就改回去；解法是設 <code>ignoreDifferences</code> 排除 <code>/spec/replicas</code>",
-      "HPA 不能跟 Argo CD 一起用，必須二選一",
-      "HPA 改的是 status，Argo CD 不會碰；不會打架",
-      "把 <code>selfHeal</code> 整個關掉"
-    ],
-    "answer": 0,
-    "explain": "HPA 改的是 <code>spec.replicas</code>（不是 status），Argo CD selfHeal 看 Git 寫的是 2、cluster 是 8 就會把它改回 2，然後 HPA 又把它改成 8，兩邊無限 ping-pong。標準解法是在 Application 寫 <code>ignoreDifferences</code> 用 jsonPointer 排除 <code>/spec/replicas</code>，selfHeal 仍然能保護其他欄位（image、env、resources），不要為了這個就把 selfHeal 整個關掉。"
-  },
-  {
-    "question": "設好 GitHub webhook 之後，從 push commit 到 Argo CD 開始 sync 大概多久？沒設 webhook 時呢？",
-    "options": [
-      "兩種情況都是即時",
-      "有 webhook 是秒級延遲；沒設 webhook 時預設每 3 分鐘 polling 一次",
-      "有 webhook 30 秒；沒 webhook 是 30 分鐘",
-      "都是 1 小時，因為 Argo CD 有快取"
-    ],
-    "answer": 1,
-    "explain": "預設 <code>timeout.reconciliation: 180s</code>（在 ConfigMap <code>argocd-cm</code>），每 3 分鐘 polling Git。設 webhook 後 GitHub push 事件會直接 POST 到 <code>/api/webhook</code>，refresh + reconcile 在幾秒內就會跑。Polling 仍然在跑當作 fallback，避免 webhook 漏單導致永遠不 sync。"
-  },
-  {
-    "question": "Argo CD UI 看到某個 Application 狀態 = <code>Unknown</code>，下列哪些是合理的排查步驟？(多選)",
-    "options": [
-      "看 <code>argocd-application-controller</code> Pod 的 logs",
-      "在本機跑 <code>helm template</code> 試渲染那個 chart，看是不是 values 缺東西",
-      "確認 Application 的 <code>spec.source.targetRevision</code> 指到的 branch / tag / SHA 真的存在",
-      "馬上把 Application 砍掉重建"
-    ],
-    "answer": [0, 1, 2],
-    "explain": "<code>Unknown</code> 代表 Argo CD 連 desired state 都算不出來，最常見三個原因：(1) controller 本身有問題 → 看 controller logs；(2) helm/kustomize 渲染失敗（缺 values、template 語法錯）→ 本機 <code>helm template</code> 重現；(3) <code>targetRevision</code> 指到不存在的 branch（手滑打錯字）→ 確認 Git。砍掉重建是最後手段，會讓你失去 history、debug 線索全部消失，先排查再說。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

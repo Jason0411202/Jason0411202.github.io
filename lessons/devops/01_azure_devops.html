@@ -38,7 +38,6 @@
       <li><a class="toc-link" href="#quality-gates">品質閘門</a></li>
       <li><a class="toc-link" href="#ops-troubleshoot">排錯</a></li>
       <li><a class="toc-link" href="#best-practices">最佳實踐</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -226,13 +225,19 @@
       <details class="collapse">
         <summary>WIQL 查詢範例：「sprint 內未完成的 user story」 <span class="collapse-tag">進階</span></summary>
         <div class="collapse-body">
-<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-kw">SELECT</span> [System.Id], [System.Title], [System.AssignedTo], [System.State]
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="code-block-lang">wiql</span>
+              <button class="code-copy-btn" type="button">複製</button>
+            </div>
+<pre><code><span class="tk-kw">SELECT</span> [System.Id], [System.Title], [System.AssignedTo], [System.State]
 <span class="tk-kw">FROM</span> WorkItems
 <span class="tk-kw">WHERE</span> [System.TeamProject] = <span class="tk-st">@project</span>
   <span class="tk-kw">AND</span> [System.WorkItemType] = <span class="tk-st">'User Story'</span>
   <span class="tk-kw">AND</span> [System.IterationPath] = <span class="tk-st">@currentIteration</span>
   <span class="tk-kw">AND</span> [System.State] &lt;&gt; <span class="tk-st">'Closed'</span>
 <span class="tk-kw">ORDER BY</span> [Microsoft.VSTS.Common.Priority]</code></pre>
+          </div>
         </div>
       </details>
     </section>
@@ -778,7 +783,12 @@
       <details class="collapse">
         <summary>self-hosted agent 在 Linux 上的最簡安裝步驟 <span class="collapse-tag">操作</span></summary>
         <div class="collapse-body">
-<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># 1. 在 Project Settings → Agent pools → New pool 建 pool</span>
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="code-block-lang">bash</span>
+              <button class="code-copy-btn" type="button">複製</button>
+            </div>
+<pre><code><span class="tk-cm"># 1. 在 Project Settings → Agent pools → New pool 建 pool</span>
 <span class="tk-cm"># 2. 進 pool → New agent，照頁面下載對應 OS 的 agent 包</span>
 
 <span class="tk-pn">$</span> <span class="tk-fn">mkdir</span> myagent &amp;&amp; <span class="tk-fn">cd</span> myagent
@@ -790,6 +800,7 @@
 <span class="tk-cm"># YAML 端改用</span>
 <span class="tk-kw">pool</span>:
   <span class="tk-kw">name</span>: <span class="tk-st">my-self-hosted-pool</span></code></pre>
+          </div>
         </div>
       </details>
     </section>
@@ -898,62 +909,6 @@
           這條 pipeline 把 image 推上 registry、把 image tag 寫進另一個 manifest repo 的 <code>values.yaml</code>。<strong>但「誰把 image 真正部署到 K8s 裡」？</strong>本系列接下來的 lesson 24 會教 K8s 日常操作（pod / svc / deployment 排錯），lesson 25 會教 Argo CD 監視 manifest repo 自動把改動同步到叢集 — 整條 GitOps 鏈才算閉環。
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "Variable group 連動 Azure Key Vault 的<strong>主要目的</strong>是什麼？",
-    "options": [
-      "讓 pipeline 跑得比較快",
-      "把 secret 集中在 Key Vault 統一管理，rotate 一次到處更新；ADO 端永遠抓最新版",
-      "繞過 service connection 的權限檢查",
-      "讓 secret 在 pipeline log 裡顯示出來方便 debug"
-    ],
-    "answer": 1,
-    "explain": "KV-linked variable group 把 secret 的 single source of truth 留在 Key Vault — pipeline、K8s External Secrets、其他系統都從 KV 拿；rotate 一次大家都更新。直接寫在 ADO secret 內每個專案要各別 rotate。"
-  },
-  {
-    "question": "把 Docker image 建好後推到 container registry，<strong>應該用哪個 task</strong>？",
-    "options": [
-      "<code>DockerInstaller@0</code>",
-      "<code>Bash@3</code> 直接 <code>docker push</code>",
-      "<code>Docker@2</code> with <code>command: buildAndPush</code>",
-      "<code>AzureCLI@2</code> 跑 <code>az acr build</code>"
-    ],
-    "answer": 2,
-    "explain": "<code>Docker@2</code> 的 <code>buildAndPush</code> 是官方標準作法 — 自動處理 service connection 認證、tag 多版本、跨 platform build。<code>az acr build</code> 是 ACR-only 的另一條路，但跨 registry 不通用。"
-  },
-  {
-    "question": "在 branch policy 設定 <code>Build validation</code> 的作用是什麼？",
-    "options": [
-      "PR 開啟時自動加 reviewer",
-      "強制 commit message 格式",
-      "PR 必須跑指定 pipeline 並通過，否則 Complete merge 按鈕 disabled",
-      "把 PR 標題自動加上 work item id"
-    ],
-    "answer": 2,
-    "explain": "Build validation 是 ADO branch policy 最關鍵的一條 — 把 pipeline 設為 PR 必通過的 gate。沒過 build 就不能 merge，從根本上避免「壞掉的程式進 main」這個常見災難。"
-  },
-  {
-    "question": "下列哪些情境<strong>應該</strong>切到 self-hosted agent？(多選)",
-    "options": [
-      "需要存取公司內網的私有 DB / 私有 image registry",
-      "想用 K3d / Kind 起本地 K8s 跑 e2e 並重用 image cache",
-      "build 每次只要 30 秒，純跑單元測試",
-      "希望 build cache 能跨 pipeline run 持久化在本機 disk"
-    ],
-    "answer": [0, 1, 3],
-    "explain": "Self-hosted agent 的核心優勢是：<strong>進得了私網</strong>、<strong>有持久化 disk</strong>、<strong>不限平行度</strong>。30 秒就跑完的純單元測試用 Microsoft-hosted 反而更省事 — 不用維護 agent VM 的更新與監控。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

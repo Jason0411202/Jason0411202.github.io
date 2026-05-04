@@ -39,7 +39,6 @@
       <li><a class="toc-link" href="#map">map</a></li>
       <li><a class="toc-link" href="#reserved">reserved 與演進</a></li>
       <li><a class="toc-link" href="#nesting">巢狀與 import</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -423,73 +422,6 @@
           長期 protobuf 會用「Editions」取代 <code>syntax = "proto3"</code>(改成 <code>edition = "2024"</code>),把每個行為變成可調整的 feature。但 gRPC 官方目前文件仍以 proto3 為主流,本課程也用 proto3。等 Editions 在 gRPC 生態普及再學即可,現在學 proto3 不是白學 — 兩者 wire format 完全相容。
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 5</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "下列關於欄位編號(field number)的描述,哪一項<strong>錯誤</strong>?",
-    "options": [
-      "1–15 的編號 tag 只佔 1 byte,該留給最高頻欄位",
-      "19000–19999 是 protobuf 內部保留範圍,不能使用",
-      "在 production 用過的編號可以拿來給新欄位用,只要型別一樣就好",
-      "改編號等同刪舊增新,所有舊資料會失效"
-    ],
-    "answer": 2,
-    "explain": "<strong>絕不可重用</strong>編號。即使型別一樣,舊版客戶端傳的舊欄位資料會被當成新欄位寫進來,語意完全錯亂。退役編號必須用 <code>reserved</code> 永久封存。"
-  },
-  {
-    "question": "為什麼 enum 的零值要慣例命名為 <code>{ENUM}_UNSPECIFIED</code>?",
-    "options": [
-      "讓編譯器跑得比較快",
-      "proto3 規定第一個 enum 值必須是 0;若把有意義的值(如 PENDING)放 0,server 無法區分客戶端「沒設」與「明確設成 PENDING」",
-      "因為 0 是保留給未來的 protobuf 內部用",
-      "為了和 proto2 不相容"
-    ],
-    "answer": 1,
-    "explain": "proto3 的 scalar 欄位沒設等同預設值,enum 預設值是 0。把 0 留給 UNSPECIFIED,server 就能 explicit 處理「客戶端沒設」 — 否則「沒設」會被當成 PENDING,bug 永遠隱藏。"
-  },
-  {
-    "question": "下列哪些情境<strong>適合</strong>用 <code>oneof</code>?(多選)",
-    "options": [
-      "通知目標只可能是 email、phone、webhook 三選一",
-      "API 回傳結果可能是 success(含 data) 或 error(含 message) 兩選一",
-      "一個訂單包含多個商品(item list)",
-      "支付方式可能是信用卡、銀行轉帳、現金"
-    ],
-    "answer": [0, 1, 3],
-    "explain": "<code>oneof</code> 表達「最多選一個」。多商品 list 是<strong>多選</strong>(用 repeated),不適合 oneof — 而且 oneof 本來就不能放 repeated 欄位。"
-  },
-  {
-    "question": "<code>optional int32 height_cm = 3;</code> 在 proto3 中的作用是?",
-    "options": [
-      "讓欄位變成可選的(其他欄位都是必填)",
-      "讓 client 可以區分「沒設」與「設成預設值 0」 — 生成的 Go 為 <code>*int32</code> 而非 <code>int32</code>",
-      "讓欄位的編號可以重複",
-      "防止欄位被序列化"
-    ],
-    "answer": 1,
-    "explain": "proto3 中所有欄位本來就是「可選」(沒有 required)。<code>optional</code> 的真正作用是<strong>顯式表達 presence</strong> — 沒有它,scalar 欄位「沒設」與「設成 0」無法區分。message 型別欄位天生有 nil 概念,不需要 optional。"
-  },
-  {
-    "question": "下列哪一項是 <code>map&lt;K, V&gt;</code> 的<strong>限制</strong>?",
-    "options": [
-      "key 不能是 float、bytes、enum、message;value 不能是另一個 map;序列化順序未定義",
-      "key 必須是 string;value 必須是 message",
-      "整個 message 內最多只能用一個 map 欄位",
-      "map 不能搭配 repeated,只能單獨使用"
-    ],
-    "answer": 0,
-    "explain": "選項 A 完全正確。map 內部其實是「repeated 的 key-value entry message」,所以無法 repeat 它(=不能 repeated)、value 不能是 map(會無限遞迴)、序列化沒順序保證。一個 message 內可以有多個 map 欄位。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

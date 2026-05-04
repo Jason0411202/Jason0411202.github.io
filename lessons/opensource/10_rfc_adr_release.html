@@ -38,7 +38,6 @@
       <li><a class="toc-link" href="#release-flow">Release 流程</a></li>
       <li><a class="toc-link" href="#hotfix-flow">Hotfix 流程</a></li>
       <li><a class="toc-link" href="#release-notes">Release Notes</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -202,7 +201,12 @@
       <details class="collapse" open>
         <summary>展開查看完整 ADR 範例 <span class="collapse-tag">範本</span></summary>
         <div class="collapse-body">
-<pre style="background:var(--paper2);padding:1rem;border-radius:8px;font-size:13px;line-height:1.7;font-family:var(--mono);overflow-x:auto;"># ADR-007: 使用 PostgreSQL 作為主要資料庫
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="code-block-lang">markdown</span>
+              <button class="code-copy-btn" type="button">複製</button>
+            </div>
+<pre><code># ADR-007: 使用 PostgreSQL 作為主要資料庫
 
 Date: 2026-04-15
 
@@ -247,7 +251,8 @@ Accepted
 ### 後續行動
 - 用 Prisma 作為 ORM (見 ADR-008)
 - migration 流程用 Prisma Migrate
-- 上線前必須建立 backup + PITR (point-in-time recovery)</pre>
+- 上線前必須建立 backup + PITR (point-in-time recovery)</code></pre>
+          </div>
         </div>
       </details>
 
@@ -430,62 +435,6 @@ Accepted
           <p style="margin-bottom:0.5rem;"><strong>Release Train</strong> (Android / Chrome 用)：固定週期 (例如 6 週) 發新版，這個週期內合進去的就有，沒合到的等下班車。優點：節奏穩定、deadline 明確；缺點：feature 沒趕上要等。</p>
         </div>
       </details>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "RFC 跟 ADR 的關鍵差別是什麼？",
-    "options": [
-      "RFC 是英文，ADR 是中文",
-      "RFC 是動工前邀請討論的長文件；ADR 是決策後永久存檔的精簡記錄",
-      "RFC 比較重要，ADR 不重要",
-      "完全一樣，只是叫法不同"
-    ],
-    "answer": 1,
-    "explain": "RFC = Request for Comments，動工前社群討論用，可以很長；ADR = Architecture Decision Record，事後留檔給未來幾年讀 codebase 的人，要精簡。實務上很多團隊只用 ADR 不用 RFC。"
-  },
-  {
-    "question": "決策被推翻後，舊的 ADR 應該怎麼處理？",
-    "options": [
-      "直接刪掉，避免混淆",
-      "把 Status 改成 <code>Superseded by ADR-N</code> 並保留所有內容",
-      "只留標題和結論",
-      "封存到另一個 repo"
-    ],
-    "answer": 1,
-    "explain": "ADR 永不刪除，這是核心原則。把 Status 改成 Superseded 並指向新 ADR，保留所有原文。讓「歷史脈絡可追溯」是 ADR 的核心價值。"
-  },
-  {
-    "question": "下列哪些是 hotfix 流程的<strong>最佳實務</strong>？(多選)",
-    "options": [
-      "從 production 對應的 tag 開 hotfix branch (不是從 main 最新)",
-      "最小修改 + 補一個 regression test",
-      "緊急情況直接強推 production，跳過 review",
-      "修完後要把 hotfix 合回 main / develop，避免 regression"
-    ],
-    "answer": [0, 1, 3],
-    "explain": "緊急情況更<strong>不能</strong>跳過 review — 線上爆炸時的 patch 最容易引入新 bug。其他三項都是業界標準做法。"
-  },
-  {
-    "question": "Feature Freeze 階段允許什麼樣的 commit 進入這個 release？",
-    "options": [
-      "只允許新功能",
-      "只允許 bug fix，不再收新 feature",
-      "什麼都不收，連 bug fix 都不行",
-      "完全沒限制"
-    ],
-    "answer": 1,
-    "explain": "Feature Freeze = 凍結功能但仍接受 bug fix。下一階段 Code Freeze 才連 bug fix 都不收 (除非嚴重 regression)。最後才發 RC → GA。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

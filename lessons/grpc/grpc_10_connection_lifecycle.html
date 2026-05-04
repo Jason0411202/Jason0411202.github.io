@@ -37,7 +37,6 @@
       <li><a class="toc-link" href="#health">Health Check</a></li>
       <li><a class="toc-link" href="#retry">Retry Policy</a></li>
       <li><a class="toc-link" href="#wrap">完賽總結</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -387,62 +386,6 @@ conn, err := grpc.NewClient(addr,
           剩下的差距只在「工程實踐」:CI/CD、observability、SRE。本系列教的是 gRPC 本身,把它銜接到你公司的基礎設施(<code>stockbot-long-backend-k8s-infra</code> 之類)就能直接派上用場。
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "<code>grpc.NewClient(target, ...)</code> 後立刻 <code>conn.GetState()</code>,最可能拿到哪個狀態?",
-    "options": [
-      "<code>READY</code> — 連線已建好",
-      "<code>IDLE</code> — NewClient 是 lazy,還沒實際連線",
-      "<code>CONNECTING</code> — 自動開始連",
-      "<code>SHUTDOWN</code>"
-    ],
-    "answer": 1,
-    "explain": "<code>NewClient</code> 是 lazy 的,不立刻連線。channel 留在 <code>IDLE</code>,直到第一支 RPC 才轉 <code>CONNECTING</code>。要主動觸發可呼叫 <code>conn.Connect()</code>。"
-  },
-  {
-    "question": "Client 設了 <code>keepalive.ClientParameters.Time = 30s</code>,但 server 一直把連線斷掉並回 <code>too many pings</code>。最可能原因?",
-    "options": [
-      "Server 沒裝 grpc-go",
-      "Server 的 <code>EnforcementPolicy.MinTime</code> 預設 5 分鐘,client 30 秒 ping 被視為 bad ping,累積到 <code>MaxPingStrikes</code>(預設 2)後送 GOAWAY 斷線",
-      "TLS 沒設好",
-      "DNS 解析失敗"
-    ],
-    "answer": 1,
-    "explain": "Server 端有 EnforcementPolicy 限制 client 不能太頻繁送 ping。<strong>兩邊要對齊</strong>:server 把 <code>MinTime</code> 設成 client <code>Time</code> 以下(例如 10s),或 client 把 <code>Time</code> 拉到 server <code>MinTime</code> 以上。"
-  },
-  {
-    "question": "在 k8s 內想讓 client 能 round_robin 到所有 backend pod,正確做法是?",
-    "options": [
-      "用普通 ClusterIP service,client 會自動發現所有 pod",
-      "建立 headless service(<code>ClusterIP: None</code>),用 <code>dns:///svc.ns.svc.cluster.local:port</code> + service config 啟用 round_robin",
-      "在 client 端寫死所有 pod IP",
-      "不可能,gRPC 不支援客戶端 LB"
-    ],
-    "answer": 1,
-    "explain": "k8s 的普通 ClusterIP 是單一 VIP,DNS 只會回一個 address,client 看到只有一個 backend。<strong>headless service</strong> 才會讓 DNS 回所有 pod IP,搭配 <code>dns:///</code> + round_robin service config 就能客戶端 LB 到所有 pod,還跳過 kube-proxy。"
-  },
-  {
-    "question": "Service config 裡設 <code>retryPolicy.retryableStatusCodes: [\"UNAVAILABLE\"]</code> 後,gRPC 會自動 retry。下列實務做法<strong>哪一項正確</strong>?",
-    "options": [
-      "全部 method 都應該開 retry,寫得越多越穩",
-      "Per-method 設定 retry,只對 idempotent method(GetUser、ListItems 等讀操作)開,寫操作要嘛不開、要嘛配合 idempotency-key",
-      "retryableStatusCodes 應該包含 <code>NOT_FOUND</code>",
-      "retry 次數設越多越好,網路不穩時保險"
-    ],
-    "answer": 1,
-    "explain": "自動 retry 對<strong>非等冪</strong>(non-idempotent)操作會造成重複扣款、重複建立資源等嚴重問題。實務做法:讀操作預設 retry、寫操作用 idempotency-key 防重複後再開 retry,或乾脆不開讓上層處理。retryableStatusCodes 不該包含 NOT_FOUND(retry 也不會找到)。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

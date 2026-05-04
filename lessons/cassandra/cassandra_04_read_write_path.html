@@ -36,7 +36,6 @@
       <li><a class="toc-link" href="#compaction">Compaction 策略</a></li>
       <li><a class="toc-link" href="#repair">Repair</a></li>
       <li><a class="toc-link" href="#hands-on">動手玩</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -291,62 +290,6 @@ cqlsh&gt; <span class="tk-fn">EXIT</span>;
           Major compaction 把所有 SSTable 合併成一個巨大檔案。短期內讀取變快，但<em>之後新進來的資料無法跟這個大檔合併</em>，磁碟使用率失衡。除非你用 STCS 且很清楚自己在做什麼。
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "為什麼 Cassandra 的「寫入快、讀取慢」？",
-    "options": [
-      "寫入只在記憶體做，讀取要查磁碟",
-      "寫入是 append-only (Commit Log + Memtable 即回)；讀取要從多個 SSTable 合併最新版本，可能要多次磁碟 I/O",
-      "因為寫入是平行的，讀取是序列的",
-      "因為 Cassandra 用 SQL 解析寫入"
-    ],
-    "answer": 1,
-    "explain": "Cassandra 是 LSM-tree。寫入只 append (Commit Log + Memtable) 就回，沒有「找舊資料修改」步驟，所以快。讀取則必須從多個 SSTable + memtable 抓出同一筆資料的所有版本、依 timestamp 合併、處理 tombstone — 所以較慢。Compaction 就是用來減緩這個讀取代價。"
-  },
-  {
-    "question": "Tombstone 太多時會發生什麼？(多選)",
-    "options": [
-      "讀取 partition 時必須把 tombstone 一起掃過，效能變差",
-      "在 log 看到 「Read X live and Y tombstone cells」警告",
-      "可能觸發 read 超時",
-      "Cassandra 會自動把整張表移除"
-    ],
-    "answer": [0, 1, 2],
-    "explain": "(0)(1)(2) 都是 tombstone 過量的真實副作用。(3) 錯：Cassandra 不會自動 drop table — 它會給你警告並讓 read 變慢，最終可能超時但不會自我刪除資料。"
-  },
-  {
-    "question": "你正在做時序資料表（每筆 TTL=30 天，append-only），下列 compaction 策略<strong>最適合</strong>？",
-    "options": [
-      "STCS - 寫入便宜",
-      "LCS - 讀延遲低",
-      "TWCS 或 UCS（搭配 TTL hint）— 同時間窗的資料整檔過期可一次刪",
-      "DTCS - 專為時序設計"
-    ],
-    "answer": 2,
-    "explain": "時序 + TTL 是 TWCS / UCS 的甜蜜點：TWCS 把每個時間窗的資料寫進一個 SSTable，TTL 到了整檔可一次淘汰，幾乎不產生 tombstone。5.0+ 推薦 UCS（可看作統一版本）。DTCS 已被 deprecated。STCS / LCS 不會利用 TTL 結構特性。"
-  },
-  {
-    "question": "為什麼 production 必須在 <code>gc_grace_seconds</code>（預設 10 天）內跑過 repair？",
-    "options": [
-      "否則 SSTable 會壞掉",
-      "否則 tombstone 過期被清除，但離線過的 replica 還沒收到刪除訊息，舊資料會在下次讀取時「復活」",
-      "因為 Cassandra 強制要求",
-      "為了釋放磁碟空間"
-    ],
-    "answer": 1,
-    "explain": "tombstone 是分散式刪除的記號 — 必須讓所有 replica 都「看過」這個 tombstone，才能安心清除。如果某個 replica 離線超過 hinted handoff 上限（3 小時），又沒在 gc_grace_seconds 內 repair，舊資料可能死灰復燃。所以 production 多半每週 incremental repair 一次。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

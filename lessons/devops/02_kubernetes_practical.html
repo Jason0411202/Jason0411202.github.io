@@ -38,7 +38,6 @@
       <li><a class="toc-link" href="#helm">Helm chart</a></li>
       <li><a class="toc-link" href="#tui-tools">TUI 工具</a></li>
       <li><a class="toc-link" href="#capacity-tuning">資源調校</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -1103,73 +1102,6 @@ sum(rate(
           所有正式服務最低也要 Burstable —— 至少把 <code>requests</code> 設好。核心 DB / 訊息佇列再考慮 Guaranteed。<strong>BestEffort 永遠不該出現在 production。</strong>
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 5</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "想看 Pod crash 之前最後一輪的 stdout/stderr，要下哪一條指令？",
-    "options": [
-      "<code>kubectl logs &lt;pod&gt;</code>",
-      "<code>kubectl logs &lt;pod&gt; --previous</code>",
-      "<code>kubectl describe pod &lt;pod&gt;</code>",
-      "<code>kubectl exec -it &lt;pod&gt; -- cat /var/log/last.log</code>"
-    ],
-    "answer": 1,
-    "explain": "<code>--previous</code>（簡寫 <code>-p</code>）會抓上一輪 container 的輸出。Pod 已經 crash 重啟過後，現在的 logs 是新一輪，必須用 <code>--previous</code> 才看得到死前的訊息。排查 <code>CrashLoopBackOff</code> 必用。"
-  },
-  {
-    "question": "某 Deployment 已經被 HPA 管理，<code>minReplicas: 2 / maxReplicas: 10</code>，目前 HPA 計算結果是 5。這時候你下 <code>kubectl scale deploy --replicas=2</code>，會發生什麼？",
-    "options": [
-      "Replicas 會永久變成 2，HPA 不再生效",
-      "kubectl 會直接報錯拒絕執行",
-      "Replicas 會暫時變成 2，但下個 HPA 評估週期 (約 15 秒) 又被調回 5",
-      "HPA 與手動 scale 互斥，要先 patch HPA 設定"
-    ],
-    "answer": 2,
-    "explain": "HPA 是 controller，會持續比對「目標 replicas」與「實際 replicas」。<code>kubectl scale</code> 改完後 HPA 下個評估循環（預設 15 秒）就會再算一次目標值並調回去。<strong>真的想手動控制要先 <code>kubectl delete hpa</code> 或調 <code>minReplicas</code>。</strong>"
-  },
-  {
-    "question": "下列哪些東西<strong>適合</strong>放在 ConfigMap 裡？(多選)",
-    "options": [
-      "應用程式 log level、feature flag",
-      "外部 API 的 URL endpoint",
-      "資料庫密碼、第三方 API key",
-      "TLS 私鑰"
-    ],
-    "answer": [0, 1],
-    "explain": "ConfigMap 放<strong>非機密</strong>設定就好。密碼、API key、私鑰要放 Secret —— 而且要記得 <strong>Secret 預設只是 base64 編碼，不是加密</strong>。真正要加密請打開 EncryptionConfiguration、或改用 SealedSecrets / External Secrets / Vault。"
-  },
-  {
-    "question": "Service 類型是 <code>ClusterIP</code>，從筆電（集群外部）能不能直接連到它的 IP？",
-    "options": [
-      "可以，ClusterIP 是公開的",
-      "不可以，ClusterIP 只在集群內部可達；要透過 Ingress、NodePort 或 <code>kubectl port-forward</code>",
-      "看雲商設定",
-      "只要拿到 kubeconfig 就能連"
-    ],
-    "answer": 1,
-    "explain": "<code>ClusterIP</code> 是 K8s 內部 SDN 的虛擬 IP，只在 cluster 網段裡才路由得到。從外部要進來：(1) <strong>Ingress</strong> (production)、(2) <strong>NodePort / LoadBalancer</strong>、或 (3) <strong><code>kubectl port-forward</code></strong> (debug)。"
-  },
-  {
-    "question": "<code>helm template &lt;release&gt; ./chart -f values.yaml</code> 的主要用途是？",
-    "options": [
-      "把 chart 安裝到集群",
-      "升級已存在的 release",
-      "本機把 chart 渲染成最終的 manifest YAML，<strong>不接觸集群</strong>，方便除錯",
-      "驗證 chart 簽章"
-    ],
-    "answer": 2,
-    "explain": "<code>helm template</code> 是純客戶端動作，把 Go template + values 渲染成普通 YAML 並印出來。<strong>它不會碰任何 cluster、不需要 kubeconfig</strong>。當 <code>helm upgrade</code> 失敗只給你一行神秘錯誤，先 <code>helm template</code> 看渲染結果是除錯第一步。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

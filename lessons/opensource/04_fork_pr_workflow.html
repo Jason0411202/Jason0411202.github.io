@@ -39,7 +39,6 @@
       <li><a class="toc-link" href="#link-issue">關聯 Issue</a></li>
       <li><a class="toc-link" href="#conflict">處理衝突</a></li>
       <li><a class="toc-link" href="#update">更新 PR</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -444,62 +443,6 @@ Closes #234
           看專案政策。如果是 squash and merge，你 PR 內 100 個 commit 最後也只會變 main 上 1 個，commit message 不重要。如果是 merge commit / rebase，每個 commit 都會出現在 main 歷史，那就值得花時間整理。<strong>看專案的 CONTRIBUTING.md，或者觀察最近合併的 PR 是哪種模式。</strong>
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "<code>origin</code> 跟 <code>upstream</code> 在 fork 工作流中分別代表什麼？",
-    "options": [
-      "origin = 原始專案，upstream = 你 fork 的版本",
-      "origin = 你 fork 的版本，upstream = 原始專案",
-      "兩者完全等價",
-      "origin 是本地 .git 目錄，upstream 是 GitHub 上"
-    ],
-    "answer": 1,
-    "explain": "業界通用慣例：<code>origin</code> 是 clone 預設指向的 — 也就是你 fork 出去的版本；<code>upstream</code> 是手動加上去指向原始專案的 remote。"
-  },
-  {
-    "question": "你的 PR 在 GitHub 顯示衝突，下列做法哪個<strong>不</strong>建議？",
-    "options": [
-      "本地 <code>git fetch upstream</code> + <code>git rebase upstream/main</code>",
-      "本地 <code>git merge upstream/main</code>",
-      "用 GitHub 網頁版的 Resolve conflicts 按鈕直接編輯",
-      "解完衝突後 <code>git push --force-with-lease</code>"
-    ],
-    "answer": 2,
-    "explain": "GitHub 網頁版的衝突解決介面只能處理超簡單的情況，且沒有編輯器輔助、沒有 lint/test 可以驗證。複雜衝突絕對在本地解。"
-  },
-  {
-    "question": "PR 描述寫 <code>Closes #234</code> 跟 <code>Refs #234</code> 的差別？",
-    "options": [
-      "完全一樣",
-      "Closes 在 PR 合併時會自動關閉 issue #234；Refs 不會自動關閉，只是建立連結",
-      "Refs 比 Closes 優先級高",
-      "Closes 只能用在 bug；Refs 只能用在 feature"
-    ],
-    "answer": 1,
-    "explain": "Closes / Fixes / Resolves 三個關鍵字會在 PR 合併時自動關閉對應 issue；Refs / See 只是建立連結方便查看，不會自動關閉。"
-  },
-  {
-    "question": "下列哪些是合理的 Draft PR 用法？(多選)",
-    "options": [
-      "想先看 CI 跑得如何，但程式還沒寫完",
-      "跨時區同事可以早一步預覽進度",
-      "已經完全寫好、想正式請求 review",
-      "公開展示一個架構提案，邀請討論"
-    ],
-    "answer": [0, 1, 3],
-    "explain": "Draft PR 的核心訊號是「請先別 review，我還沒準備好」。完全寫好要 review 時應該按 <em>Ready for review</em> 切回正式 PR。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

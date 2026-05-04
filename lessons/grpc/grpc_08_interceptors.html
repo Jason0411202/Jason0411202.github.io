@@ -37,7 +37,6 @@
       <li><a class="toc-link" href="#recovery">recovery</a></li>
       <li><a class="toc-link" href="#auth">auth</a></li>
       <li><a class="toc-link" href="#timing">timing</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -351,62 +350,6 @@
     <span class="tk-kw">return</span> handler(srv, &amp;wrappedStream{ServerStream: ss, ctx: newCtx})
 }</code></pre>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "<code>grpc.ChainUnaryInterceptor(A, B, C)</code> 中,執行順序是?",
-    "options": [
-      "A 最內層緊鄰 handler,C 最外層",
-      "A 最外層(最先進、最後出),C 最內層緊鄰 handler",
-      "三個並行執行",
-      "依字母序自動排序"
-    ],
-    "answer": 1,
-    "explain": "Chain 順序:<strong>第一個 interceptor = 最外層</strong>。所以 recovery 必須放第一個才能接住所有 inner 層的 panic。執行順序:A in → B in → C in → handler → C out → B out → A out。"
-  },
-  {
-    "question": "下列 interceptor 排列順序,哪一個<strong>合理</strong>?",
-    "options": [
-      "<code>auth, recovery, logging</code>",
-      "<code>recovery, logging, auth, timing</code>",
-      "<code>handler, auth, logging</code>(handler 不是 interceptor)",
-      "<code>timing, auth, logging, recovery</code>"
-    ],
-    "answer": 1,
-    "explain": "<strong>recovery 必須最外層</strong>(否則接不住內層 panic)。<strong>logging 通常在 auth 之前</strong>(讓未授權 request 也留紀錄)。<strong>timing 內層</strong>(只量真正 handler 耗時)。選項 D 把 recovery 放最後就接不住其他 interceptor 的 panic。"
-  },
-  {
-    "question": "Server interceptor 內<strong>忘了呼叫</strong> <code>handler(ctx, req)</code> 會發生什麼?",
-    "options": [
-      "RPC 會自動跳過後續 chain 直接成功回傳",
-      "RPC 卡死或回傳零值,真正的 handler 永遠不會被執行",
-      "gRPC 會自動補上 handler call",
-      "編譯失敗"
-    ],
-    "answer": 1,
-    "explain": "interceptor 必須<strong>主動</strong>呼叫 <code>handler</code>(server 端)或 <code>invoker</code>/<code>streamer</code>(client 端)把控制權交給下一層。忘記呼叫 = 整個 chain 沒往下走、handler 沒執行,client 拿到的是 interceptor return 的零值或 error。"
-  },
-  {
-    "question": "Auth interceptor 想把驗證後的 user_id 傳給 handler,正確做法是?",
-    "options": [
-      "用全域變數存",
-      "<code>ctx = context.WithValue(ctx, userIDKey{}, userID)</code> 然後 <code>handler(ctx, req)</code>",
-      "塞進 request message",
-      "存進 outgoing metadata"
-    ],
-    "answer": 1,
-    "explain": "request-scoped 控制資料(authn 結果、trace id)的標準做法就是塞進 <code>ctx.Value</code>。要用<strong>不可匯出的 type</strong>當 key(避免 ctx key 撞名)— 像 <code>type userIDKey struct{}</code> 是慣用做法。注意這是 <code>ctx.Value</code> 唯一適合用的場景之一(本課第 6 課提過 ctx is not your bag)。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

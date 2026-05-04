@@ -37,7 +37,6 @@
       <li><a class="toc-link" href="#client">寫 Client</a></li>
       <li><a class="toc-link" href="#run">跑起來</a></li>
       <li><a class="toc-link" href="#api-evolution">舊 API vs 新 API</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -385,62 +384,6 @@
           舊專案維護時看到 <code>Dial</code> 不用急著換(1.x 還支援),但寫新 code 時請用新 API。本系列後續所有 client 範例全部用 <code>NewClient</code>。
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "為什麼 server struct 必須 embed <code>pb.UnimplementedGreeterServer</code>?",
-    "options": [
-      "為了讓 server 速度更快",
-      "為了 forward compatibility — 將來 proto 加新 method,你的 server 不會編不過,且新 method 會回傳預設的 Unimplemented 錯誤",
-      "為了讓 client 能呼叫",
-      "為了符合 Go interface 的私有欄位要求"
-    ],
-    "answer": 1,
-    "explain": "embedding 的核心目的是 forward compatibility — proto 演進加新 method 時你不必立刻實作,server 仍能編譯並對未實作的 method 回傳 Unimplemented。protoc-gen-go-grpc 預設強制要求,可關但<strong>不建議</strong>關。"
-  },
-  {
-    "question": "<code>grpc.NewClient</code> 與已 deprecated 的 <code>grpc.Dial</code> 最重要的行為差別是?",
-    "options": [
-      "NewClient 是 lazy 的,不會立刻建連線;第一次 RPC 才實際 dial。所以 WithBlock/WithTimeout 等選項對 NewClient 無效",
-      "NewClient 速度比較快,但功能比較少",
-      "NewClient 只支援 TLS,不能用 insecure",
-      "NewClient 不支援 DNS 解析"
-    ],
-    "answer": 0,
-    "explain": "<code>NewClient</code> 設計成 lazy(<em>No I/O is performed</em>),這也是為什麼 <code>WithBlock</code>、<code>WithTimeout</code>、<code>WithReturnConnectionError</code>、<code>FailOnNonTempDialError</code> 對 <code>NewClient</code> 無效。另外 NewClient 預設 name resolver 是 <code>dns</code>(Dial 是 <code>passthrough</code>)。"
-  },
-  {
-    "question": "下列哪一個 client 寫法是 grpc-go 2026 年的<strong>推薦寫法</strong>?",
-    "options": [
-      "<code>grpc.Dial(\"x:50051\", grpc.WithInsecure(), grpc.WithBlock())</code>",
-      "<code>grpc.DialContext(ctx, \"x:50051\", grpc.WithInsecure())</code>",
-      "<code>grpc.NewClient(\"x:50051\", grpc.WithTransportCredentials(insecure.NewCredentials()))</code>",
-      "<code>grpc.Connect(\"x:50051\")</code>"
-    ],
-    "answer": 2,
-    "explain": "選項 A、B 用了 deprecated 的 <code>Dial</code>/<code>DialContext</code>(v1.63+ 廢棄)和 deprecated 的 <code>WithInsecure()</code>。選項 D 不存在。正確現代寫法是 <code>grpc.NewClient + WithTransportCredentials(insecure.NewCredentials())</code>。"
-  },
-  {
-    "question": "Unary RPC handler 在 server 端的標準簽名是?",
-    "options": [
-      "<code>func(req *pb.X) *pb.Y</code>",
-      "<code>func(ctx context.Context, req *pb.X) (*pb.Y, error)</code>",
-      "<code>func(stream pb.Service_MethodServer) error</code>",
-      "<code>func(req *pb.X) (*pb.Y, error)</code>"
-    ],
-    "answer": 1,
-    "explain": "Unary handler 簽名固定為 <code>(ctx context.Context, req *pb.X) (*pb.Y, error)</code>。<code>ctx</code> 帶 deadline、cancellation、metadata(下一課詳講)。選項 C 是 streaming handler 的形式。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

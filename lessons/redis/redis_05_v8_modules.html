@@ -37,7 +37,6 @@
       <li><a class="toc-link" href="#86">8.6 亮點</a></li>
       <li><a class="toc-link" href="#vs-others">vs ES/Pinecone</a></li>
       <li><a class="toc-link" href="#hands-on">動手玩</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -269,62 +268,6 @@ redis_version:8.6.x
 &gt; <span class="tk-fn">FT.SEARCH</span> idx:user <span class="tk-st">"@city:{Taipei}"</span>
 &gt; <span class="tk-fn">FT.SEARCH</span> idx:user <span class="tk-st">"@age:[30 +inf]"</span></code></pre>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "Redis 8 「把 Stack 併回 OSS」對你影響最大的是？",
-    "options": [
-      "原本用 RediSearch / RedisJSON 的應用要重寫",
-      "Redis 8 內建 Search/JSON/TimeSeries/Bloom,不用再單裝模組或選 Stack 版",
-      "OSS Redis 不再開源",
-      "向量功能被移除"
-    ],
-    "answer": 1,
-    "explain": "Redis 8 把原本要分開維護的 Stack 模組全部合進主線。裝 redis:8.x 自動有所有功能,Redis Stack 6.2/7.2/7.4 已於 2025-09-15 停止支援。對使用者來說就是「一條版本線、一個指令集」,大幅簡化版本與部署。"
-  },
-  {
-    "question": "下列哪些<strong>正確</strong>描述 Redis Vector Sets？(多選)",
-    "options": [
-      "是 Redis 8 引入的新原生資料結構,API 為 VADD/VSIM/VCARD 等",
-      "Vector Sets 跟 RediSearch 的 VECTOR field 功能完全等同",
-      "8.6 vs 8.4 的 VADD 寫入快約 43%、VSIM 查詢快約 58%",
-      "底層使用 HNSW 演算法"
-    ],
-    "answer": [0, 2, 3],
-    "explain": "(0)(2)(3) 正確。(1) 錯：兩者目的不同 — Vector Sets 是輕量、純向量的<em>資料結構</em>;RediSearch 的 VECTOR field 包在 search index 內，可與 TAG / NUMERIC / TEXT 欄位做混合搜尋。複雜場景仍要用 RediSearch。"
-  },
-  {
-    "question": "你的場景是「商品搜尋系統,要全文 + 標籤 + 數值範圍 + 向量(用語意找相似商品)」,規模 200 萬筆。在 Redis 8 下最適合？",
-    "options": [
-      "用一個 Vector Set + 多個 Set 做 metadata 過濾",
-      "用 RediSearch FT.CREATE,單一 index 涵蓋 TEXT / TAG / NUMERIC / VECTOR",
-      "把資料丟去 Elasticsearch,Redis 只當 cache",
-      "用 Redis Streams 做搜尋"
-    ],
-    "answer": 1,
-    "explain": "需要 <strong>混合搜尋</strong>(全文 + 結構化 + 向量) → RediSearch 是 Redis 內最合適的選擇。一個 FT.CREATE 就涵蓋四種欄位型態，且可寫複合 query 如 <code>@category:{phones} @price:[100 500] =&gt;[KNN 10 @emb $q]</code>。200 萬筆對 RediSearch 是輕量規模。Vector Set 只支援純向量，做 metadata filter 不易。"
-  },
-  {
-    "question": "下列關於 Hash Field TTL（8.0 引入的 <code>HEXPIRE</code>）的敘述，哪一項<strong>正確</strong>？",
-    "options": [
-      "整個 hash 一起過期",
-      "可以對 hash 內個別欄位設 TTL,其他欄位不受影響",
-      "只有 String 型態能設 TTL,Hash 不能",
-      "需要額外載入模組才能用"
-    ],
-    "answer": 1,
-    "explain": "Redis 8.0 引入 Hash Field TTL：<code>HEXPIRE / HEXPIREAT / HPERSIST</code> 等指令能對<strong>個別 field</strong>設過期。例如 session 中 <code>last_seen</code> 過期但 <code>user_id</code> 永久。原本要做這個只能多用幾個 key 模擬,現在直接用 hash 即可。是 8.x 系列務實的小升級。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

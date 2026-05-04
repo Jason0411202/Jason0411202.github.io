@@ -1,7 +1,7 @@
 /* ============================================================
  * Open Source Contribution Course Series — Shared JS
  * 純原生 JS，無依賴
- * 提供：reading progress / TOC scrollspy / code copy / quiz
+ * 提供：reading progress / TOC scrollspy / code copy
  * ============================================================ */
 (function () {
   'use strict';
@@ -104,136 +104,6 @@
     });
   }
 
-  /* ─────────── Quiz engine ─────────── */
-  function initQuiz() {
-    const quizSection = document.querySelector('.quiz-section');
-    if (!quizSection) return;
-    const dataEl = document.getElementById('quiz-data');
-    if (!dataEl) return;
-
-    let questions;
-    try {
-      questions = JSON.parse(dataEl.textContent);
-    } catch (e) {
-      console.error('quiz-data 解析失敗', e);
-      return;
-    }
-
-    const container = quizSection.querySelector('.quiz-list');
-    if (!container) return;
-
-    const progressEl = quizSection.querySelector('.quiz-progress span');
-    let answeredCount = 0;
-    const updateProgress = () => {
-      if (progressEl) progressEl.textContent = answeredCount + ' / ' + questions.length;
-    };
-    updateProgress();
-
-    questions.forEach((q, qi) => {
-      const card = document.createElement('div');
-      card.className = 'quiz-card';
-      const isMulti = Array.isArray(q.answer);
-
-      const correctSet = new Set(isMulti ? q.answer : [q.answer]);
-
-      const opts = q.options.map((opt, oi) => {
-        const letter = String.fromCharCode(65 + oi); // A B C D
-        return `
-          <div class="quiz-option" data-idx="${oi}">
-            <div class="opt-marker">${letter}</div>
-            <div class="opt-text">${opt}</div>
-          </div>
-        `;
-      }).join('');
-
-      card.innerHTML = `
-        <div class="quiz-question">
-          <span class="quiz-question-num">Q${qi + 1}</span>${q.question}
-        </div>
-        <div class="quiz-hint">${isMulti ? '※ 多選題' : '※ 單選題'}</div>
-        <div class="quiz-options">${opts}</div>
-        <div class="quiz-feedback"><strong>解析</strong><br>${q.explain || ''}</div>
-      `;
-
-      const optionEls = card.querySelectorAll('.quiz-option');
-      const feedbackEl = card.querySelector('.quiz-feedback');
-      const selected = new Set();
-      let answered = false;
-
-      const evaluate = () => {
-        if (answered) return;
-        answered = true;
-        answeredCount += 1;
-        updateProgress();
-
-        optionEls.forEach((el, idx) => {
-          el.classList.add('locked');
-          const isCorrect = correctSet.has(idx);
-          const isSelected = selected.has(idx);
-          if (isCorrect) el.classList.add('correct');
-          if (isSelected && !isCorrect) el.classList.add('wrong');
-        });
-
-        feedbackEl.classList.add('show');
-      };
-
-      optionEls.forEach((el) => {
-        el.addEventListener('click', () => {
-          if (answered) return;
-          const idx = Number(el.dataset.idx);
-          if (isMulti) {
-            if (selected.has(idx)) {
-              selected.delete(idx);
-              el.classList.remove('selected-pending');
-              el.querySelector('.opt-marker').style.background = '';
-              el.querySelector('.opt-marker').style.color = '';
-              el.querySelector('.opt-marker').style.borderColor = '';
-            } else {
-              selected.add(idx);
-              el.classList.add('selected-pending');
-              el.querySelector('.opt-marker').style.background = 'var(--ecc)';
-              el.querySelector('.opt-marker').style.color = 'var(--white)';
-              el.querySelector('.opt-marker').style.borderColor = 'var(--ecc)';
-            }
-          } else {
-            selected.clear();
-            selected.add(idx);
-            evaluate();
-          }
-        });
-      });
-
-      // 多選題加上 「送出」按鈕
-      if (isMulti) {
-        const submitWrap = document.createElement('div');
-        submitWrap.style.marginTop = '0.6rem';
-        const submitBtn = document.createElement('button');
-        submitBtn.textContent = '送出答案';
-        submitBtn.style.cssText = `
-          font-family: var(--mono);
-          font-size: 12px;
-          padding: 6px 14px;
-          border-radius: 8px;
-          background: var(--ecc);
-          color: var(--white);
-          border: none;
-          cursor: pointer;
-          font-weight: 600;
-        `;
-        submitBtn.addEventListener('click', () => {
-          if (selected.size === 0) return;
-          submitBtn.disabled = true;
-          submitBtn.style.opacity = '0.4';
-          evaluate();
-        });
-        submitWrap.appendChild(submitBtn);
-        card.querySelector('.quiz-options').after(submitWrap);
-      }
-
-      container.appendChild(card);
-    });
-  }
-
   /* ─────────── Boot ─────────── */
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
@@ -244,6 +114,5 @@
     initReadingProgress();
     initTocScrollspy();
     initCodeCopy();
-    initQuiz();
   }
 })();

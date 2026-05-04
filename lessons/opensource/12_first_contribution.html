@@ -40,7 +40,6 @@
       <li><a class="toc-link" href="#examples">好/壞範例</a></li>
       <li><a class="toc-link" href="#review-quiz">總回顧</a></li>
       <li><a class="toc-link" href="#graduation">畢業任務</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -502,62 +501,6 @@
           你現在已經具備加入任何大型開源專案、或進公司寫大型專案的協作能力。剩下的就是不斷實戰累積。<strong>繼續送 PR、繼續 review 別人 PR — 這是進步最快的方式。</strong>
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "5 分鐘判斷一個專案是否值得貢獻，下列哪些是<strong>關鍵指標</strong>？(多選)",
-    "options": [
-      "CONTRIBUTING.md 是否清楚",
-      "最近 30 天是否有活動 (commit / PR / issue)",
-      "PR 平均合併時間",
-      "GitHub stars 數量"
-    ],
-    "answer": [0, 1, 2],
-    "explain": "Stars 數很多但維護死寂的專案非常多。重要的是「活躍度 + 流程清楚 + maintainer 有在處理 PR」— 這幾個一起看才能判斷貢獻流程順不順。"
-  },
-  {
-    "question": "認領 issue 的<strong>正確</strong>做法是？",
-    "options": [
-      "看到喜歡的 issue 立刻留 'I'll do it' 鎖住",
-      "先看 issue 留言區與 Linked PRs 確認沒人在做，留言預計 N 天內送 PR，等 maintainer 回應後動工",
-      "不留言直接動工，做完再說",
-      "認領很多個然後選一個做"
-    ],
-    "answer": 1,
-    "explain": "過度承諾會讓 issue 卡死沒人能做。確認沒人做 + 留言宣告 + 等回應 + 動手做，是友善流程。如果 1-2 天 maintainer 沒回應，直接動工是 OK 的。"
-  },
-  {
-    "question": "下列哪些是新手最容易踩的雷？(多選)",
-    "options": [
-      "Force push 自己的 main",
-      "送 1000+ 行的大 PR",
-      "Commit message 寫 'fix' / 'WIP'",
-      "送 PR 前先在本地跑測試確認綠燈"
-    ],
-    "answer": [0, 1, 2],
-    "explain": "前三個都是常見雷。第四個 (跑測試確認) 不是雷，是<strong>應該做的好習慣</strong>。"
-  },
-  {
-    "question": "你選的開源專案有提到「請使用 DCO (Signed-off-by)」，你應該怎麼做？",
-    "options": [
-      "忽略，反正 CI 沒擋",
-      "<code>git commit -s</code> 加上 <code>Signed-off-by:</code> footer，表示有權貢獻這段程式碼",
-      "在 PR 描述寫一句「我同意 DCO」就好",
-      "申請 maintainer 幫你簽"
-    ],
-    "answer": 1,
-    "explain": "DCO 要求每個 commit 都有 <code>Signed-off-by:</code> footer，用 <code>git commit -s</code> 自動加。Linux Kernel、Docker、CNCF 系列都採用這個做法。沒簽的 commit 通常會被 CI 擋下。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

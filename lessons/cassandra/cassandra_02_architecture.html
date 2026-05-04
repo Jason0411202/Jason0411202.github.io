@@ -38,7 +38,6 @@
       <li><a class="toc-link" href="#consistency">Consistency Level</a></li>
       <li><a class="toc-link" href="#pacelc">PACELC</a></li>
       <li><a class="toc-link" href="#nodetool">nodetool 動手玩</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -340,62 +339,6 @@ cqlsh&gt; <span class="tk-fn">DESCRIBE</span> <span class="tk-kw">KEYSPACE</span
           要看真實的多節點 ring，最簡單方式是用 <code>ccm</code>（Cassandra Cluster Manager）在本機起 3 節點：<code>ccm create test -v 5.0.8 -n 3 -s</code>。或者用 docker-compose。本系列為了上手簡單只跑單節點，但 nodetool 指令在多節點環境會有趣很多。
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "假設 RF=3，client 用 W=QUORUM、R=QUORUM 進行讀寫。下列哪一項<strong>正確</strong>？",
-    "options": [
-      "這樣是強一致：寫入的 2 個 replica 跟讀取的 2 個必有交集",
-      "因為 Cassandra 是 AP，所以不論 CL 怎麼設都不可能強一致",
-      "只有 R=ALL 才能達到強一致",
-      "QUORUM 表示寫到 3 個 replica，效能最慢"
-    ],
-    "answer": 0,
-    "explain": "公式 <code>R + W &gt; RF</code> 成立即強一致。RF=3 時 QUORUM=2，2+2=4 &gt; 3。最差情況下讀取的 2 個 replica 與寫入的 2 個必有交集，能讀到最新值。<br>(2) QUORUM = ⌊RF/2⌋+1 = 2，不是 3。"
-  },
-  {
-    "question": "下列關於「coordinator」的敘述，哪些<strong>正確</strong>？(多選)",
-    "options": [
-      "Client 可以連任何一台節點，那台就成為這次請求的 coordinator",
-      "Coordinator 是叢集事先選出的固定 master，所有寫入都要透過它",
-      "Coordinator 負責用 partitioner 算出資料該寫到哪些 replica，並等 CL 達標",
-      "若 coordinator 自己不是 replica 之一，它會幫忙轉發但不會儲存資料"
-    ],
-    "answer": [0, 2, 3],
-    "explain": "(0)(2)(3) 都是 coordinator 的真實角色。(1) 錯：Cassandra 沒有 master，coordinator 是<em>每次請求即時指定</em>的 — 你連哪台、哪台就是 coordinator。"
-  },
-  {
-    "question": "為什麼多 DC 部署時實務上幾乎一律用 <code>LOCAL_QUORUM</code> 而不是 <code>QUORUM</code>？",
-    "options": [
-      "QUORUM 不支援多 DC",
-      "QUORUM 會等到跨 DC 多數派回應，動輒幾十 ms 延遲；LOCAL_QUORUM 只等本 DC 多數派",
-      "LOCAL_QUORUM 才能達到強一致",
-      "QUORUM 不允許 hinted handoff"
-    ],
-    "answer": 1,
-    "explain": "跨 DC 網路 RTT 通常 30~100ms，QUORUM 要等遠端 DC 回應、寫入延遲爆炸。LOCAL_QUORUM 達成「本地強一致 + 跨 DC 非同步複寫的最終一致」。"
-  },
-  {
-    "question": "vnode（virtual node）的設計目的<strong>不包含</strong>下列哪一項？",
-    "options": [
-      "讓資料負載在實體節點之間更平均",
-      "加減節點時資料搬移更平均、影響範圍更小",
-      "提升單筆查詢的延遲",
-      "讓 streaming repair 比較順暢"
-    ],
-    "answer": 2,
-    "explain": "vnode 是<em>叢集級的負載與運維特性</em>，跟單筆查詢延遲<strong>幾乎無關</strong>。其他三項都是 vnode 真實帶來的好處（負載平均、加減節點時影響小、repair 較順）。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

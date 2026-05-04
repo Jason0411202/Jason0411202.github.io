@@ -37,7 +37,6 @@
       <li><a class="toc-link" href="#capacity">容量規劃</a></li>
       <li><a class="toc-link" href="#pitfall">常見地雷</a></li>
       <li><a class="toc-link" href="#prod">Production 工具</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -252,62 +251,6 @@ Requested creating snapshot(s) for [stockbot] with snapshot name [backup-2026-04
           走完這 6 堂後,你應該有能力:讀懂團隊的 Cassandra schema、看 nodetool 輸出排查、設計新 table 不踩 hot partition、知道何時用 SAI / Vector / UCS、討論 production 架構時聽得懂 RF、CL、repair、operator。<em>下一步是把它應用到 stockbot 的真實 workload</em>。
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "你巡檢時發現某節點 <code>nodetool tpstats</code> 顯示 <code>MutationStage Pending: 800, Blocked: 50</code>。最可能的問題是？",
-    "options": [
-      "節點 CPU 太空閒",
-      "寫入超過節點處理能力（I/O 或 CPU 跟不上）;持續下去會出現 dropped mutations 與資料不一致",
-      "正常現象,不用處理",
-      "需要立刻重啟節點"
-    ],
-    "answer": 1,
-    "explain": "<code>tpstats</code> 的 Pending/Blocked 是 thread pool 的等待數。MutationStage 是寫入處理,Pending 大、Blocked 出現代表寫入消化不過來 — I/O 不足、CPU 飽和、或某張表 SSTable 太多讓寫入變慢。持續會觸發 dropped mutations,造成 replica 之間不一致。要找出原因(查 compaction debt、磁碟 IOPS、慢查表)。重啟解決不了根本問題。"
-  },
-  {
-    "question": "你要在 production 跑備份。下列哪個流程<strong>正確</strong>？",
-    "options": [
-      "停掉 Cassandra → 直接複製 /var/lib/cassandra/data → 啟動",
-      "nodetool snapshot 建立 SSTable 硬連結快照 → 把 snapshots 目錄複製到外部儲存",
-      "用 SELECT * 把所有資料讀出來存成 CSV",
-      "只備份 commit log"
-    ],
-    "answer": 1,
-    "explain": "正確流程:<code>nodetool snapshot</code> 建立 SSTable 硬連結快照 (即時、不停機、不額外佔空間,因為 SSTable 是 immutable),再把那些檔案 rsync/s3 sync 到外部儲存。停機複製是大忌(若有複製延遲不一致)。SELECT * 不切實際也漏 schema。commit log 只保最近寫入。production 多用 Medusa 自動化這個流程。"
-  },
-  {
-    "question": "你估算自家 workload 是「每天 50 GB raw、保留 60 天」,RF=3。下列哪個節點數規劃<strong>較合適</strong>？(假設用 5.0 + 4 TB / node 上限)",
-    "options": [
-      "2 個節點 (50 × 60 × 3 = 9 TB,2 個節點各 4.5 TB)",
-      "3 個節點 (每台 ~3 TB,使用率 ~75%)",
-      "6 個節點 (每台 ~1.5 TB,使用率 ~38% 留空間 compaction + 成長)",
-      "1 個節點"
-    ],
-    "answer": 2,
-    "explain": "9 TB 資料 + 30% overhead ≈ 12 TB total。要留 50% 空檔給 compaction 與成長 → 12 / 0.5 = 24 TB → 6 節點各 4 TB 上限。實務剩 ~38% 使用率。(0)(1) 都太擠,compaction 會卡。(3) 沒擴展性、無 HA。記住「規劃時 disk 留一半」是 Cassandra 的常識。"
-  },
-  {
-    "question": "在 production 環境跑 Cassandra,下列哪些做法<strong>合理</strong>?(多選)",
-    "options": [
-      "用 k8ssandra-operator 在 K8s 上管理叢集",
-      "用 Reaper 排程每週 incremental repair",
-      "把 nodetool 健康指標接 Prometheus + Grafana 監控",
-      "用 LWT (IF NOT EXISTS) 當所有寫入的預設,確保資料正確"
-    ],
-    "answer": [0, 1, 2],
-    "explain": "(0)(1)(2) 都是業界常見且推薦做法。(3) 錯：LWT 用 Paxos,每筆要 4 次 RTT,效能極差。<strong>偶爾用</strong>(像帳號註冊唯一性)沒問題,當所有寫入的預設會把叢集寫垮。應用層在能容忍時用 last-write-wins,真的需要 CAS 才用 LWT。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

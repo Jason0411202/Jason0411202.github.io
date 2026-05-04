@@ -37,7 +37,6 @@
       <li><a class="toc-link" href="#compare">vs MySQL / Mongo / Redis</a></li>
       <li><a class="toc-link" href="#fit">何時該用 / 不該用</a></li>
       <li><a class="toc-link" href="#hands-on">Docker 動手玩</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -364,62 +363,6 @@ system_schema   system_virtual_schema</code></pre>
           正式環境一定要用 <code>NetworkTopologyStrategy</code>（指定每個 DC 的 RF），這個下一堂會說明。<code>SimpleStrategy</code> 在多 DC 部署會出怪事。
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "下列哪一個情境<strong>最不適合</strong>用 Cassandra？",
-    "options": [
-      "IoT 系統收集數百萬個 device 的時序事件，未來要再擴點",
-      "後台報表系統需要做複雜 join 與多維度 ad-hoc 查詢",
-      "多地區部署，每個 region 都要可獨立讀寫",
-      "電商訂單流水，主要查詢是「給我這個用戶的訂單列表」"
-    ],
-    "answer": 1,
-    "explain": "Cassandra 的 CQL <strong>不支援 join</strong>，schema 是為「已知查詢」設計的。複雜 join + 多維 ad-hoc 屬於 OLAP，應該用 ClickHouse / BigQuery / Snowflake 或把資料 ETL 到分析系統。其他三項（時序、多 DC、按 entity 查）都是 Cassandra 的甜蜜點。"
-  },
-  {
-    "question": "「Cassandra 是 AP 型」這句話最精確的解讀是？",
-    "options": [
-      "Cassandra 永遠不能保證一致性，所以不能用在金融場景",
-      "Cassandra 預設偏 AP，但可透過 consistency level（如 QUORUM）達到強一致",
-      "Cassandra 是 CP 型，只是大家誤傳成 AP",
-      "Cassandra 可以同時兼具 C、A、P，沒有取捨"
-    ],
-    "answer": 1,
-    "explain": "Cassandra 提供 <em>tunable consistency</em>。當 <code>R + W &gt; RF</code>（例如 RF=3 + 讀 QUORUM + 寫 QUORUM）時即得到強一致。預設值偏 AP（因為要在分區時保持可用），但你能依場景調。CAP 定理本身不允許三者兼得（C 是錯的）。"
-  },
-  {
-    "question": "下列哪些敘述<strong>正確</strong>描述 Cassandra 的「寬欄式」？(多選)",
-    "options": [
-      "同一張 table 的不同 row（partition）可以有不同的 column 集合",
-      "把同一個 column 的所有值連續儲存以方便壓縮（這是欄式儲存的特徵）",
-      "一個 partition 內可放數百萬個 column 值",
-      "Cassandra 是 OLAP 引擎，專為分析查詢優化"
-    ],
-    "answer": [0, 2],
-    "explain": "(0)(2) 是 wide-column 的核心特徵。(1) 描述的是 <strong>columnar / column-oriented</strong>（如 ClickHouse、Parquet），跟 wide-column 是不同的概念，常被搞混。(3) 錯：Cassandra 是 OLTP 系統，分析應 ETL 到分析引擎。"
-  },
-  {
-    "question": "為什麼 Cassandra 是「無 master」架構？最主要的好處是？",
-    "options": [
-      "省去 leader election 演算法的實作複雜度",
-      "沒有單點故障，且任何節點都能接受讀寫，可線性擴展",
-      "讀寫一定比有 master 的系統快",
-      "因為沒人要當 master"
-    ],
-    "answer": 1,
-    "explain": "「無 master」（peer-to-peer ring）的真正價值是 <strong>沒有單點故障 + 線性擴展</strong>。每個節點對等，client 可連任一節點當 coordinator，整個叢集任何子集合掛掉，剩下的仍可服務。讀寫速度不一定比較快（強一致時還可能更慢），但擴展性與可用性是它最大的賣點。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

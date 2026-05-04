@@ -39,7 +39,6 @@
       <li><a class="toc-link" href="#milestone">Milestone</a></li>
       <li><a class="toc-link" href="#projects">GitHub Projects</a></li>
       <li><a class="toc-link" href="#triage">Triage 流程</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -377,62 +376,6 @@ ISO 格式，需要在 component 外面額外做轉換。
           有些 issue 是真的重要但 maintainer 沒空看，被自動 close 後社群會生氣。所以 stale bot 通常配合白名單 — 標了 <code>pinned</code> / <code>priority: high</code> 的 issue 不會被自動關。
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "下列哪個是<strong>最不</strong>重要的 bug report 內容？",
-    "options": [
-      "重現步驟",
-      "預期行為 vs 實際行為",
-      "你的猜測 (可能是哪段 code 的問題)",
-      "環境資訊 (OS / 瀏覽器版本 / app 版本)"
-    ],
-    "answer": 2,
-    "explain": "猜測是「nice to have」但不是必要 — 而且 reporter 的猜測常常是錯的。重現步驟、預期/實際、環境資訊才是 maintainer 真正必要的東西。"
-  },
-  {
-    "question": "你想找開源專案開始貢獻，下列哪個標籤<strong>最適合</strong>新手起步？",
-    "options": [
-      "<code>priority: critical</code>",
-      "<code>good first issue</code>",
-      "<code>status: needs-info</code>",
-      "<code>type: discussion</code>"
-    ],
-    "answer": 1,
-    "explain": "<code>good first issue</code> 是 GitHub 官方推薦的「邀請新貢獻者」標籤 — maintainer 已經評估過範圍適合新手、有清楚說明、不需要深入熟悉 codebase。"
-  },
-  {
-    "question": "下列哪些是 Stale bot 的合理使用方式？(多選)",
-    "options": [
-      "30 天沒回應的 issue 自動標 stale",
-      "標了 stale 後再 7 天還沒回應自動 close",
-      "重要 issue (priority: high / pinned) 加白名單避免被自動關",
-      "所有 issue 不分情況一週後自動 close"
-    ],
-    "answer": [0, 1, 2],
-    "explain": "Stale bot 設計是「自動處理被遺忘的 issue」，但要有白名單機制保護真正重要的 issue。一週統殺所有 issue 會傷害社群信任。"
-  },
-  {
-    "question": "Feature Request 應該優先描述什麼？",
-    "options": [
-      "詳細的實作細節",
-      "你遇到的痛點 / 使用情境 (然後才提建議解法)",
-      "罵舊版本不好",
-      "競品有這個功能所以要做"
-    ],
-    "answer": 1,
-    "explain": "Maintainer 要評估 feature 的價值與成本，需要先知道「有誰、為什麼、什麼情境」需要這個功能。只丟解法 (「請加 X」) 沒有上下文，很容易被拒。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

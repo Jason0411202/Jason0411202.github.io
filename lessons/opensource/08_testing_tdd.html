@@ -38,7 +38,6 @@
       <li><a class="toc-link" href="#aaa">AAA 模式</a></li>
       <li><a class="toc-link" href="#coverage">Coverage 迷思</a></li>
       <li><a class="toc-link" href="#frameworks">主流框架</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -393,73 +392,6 @@ test(<span class="tk-st">'add: 兩個數相加'</span>, () =&gt; {
           <tr><td>E2E (前端)</td><td><strong>Playwright</strong> (新) / Cypress</td><td>Playwright 跨瀏覽器、無 iframe 限制，2024 後快速取代 Cypress</td></tr>
         </tbody>
       </table>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 5</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "Mike Cohn 測試金字塔的中心思想是什麼？",
-    "options": [
-      "三種測試類型都要剛好 33%",
-      "越底層的測試越多 (Unit) 因為快、便宜、穩定；越頂層越少 (E2E) 因為慢、貴、易壞",
-      "E2E 測試最重要應該佔最多",
-      "金字塔只是裝飾，實際比例不重要"
-    ],
-    "answer": 1,
-    "explain": "Unit 多 (70%)、Integration 中 (20%)、E2E 少 (10%) 是金字塔的核心。反過來 (倒三角) 是最常見的反模式 — test suite 跑半小時又隨機壞。"
-  },
-  {
-    "question": "TDD 的 Red-Green-Refactor 順序中，Red 步驟做什麼？",
-    "options": [
-      "寫好的程式碼讓測試通過",
-      "<strong>先寫一個會失敗的測試</strong> (因為要測的功能還沒實作)",
-      "把舊測試標紅刪掉",
-      "重構但保持測試通過"
-    ],
-    "answer": 1,
-    "explain": "Red = 寫好失敗的測試。這一步逼你思考「我要做什麼，input/output 是什麼」。再用最少改動讓測試通過 (Green)，最後整理程式碼 (Refactor)。"
-  },
-  {
-    "question": "F.I.R.S.T 原則中，<code>Repeatable</code> 的意思是？",
-    "options": [
-      "測試可以複製貼上",
-      "同樣輸入永遠同樣結果，不依賴時間/亂數/網路/順序",
-      "測試碼可以重複使用",
-      "測試可以無限次跑"
-    ],
-    "answer": 1,
-    "explain": "違反 Repeatable 的最常見原因是 flaky test — 依賴時間、亂數、外部服務、執行順序。flaky test 比沒測試更糟，會訓練團隊忽略 CI 紅燈。"
-  },
-  {
-    "question": "下列哪個 coverage 指標<strong>最重要</strong>？",
-    "options": [
-      "Line coverage",
-      "Branch coverage",
-      "Function coverage",
-      "Statement coverage"
-    ],
-    "answer": 1,
-    "explain": "Branch coverage (分支覆蓋率) 衡量 if-else / switch / 三元運算子的所有分支是否都被測試走過。它比 line coverage 嚴格 — 一行的 if 條件可能 line 看起來覆蓋但只走過一邊。"
-  },
-  {
-    "question": "下列哪些情境<strong>不該</strong>追求高測試覆蓋率？(多選)",
-    "options": [
-      "Prototype / spike 探索性程式碼",
-      "純包裝第三方 API 的 wrapper",
-      "正在 production 跑的核心商業邏輯",
-      "複雜 UI 微互動 (用視覺回歸更有效)"
-    ],
-    "answer": [0, 1, 3],
-    "explain": "覆蓋率不是越高越好。探索碼丟掉就好；wrapper 只能 mock 自己；UI 互動視覺回歸更有效。<strong>核心商業邏輯</strong>絕對該高覆蓋率 — 這是 production 的安全網。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

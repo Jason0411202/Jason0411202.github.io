@@ -37,7 +37,6 @@
       <li><a class="toc-link" href="#bidi">Bidirectional</a></li>
       <li><a class="toc-link" href="#eof">io.EOF 的角色</a></li>
       <li><a class="toc-link" href="#pitfalls">常見坑</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -388,62 +387,6 @@ stream.CloseSend()
 }</code></pre>
         </div>
       </details>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "<code>stream.Recv()</code> 回傳 <code>io.EOF</code> 代表什麼?",
-    "options": [
-      "發生網路錯誤,連線中斷",
-      "對方正常結束 stream(server return nil 或 client CloseSend),不是錯誤",
-      "deadline 已過,需要重新 retry",
-      "protobuf 解碼失敗"
-    ],
-    "answer": 1,
-    "explain": "<code>io.EOF</code> 在 Go 是「正常結束」的慣例。streaming RPC 裡代表對方正常結束 stream(server <code>return nil</code> / <code>SendAndClose</code>,client <code>CloseSend</code>)。網路錯誤等真錯誤會回不同的 error,用 <code>status.Code(err)</code> 解析。"
-  },
-  {
-    "question": "Client streaming 的 client 端用什麼 method 同時「結束 send 半邊 + 等 server 回應」?",
-    "options": [
-      "<code>stream.CloseSend()</code>",
-      "<code>stream.SendAndClose(req)</code>",
-      "<code>stream.CloseAndRecv()</code>",
-      "<code>stream.Close()</code>"
-    ],
-    "answer": 2,
-    "explain": "<strong>Client streaming</strong> client 用 <code>CloseAndRecv()</code> 一步完成「告訴 server 沒了 + 拿回應」。<code>CloseSend()</code> 是 bidi 才用(只關 send 不要回應);<code>SendAndClose(resp)</code> 是 client streaming 的 <strong>server</strong> 端用的(送回應 + 關 stream)。"
-  },
-  {
-    "question": "下列關於 bidirectional streaming 的描述,哪些<strong>正確</strong>?(多選)",
-    "options": [
-      "雙方可獨立、交錯地 send 與 recv",
-      "同一個 stream 同方向用兩個 goroutine 同時 Send 是 thread-safe 的",
-      "client 用 <code>CloseSend()</code> 告訴 server 不再送,但仍可繼續 Recv server 後續訊息",
-      "server 端用 return nil 結束整個 stream"
-    ],
-    "answer": [0, 2, 3],
-    "explain": "選項 B <strong>錯</strong> — Send 同方向<strong>不是</strong> thread-safe,兩個 goroutine 寫會混合 byte 造成 decode 失敗。其他三項都是 bidi 的標準用法。"
-  },
-  {
-    "question": "下列哪一項是長時間 server streaming handler <strong>必須</strong>注意的事?",
-    "options": [
-      "每送一筆都要 sleep 至少 1 秒",
-      "要在迴圈裡 select <code>stream.Context().Done()</code>,讓 client 斷線/取消時 server 能及時退出,避免資源洩漏",
-      "每筆訊息都要重新 build 一個 stream 物件",
-      "Send 之前一定要 lock mutex"
-    ],
-    "answer": 1,
-    "explain": "長時間 server streaming 不關注 ctx.Done() 是常見的資源洩漏來源 — client 早就走了,server 還在傻傻送。<code>stream.Context()</code> 會在 client 取消、deadline 到、或 connection 斷時 Done,要 select 它。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

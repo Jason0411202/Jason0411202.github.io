@@ -37,7 +37,6 @@
       <li><a class="toc-link" href="#trunk-based">Trunk-Based</a></li>
       <li><a class="toc-link" href="#how-to-choose">怎麼選</a></li>
       <li><a class="toc-link" href="#hotfix">Hotfix</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -351,62 +350,6 @@
           </div>
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "下列哪個情境<strong>最不適合</strong>用 Git Flow？",
-    "options": [
-      "有多個 LTS (long-term support) 版本要同時維護",
-      "桌面軟體，每季發布一次大版本",
-      "持續部署的 SaaS Web 服務",
-      "硬體 SDK，需要支援 v1 / v2 / v3 三個主版本"
-    ],
-    "answer": 2,
-    "explain": "Git Flow 原作者 Vincent Driessen 在 2020 年自己說：對持續部署的 Web 服務來說 Git Flow 過於複雜，推薦用 GitHub Flow。"
-  },
-  {
-    "question": "Trunk-Based Development 的兩個關鍵配套是什麼？(多選)",
-    "options": [
-      "Feature flag (功能旗標)",
-      "強大的自動化測試 / CI",
-      "Git Flow 拓樸",
-      "release/* 分支"
-    ],
-    "answer": [0, 1],
-    "explain": "Trunk-based 把所有東西都壓在 main 上，半成品靠 feature flag 隱藏，品質靠 CI 守住。沒這兩樣東西硬上會線上每天炸。"
-  },
-  {
-    "question": "緊急 hotfix 修完上線後，為什麼還要再合回 main / develop？",
-    "options": [
-      "為了符合 Git 規範",
-      "如果不合回去，下次 deploy 主分支內容時這個 bug 會再回來 (regression)",
-      "為了讓 reflog 看起來漂亮",
-      "完全不用合回去"
-    ],
-    "answer": 1,
-    "explain": "hotfix 是從 production 分支拉的舊版本上修，main 上沒有這個修補。如果不合回去，下次正常 release 把新功能 deploy 上線時，這個被修掉的 bug 會跟著新版本一起回來。"
-  },
-  {
-    "question": "你的團隊有 8 個人，做 SaaS Web 產品，每天 deploy 多次，CI 穩定。下列哪個分支策略最適合？",
-    "options": [
-      "Git Flow",
-      "GitHub Flow",
-      "GitLab Flow + 環境分支",
-      "Trunk-Based + feature flag"
-    ],
-    "answer": 1,
-    "explain": "8 人團隊 + 持續部署 + 穩定 CI 的甜蜜點是 GitHub Flow。Trunk-Based 在這個規模下是過度設計 (feature flag 系統需要額外建置)，Git Flow 又太重。GitLab Flow 也能用，但只在有真正多環境隔離需求時才會比 GitHub Flow 好。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

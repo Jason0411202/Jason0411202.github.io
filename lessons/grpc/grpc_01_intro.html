@@ -37,7 +37,6 @@
       <li><a class="toc-link" href="#four-types">四種 RPC 模式</a></li>
       <li><a class="toc-link" href="#when-not">何時不該用</a></li>
       <li><a class="toc-link" href="#ecosystem">生態與版本</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -395,62 +394,6 @@
           後續 9 堂課所有 API 與用法,以 <a class="inline-link" href="https://grpc.io/docs/" target="_blank" rel="noopener">grpc.io/docs</a> 與 <a class="inline-link" href="https://pkg.go.dev/google.golang.org/grpc" target="_blank" rel="noopener">pkg.go.dev/google.golang.org/grpc</a> 為準。網路上很多教學示範的 <code>grpc.Dial(...)</code> 已被 deprecated,本課全部使用<strong>新的 <code>grpc.NewClient(...)</code></strong>。
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "下列哪一項<strong>不是</strong> gRPC 強制用 HTTP/2 的原因?",
-    "options": [
-      "HTTP/2 支援單一連線多 stream 並行(multiplexing)",
-      "HTTP/2 支援全雙工 stream,讓 bidirectional streaming 可行",
-      "HTTP/2 強制使用 TLS 加密所有流量",
-      "HTTP/2 用 HPACK 壓縮 header,小訊息更省頻寬"
-    ],
-    "answer": 2,
-    "explain": "HTTP/2 規格本身<strong>沒有</strong>強制 TLS,只是大多數瀏覽器要求 HTTPS。gRPC 自己有 TLS 設定(第 9 課會講),但這不是 HTTP/2 的特性。其他三項都是 HTTP/2 帶給 gRPC 的關鍵能力。"
-  },
-  {
-    "question": "下列哪些情境比較<strong>不</strong>適合用 gRPC?(多選)",
-    "options": [
-      "兩個內部 Go microservice 之間互相呼叫",
-      "對外公開、要讓第三方開發者用的 REST-like API",
-      "需要 server 持續推訊息給 client(訂閱、log tail)",
-      "瀏覽器 SPA 直接呼叫 backend,沒有額外 proxy 基礎設施"
-    ],
-    "answer": [1, 3],
-    "explain": "<strong>對外公開 API</strong>:第三方開發者熟悉 REST+JSON,要他們 protoc 編譯 stub 阻力大。<strong>瀏覽器直連</strong>:瀏覽器無法直接發 HTTP/2 trailer,需 gRPC-Web + Envoy 代理,架構變複雜。內部 microservice 與 streaming 訂閱反而是 gRPC 的甜蜜點。"
-  },
-  {
-    "question": "Protocol Buffers(protobuf)和 gRPC 的關係是?",
-    "options": [
-      "protobuf 是 gRPC 的子模組,只能在 gRPC 裡用",
-      "兩者必須一起用,缺一不可",
-      "兩者是分開的東西。gRPC 預設用 protobuf,但也能用 JSON;protobuf 也可單獨當序列化格式用",
-      "gRPC 是 protobuf 的舊名"
-    ],
-    "answer": 2,
-    "explain": "protobuf 是 Google 2008 開源的<strong>序列化格式 + IDL</strong>,跟 gRPC 是兩個獨立專案。gRPC 用 protobuf 定義 service/message,但設計上允許其他格式;protobuf 也能脫離 gRPC,只用來儲存或傳輸資料。"
-  },
-  {
-    "question": "下列關於 gRPC 四種 RPC 模式的描述,哪一個<strong>正確</strong>?",
-    "options": [
-      "Unary RPC 是 client 一條訊息、server 一條訊息",
-      "Server streaming 是 client 多條訊息、server 一條訊息",
-      "Client streaming 是雙向都多條訊息,可以交錯",
-      "Bidirectional streaming 等同 HTTP request,client 和 server 各送一條"
-    ],
-    "answer": 0,
-    "explain": "Unary 是最常見的 1 req → 1 resp 模式。Server streaming 應為 1 req → N resp(B 是反過來);Client streaming 應為 N req → 1 resp(C 描述錯了);Bidirectional 才是雙向都 N 條(D 描述錯了)。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

@@ -36,7 +36,6 @@
       <li><a class="toc-link" href="#mtls">mTLS</a></li>
       <li><a class="toc-link" href="#per-rpc">PerRPC token</a></li>
       <li><a class="toc-link" href="#choose">怎麼選</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -300,62 +299,6 @@ conn, err := grpc.NewClient(addr,
           <code>insecure.NewCredentials()</code> 等於明文 HTTP/2(h2c)。對網際網路曝露 = 流量可被中間人讀取/修改、token 一傳就洩漏。<strong>只在 localhost 開發、或 service mesh 已處理</strong>的情況下用。
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "Transport credentials 與 PerRPC credentials 的差別是?",
-    "options": [
-      "兩者完全等價,擇一即可",
-      "Transport 處理連線層加密與身份(TLS、mTLS);PerRPC 處理每支 RPC 帶的 token(authorization metadata)。兩者可同時存在",
-      "Transport 給 server 用,PerRPC 給 client 用",
-      "Transport 是新 API,PerRPC 是舊 API"
-    ],
-    "answer": 1,
-    "explain": "兩層獨立、可組合。典型 production:transport 用 TLS 加密 + PerRPC 帶 OAuth token 表達 user 身份。"
-  },
-  {
-    "question": "下列哪一項是 mTLS 與單向 TLS 的<strong>差別</strong>?",
-    "options": [
-      "mTLS 速度比較快",
-      "mTLS 只能用於 streaming RPC",
-      "mTLS 中 server 也會驗 client 的憑證(<code>tls.RequireAndVerifyClientCert</code>);單向 TLS 只驗 server",
-      "mTLS 不需要憑證"
-    ],
-    "answer": 2,
-    "explain": "<strong>m</strong>TLS = mutual TLS,雙方互驗。Server 端關鍵設定是 <code>ClientAuth: tls.RequireAndVerifyClientCert</code>,並提供 <code>ClientCAs</code> 信任的 client CA pool。client 端必須出示自己的 <code>Certificates</code>。常用於內部 service-to-service。"
-  },
-  {
-    "question": "實作 PerRPCCredentials 時,<code>RequireTransportSecurity() bool</code> 應該怎麼決定?",
-    "options": [
-      "永遠回 <code>false</code>,簡單就好",
-      "永遠回 <code>true</code>(token 必須在 TLS 上傳;明文傳會被截獲)",
-      "依 token 長度決定",
-      "依 client IP 決定"
-    ],
-    "answer": 1,
-    "explain": "PerRPC 把 token 放 metadata,沒 TLS = 明文。回 <code>true</code> 讓 grpc-go 在 connection 不安全時直接拒絕掛上去。本地測試環境的開發 token 也應該用 TLS 或 unix socket,不要養成裸傳習慣。"
-  },
-  {
-    "question": "k8s 內已部署 Istio service mesh 的環境,內部 service-to-service gRPC 的 transport credentials 該怎麼設?",
-    "options": [
-      "務必手寫 mTLS,不要信任 mesh",
-      "用 <code>insecure.NewCredentials()</code>,因為 mesh sidecar 已自動接管 mTLS",
-      "改用單向 TLS",
-      "完全不能用 gRPC"
-    ],
-    "answer": 1,
-    "explain": "service mesh(Istio、Linkerd)的 sidecar proxy 會在 application 不知情的情況下幫雙方加上 mTLS。Application 用 <code>insecure</code> 即可,不需重複實作。少數例外:application 想額外驗 client 細節時才會自己再做一層。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

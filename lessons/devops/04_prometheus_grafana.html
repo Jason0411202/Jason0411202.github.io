@@ -39,7 +39,6 @@
       <li><a class="toc-link" href="#dashboard-as-code">Dashboard as Code</a></li>
       <li><a class="toc-link" href="#alerting">告警系統</a></li>
       <li><a class="toc-link" href="#custom-metrics">自訂業務指標</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -378,7 +377,12 @@ histogram_quantile(
       <details class="collapse">
         <summary>進階:offset、subquery、@ modifier 三招少見但很救命 <span class="collapse-tag">深入</span></summary>
         <div class="collapse-body">
-<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># 1) offset — 跟一週前同時段比</span>
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="code-block-lang">promql</span>
+              <button class="code-copy-btn" type="button">複製</button>
+            </div>
+<pre><code><span class="tk-cm"># 1) offset — 跟一週前同時段比</span>
 sum(rate(http_requests_total[5m]))
   /
 sum(rate(http_requests_total[5m] offset 1w))
@@ -390,6 +394,7 @@ max_over_time(
 
 <span class="tk-cm"># 3) @ modifier — 鎖定某個絕對時間點(對 alerting 反查很有用)</span>
 http_requests_total @ 1700000000</code></pre>
+          </div>
         </div>
       </details>
     </section>
@@ -988,75 +993,6 @@ topk(<span class="tk-num">10</span>, count by (__name__) ({__name__!=<span class
 <span class="tk-cm"># 看每個 job 的 series 量 — 哪個服務貢獻最多</span>
 topk(<span class="tk-num">10</span>, count by (job) ({__name__!=<span class="tk-st">""</span>}))</code></pre>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 5</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "Counter 跟 Gauge 最關鍵的差別是什麼?",
-    "options": [
-      "Counter 是浮點、Gauge 是整數",
-      "Counter 單調遞增(只升不降,process restart 才歸零);Gauge 可上可下",
-      "Counter 跨 instance 不能聚合,Gauge 可以",
-      "Counter 是 Prometheus 內建、Gauge 要自己寫"
-    ],
-    "answer": 1,
-    "explain": "Counter 的本質是「累積計數」,只能增加(或 process 重啟歸零),所以對 counter 才能用 <code>rate()</code> / <code>increase()</code>。Gauge 是「當前的瞬時值」,例如記憶體使用、queue 長度,可上可下,要看趨勢用 <code>avg_over_time()</code> 之類。"
-  },
-  {
-    "question": "你新加了一個 ServiceMonitor,但 Prometheus <code>/targets</code> 完全看不到它,最可能的原因?",
-    "options": [
-      "Prometheus 還沒 reload,等 5 分鐘",
-      "ServiceMonitor 的 <code>metadata.labels.release</code> 沒對到 Prometheus CR 的 <code>serviceMonitorSelector</code>",
-      "Service 沒開 NodePort",
-      "ServiceMonitor 必須跟 Prometheus 在同一個 namespace"
-    ],
-    "answer": 1,
-    "explain": "Prometheus Operator 不會把 cluster 內所有 ServiceMonitor 都吃進來,Prometheus CR 的 <code>serviceMonitorSelector</code> 只挑特定 label。kube-prometheus-stack 預設要求 <code>release: kube-prometheus-stack</code>(或對應的 helm release 名),漏寫就會被忽略。第一個排查指令永遠是 <code>kubectl get prometheus -A -o yaml | grep -A5 serviceMonitorSelector</code>。"
-  },
-  {
-    "question": "為什麼算 p95 latency 一定要 <code>sum by (le, ...)</code>?",
-    "options": [
-      "<code>le</code> 是 Prometheus 保留字,不寫會語法錯",
-      "為了減少 cardinality,讓 query 更快",
-      "<code>histogram_quantile()</code> 必須保留 <code>le</code> 標籤,它靠 bucket 邊界做線性插值算分位數",
-      "<code>by</code> 只是美化 legend,實際上不影響結果"
-    ],
-    "answer": 2,
-    "explain": "Histogram 的 bucket 是 cumulative,以 <code>le</code> 標籤標示「≤ X 秒」。<code>histogram_quantile()</code> 透過比較相鄰 bucket 的累積數來估算分位數,所以聚合時必須保留 <code>le</code>。聚掉 <code>le</code> 等於把所有 bucket 加成一個值,quantile 自然算不出來。"
-  },
-  {
-    "question": "在 kube-prometheus-stack 裡,要怎麼讓自製的 dashboard JSON 自動進 Grafana?",
-    "options": [
-      "把 JSON 放進 PVC,重啟 Grafana",
-      "用 Grafana API token 寫 CI script 推上去",
-      "包成 ConfigMap、加 label <code>grafana_dashboard: \"1\"</code>,Grafana sidecar 會自動載入",
-      "只能手動在 UI Import"
-    ],
-    "answer": 2,
-    "explain": "kube-prometheus-stack 內建的 Grafana sidecar 會監聽帶有 <code>grafana_dashboard: \"1\"</code> label 的 ConfigMap,把裡面的 JSON 自動掛載成 dashboard。配合 GitOps(Lesson 03 的 Argo CD)就能達到「PR merge → dashboard 上線」全自動。"
-  },
-  {
-    "question": "下列哪些 label 是「cardinality 災難」、絕對<strong>不</strong>該放進 metric label?(多選)",
-    "options": [
-      "<code>user_id</code> — 每個使用者的 ID",
-      "<code>request_id</code> — 每筆請求的 trace ID",
-      "<code>method</code> — HTTP method (GET / POST / DELETE 等)",
-      "完整 URL 路徑(含 path 變數,如 <code>/users/12345</code>)",
-      "<code>status</code> — HTTP 狀態碼",
-      "client IP address"
-    ],
-    "answer": [0, 1, 3, 5],
-    "explain": "Cardinality 爆炸的根源都是「值的可能組合趨近無限」:user_id / request_id 完全不重複,完整 URL 含路徑變數同樣每筆都不一樣,IP 雖有限但常見上萬。<strong>method 跟 status 是固定 enum,可放心當 label。</strong>需要 user_id / request_id 等細節請用 logs 與 tracing 系統(Lesson 05 ELK 會講),metric 只放低 cardinality 的維度。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

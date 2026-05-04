@@ -37,7 +37,6 @@
       <li><a class="toc-link" href="#hello">第一支 hello.proto</a></li>
       <li><a class="toc-link" href="#buf">認識 buf</a></li>
       <li><a class="toc-link" href="#troubleshoot">疑難排解</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -408,11 +407,17 @@ proto/
         <summary><code>protoc-gen-go: program not found or is not executable</code> <span class="collapse-tag">最常見</span></summary>
         <div class="collapse-body">
           <p><code>protoc</code> 找不到 plugin。<strong>原因 99% 是 PATH 沒有包到 <code>$(go env GOPATH)/bin</code></strong>。</p>
-          <pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;"><code><span class="tk-pn">$</span> <span class="tk-fn">go</span> env GOPATH
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="code-block-lang">bash</span>
+              <button class="code-copy-btn" type="button">複製</button>
+            </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">go</span> env GOPATH
 /Users/jason/go
 
 <span class="tk-pn">$</span> <span class="tk-fn">echo</span> <span class="tk-st">'export PATH="$PATH:$(go env GOPATH)/bin"'</span> <span class="tk-op">&gt;&gt;</span> ~/.zshrc
 <span class="tk-pn">$</span> <span class="tk-fn">source</span> ~/.zshrc</code></pre>
+          </div>
         </div>
       </details>
 
@@ -436,62 +441,6 @@ proto/
           <p>可能是 plugin 太舊或太新,生成 API 有變。<code>protoc-gen-go-grpc</code> v1.5 起改用 <code>NewClient</code> 介面,舊版生成的 stub 用 <code>NewXxxServiceClient(*grpc.ClientConn)</code>。重新 <code>go install ...@latest</code> 一次。</p>
         </div>
       </details>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "<code>protoc</code>、<code>protoc-gen-go</code>、<code>protoc-gen-go-grpc</code> 三者的關係是?",
-    "options": [
-      "三個都是 protoc 的別名,功能相同",
-      "protoc 是編譯器主程式,後兩者是 plugin。message 由 protoc-gen-go 處理,service 由 protoc-gen-go-grpc 處理",
-      "protoc-gen-go 是新版,protoc-gen-go-grpc 是舊版,可以擇一安裝",
-      "protoc 處理 Go,protoc-gen-go 處理其他語言,protoc-gen-go-grpc 處理串流"
-    ],
-    "answer": 1,
-    "explain": "<code>protoc</code> 本體用 C++ 寫,只負責解析 <code>.proto</code> 語法產生 descriptor,真正的 code 生成交給 plugin。protobuf 與 gRPC 是兩件獨立的事,所以 plugin 也分兩個 — 你可以只裝 <code>protoc-gen-go</code> 用 protobuf 序列化但不開 gRPC service。"
-  },
-  {
-    "question": "下列哪一個是 <code>protoc</code> 找不到 plugin (<code>protoc-gen-go: program not found</code>) 的<strong>最常見原因</strong>?",
-    "options": [
-      "Go 版本太舊",
-      "沒裝 protoc",
-      "<code>$(go env GOPATH)/bin</code> 沒加進 PATH 環境變數",
-      "防火牆擋住了 protoc 跟 plugin 的通訊"
-    ],
-    "answer": 2,
-    "explain": "<code>go install</code> 會把 plugin 放到 <code>$(go env GOPATH)/bin</code>。<code>protoc</code> 是用 PATH 找 <code>protoc-gen-XXX</code> 這個執行檔(對應 <code>--XXX_out</code> flag),PATH 找不到就跳這個錯。把 GOPATH/bin 加進 PATH 就好。"
-  },
-  {
-    "question": "下列關於 <code>--go_opt=paths=source_relative</code> 的描述,哪一項<strong>正確</strong>?",
-    "options": [
-      "它讓生成檔依 go_package 的完整 import path 展開到深層子資料夾",
-      "它讓生成檔放在跟 .proto 同一個資料夾,而不是依 go_package 展開",
-      "它告訴 protoc 用相對路徑找 import 的其他 .proto",
-      "它是必填 flag,沒加會編譯失敗"
-    ],
-    "answer": 1,
-    "explain": "<strong>預設</strong>(沒加這個 flag)行為才是依 <code>go_package</code> import path 展開。加上 <code>paths=source_relative</code> 後,生成檔會跟原 <code>.proto</code> 並排,小專案這樣比較好管理。<code>--go-grpc_opt</code> 也要對應加。"
-  },
-  {
-    "question": "下列哪些是 <code>buf</code> 比 <code>protoc</code> 好用的地方?(多選)",
-    "options": [
-      "用 buf.yaml 配置取代一長串命令列 flag",
-      "可以對 .proto 做 lint,強制風格一致",
-      "可以偵測 schema 的 breaking change(例如改了 field number)",
-      "可以完全取代 Go 編譯器,不需要再裝 Go"
-    ],
-    "answer": [0, 1, 2],
-    "explain": "<code>buf</code> 是 protoc 的<strong>友好封裝</strong>,提供配置、lint、breaking detection、plugin 版本管理。但它和 Go 編譯器是不同層的東西,還是需要裝 Go 才能編 .pb.go 出來的 Go 程式碼。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

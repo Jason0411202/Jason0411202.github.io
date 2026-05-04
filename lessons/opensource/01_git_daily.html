@@ -30,15 +30,13 @@
   <div class="sticky-nav-inner">
     <span class="toc-label">章節</span>
     <ul class="toc-list">
-      <li><a class="toc-link" href="#mental-model">心智模型</a></li>
-      <li><a class="toc-link" href="#daily-flow">每日工作流</a></li>
-      <li><a class="toc-link" href="#log">看歷史</a></li>
-      <li><a class="toc-link" href="#diff">看差異</a></li>
-      <li><a class="toc-link" href="#amend">修補改動</a></li>
-      <li><a class="toc-link" href="#stash">暫存</a></li>
-      <li><a class="toc-link" href="#restore">取消改動</a></li>
-      <li><a class="toc-link" href="#gitignore">.gitignore</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
+      <li><a class="toc-link" href="#mental-model">總覽</a></li>
+      <li><a class="toc-link" href="#daily-flow">基本操作</a></li>
+      <li><a class="toc-link" href="#log">git blame</a></li>
+      <li><a class="toc-link" href="#diff">git diff</a></li>
+      <li><a class="toc-link" href="#amend">git --amend 參數</a></li>
+      <li><a class="toc-link" href="#stash">git stash</a></li>
+      <li><a class="toc-link" href="#restore">git restore</a></li>
     </ul>
   </div>
 </nav>
@@ -47,7 +45,7 @@
   <article class="lesson-article">
 
     <section id="mental-model">
-      <span class="section-eyebrow">01 — 心智模型</span>
+      <span class="section-eyebrow">01 — 總覽</span>
       <h2>四個區、一張圖</h2>
       <p>Git 的所有指令幾乎都在做同一件事：<strong>把檔案在四個區之間搬來搬去</strong>。理解這張圖，你就懂 80% 的 Git 指令在幹嘛。</p>
 
@@ -111,7 +109,7 @@
     </section>
 
     <section id="daily-flow">
-      <span class="section-eyebrow">02 — 每日工作流</span>
+      <span class="section-eyebrow">02 — 基本操作</span>
       <h2>每天做事的標準節奏</h2>
       <p>無論在公司或開源專案，一天的 Git 操作會像下面這樣循環：</p>
 
@@ -223,8 +221,8 @@
     </section>
 
     <section id="log">
-      <span class="section-eyebrow">03 — 看歷史</span>
-      <h2>看 commit 歷史的三個工具</h2>
+      <span class="section-eyebrow">03 — git blame</span>
+      <h2>看 commit 歷史的兩個工具</h2>
 
       <h3>Git Graph (VSCode 擴充套件) — 視覺化分支與 commit</h3>
       <p>原始的 <code>git log</code> 在 terminal 裡看起來又長又難讀。實務上,大多數開發者會直接在 VSCode 裝 <a class="inline-link" href="https://marketplace.visualstudio.com/items?itemName=mhutchie.git-graph" target="_blank" rel="noopener">Git Graph</a> 擴充套件,用視覺化介面看歷史。</p>
@@ -261,72 +259,19 @@ e4f5a6b7 (Bob    2025-02-03 09:11:45 +0800  44)     throw new Error(<span class=
 ^a1b2c3d (Alice  2024-08-12 14:32:01 +0800  45)   }</code></pre>
       </div>
 
-      <p>找到可疑那行的 SHA 後,直接 <code>git show e4f5a6b7</code> 就能看到當時整筆 commit 的 message 跟改了什麼,線索就接起來了。SHA 開頭的 <code>^</code> 代表這行從專案最早的 commit 就存在、沒被改過。</p>
-
-      <h3>git log -p — 看歷史 + 每筆 diff</h3>
-      <div class="code-block">
-        <div class="code-block-header">
-          <span class="code-block-lang">bash</span>
-          <button class="code-copy-btn" type="button">複製</button>
-        </div>
-<pre><code><span class="tk-pn">$</span> <span class="tk-fn">git</span> log <span class="tk-op">-p</span> <span class="tk-op">--follow</span> src/auth.ts   <span class="tk-cm"># 這個檔案歷年來的所有改動 + 內容</span></code></pre>
-      </div>
-
-      <p>輸出會「一筆 commit 配一段 diff」往下排。每段 diff 開頭的 <code>@@ -10,3 +12,5 @@</code> 叫 <strong>hunk header</strong>,意思是「舊版第 10 行起的 3 行,對應新版第 12 行起的 5 行」;之後 <code>-</code> 開頭是被刪掉的、<code>+</code> 開頭是新加的、沒符號的是上下文沒動的行:</p>
-
-      <div class="code-block">
-        <div class="code-block-header">
-          <span class="code-block-lang">output</span>
-          <button class="code-copy-btn" type="button">複製</button>
-        </div>
-<pre><code>commit e4f5a6b7c8d9...
-Author: Bob &lt;bob@example.com&gt;
-Date:   Mon Feb 3 09:11:45 2025 +0800
-
-    feat(auth): require email on login
-
-diff --git a/src/auth.ts b/src/auth.ts
-index 1a2b3c4..5d6e7f8 100644
---- a/src/auth.ts
-+++ b/src/auth.ts
-@@ -42,3 +42,6 @@ export function login(user) {
-   if (!user.password) {
-     throw new Error(<span class="tk-st">"password required"</span>);
-   }
-+  if (!user.email) {
-+    throw new Error(<span class="tk-st">"email required"</span>);
-+  }
- }</code></pre>
-      </div>
-
-      <p>整個檔案的故事從最新到最舊一筆筆往下卷,適合用來追「這段邏輯是哪一次改成現在這樣的」。預設的 <code>git log</code> 在檔案被改名後只看得到改名後的歷史,加 <code>--follow</code> 會追溯改名前的內容。</p>
+      <p>找到可疑那行的 SHA 後,直接 <code>git show e4f5a6b7</code> 就能看到當時整筆 commit 的 message 跟改了什麼,線索就接起來了。SHA 開頭有 <code>^</code> 的(像上面的 <code>^a1b2c3d</code>)代表這行從專案最早的 commit 就存在、沒被改過;沒有 <code>^</code> 的(像 <code>e4f5a6b7</code>)則是後來某個 commit 才新增或修改的那行。</p>
     </section>
 
     <section id="diff">
-      <span class="section-eyebrow">04 — 看差異</span>
-      <h2><code>diff</code> 的四種模式</h2>
-      <p>Git 有四個區，所以 <code>diff</code> 自然有四種比法。能熟練切換是進階使用者的標誌。</p>
+      <span class="section-eyebrow">04 — git diff</span>
+      <h2>比較分支差異</h2>
+      <p>單檔或工作區的差異,VSCode 的 Source Control 面板直接點檔案就能看,平常不太會用 <code>git diff</code>。真正在 terminal 還會用到的場景,是<strong>比較兩個分支的整體差異</strong> —— 例如送 PR 前想確認自己這條分支跟 <code>main</code> 到底差了什麼。</p>
 
       <table>
         <thead>
           <tr><th>指令</th><th>比的是</th><th>用在哪</th></tr>
         </thead>
         <tbody>
-          <tr>
-            <td><code>git diff</code></td>
-            <td>Working Tree ↔ Staging</td>
-            <td>「我改了什麼<strong>還沒</strong> stage？」</td>
-          </tr>
-          <tr>
-            <td><code>git diff --staged</code></td>
-            <td>Staging ↔ HEAD</td>
-            <td>「commit 前再看一次這次到底要送什麼」</td>
-          </tr>
-          <tr>
-            <td><code>git diff HEAD</code></td>
-            <td>Working Tree + Staging ↔ HEAD</td>
-            <td>「我跟最後一次 commit 的全部差異」</td>
-          </tr>
           <tr>
             <td><code>git diff main..feat/x</code></td>
             <td>分支 vs 分支</td>
@@ -335,16 +280,8 @@ index 1a2b3c4..5d6e7f8 100644
         </tbody>
       </table>
 
-      <div class="callout callout-info">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong><code>--staged</code> vs <code>--cached</code></strong>
-          兩者完全等價,<code>--staged</code> 是新版的別名。看到任何文章混用不必擔心。
-        </div>
-      </div>
-
       <h3>讀懂 diff 輸出</h3>
-      <p>四種模式產生的格式都長一樣,看懂一次就能看懂全部。下面是執行 <code>git diff</code> 的典型輸出:</p>
+      <p>下面是典型的 diff 輸出:</p>
 
       <div class="code-block">
         <div class="code-block-header">
@@ -374,12 +311,10 @@ index 1a2b3c4..5d6e7f8 100644
         <li><code>@@ -10,6 +10,8 @@</code>:稱為 <strong>hunk header</strong>,意思是「舊版第 10 行起的 6 行,對應新版第 10 行起的 8 行」;後面跟著的是該函式或區塊的 context (例如 <code>export function login(user) {</code>)。</li>
         <li><code>-</code> 開頭:被刪掉的行;<code>+</code> 開頭:新加的行;<strong>沒符號的行</strong>:沒動,只是上下文方便閱讀。</li>
       </ul>
-
-      <p>如果改的是同一行 (修改 = 刪一行 + 加一行),預設輸出看起來會是兩塊紅綠分開的整行。想看「同一行內哪幾個字改了」可以加 <code>--word-diff</code>:<code>git diff --word-diff src/auth.ts</code>,變動會直接 inline 用 <code>[-舊-]{+新+}</code> 標示,改變數名或文字時特別好用。</p>
     </section>
 
     <section id="amend">
-      <span class="section-eyebrow">05 — 修補最近的改動</span>
+      <span class="section-eyebrow">05 — git --amend 參數</span>
       <h2>剛 commit 完發現少改一個地方</h2>
       <p>不要再開一個 <code>fix typo</code> 的 commit，用 <code>--amend</code> 補進上一筆：</p>
 
@@ -402,13 +337,13 @@ index 1a2b3c4..5d6e7f8 100644
         <div class="callout-icon">!</div>
         <div class="callout-body">
           <strong>已經 push 出去的 commit 不要 amend</strong>
-          <code>--amend</code> 會改變 commit 的 SHA，等於 rewrite history。如果這個 commit 已經 push、別人已經 pull 走，他們的 git 會抓狂。<strong>只有自己分支沒推出去前才能 amend。</strong>已 push 後仍要 amend 的話，請改用 <code>git push --force-with-lease</code> (Lesson 02 會說明)。
+          <code>--amend</code> 會改變 commit 的 SHA，等於 rewrite history。如果這個 commit 已經 push、別人已經 pull 走，他們的 git 會抓狂。
         </div>
       </div>
     </section>
 
     <section id="stash">
-      <span class="section-eyebrow">06 — 暫存</span>
+      <span class="section-eyebrow">06 — git stash</span>
       <h2><code>stash</code>：手邊改一半，但要切去別處救火</h2>
 
       <p>主管丟一個線上 bug 過來,你手邊有 30% 沒 commit 的工作不想丟掉,這時候就用 stash。</p>
@@ -513,7 +448,12 @@ stash@{1}: On feat/user-profile: WIP with new files
       <details class="collapse">
         <summary>進階:stash 只暫存一部分檔案 <span class="collapse-tag">深入</span></summary>
         <div class="collapse-body">
-<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># 只 stash 已 stage 的部分,working tree 的改動留著繼續寫</span>
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="code-block-lang">bash</span>
+              <button class="code-copy-btn" type="button">複製</button>
+            </div>
+<pre><code><span class="tk-cm"># 只 stash 已 stage 的部分,working tree 的改動留著繼續寫</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> stash push <span class="tk-op">--staged</span> <span class="tk-op">-m</span> <span class="tk-st">"only staged"</span>
 
 <span class="tk-cm"># 指定要 stash 哪幾個檔案</span>
@@ -521,155 +461,61 @@ stash@{1}: On feat/user-profile: WIP with new files
 
 <span class="tk-cm"># 看某筆 stash 改了什麼</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> stash show <span class="tk-op">-p</span> stash@{0}</code></pre>
+          </div>
         </div>
       </details>
     </section>
 
     <section id="restore">
-      <span class="section-eyebrow">07 — 取消改動</span>
-      <h2>用 <code>restore</code> 取消改動</h2>
+      <span class="section-eyebrow">07 — git restore</span>
+      <h2>用 <code>restore</code> 從特定 commit 還原檔案</h2>
 
-      <p>不小心改錯檔案、想把已 stage 的取消、想還原檔案到上一次 commit 的狀態 —— 全都用 <code>git restore</code>。指令名稱直接告訴你它在做什麼,不用記一堆參數。</p>
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>日常的取消改動,直接用 VSCode 的 Source Control 面板就好</strong>
+          像是「丟掉 working tree 的改動」、「把已 stage 的取消 stage」、「整個資料夾還原」這類操作,VSCode 的 Source Control 面板都有對應按鈕(改動旁邊的 <code>↶ Discard Changes</code>、<code>−</code> Unstage 等),不用記指令。terminal 真正會用到的場景,是<strong>從某個歷史 commit 把單一檔案還原回來</strong> —— 因為 GUI 對這個操作沒那麼順手。</p>
+        </div>
+      </div>
 
-      <table>
-        <thead>
-          <tr><th>想做什麼</th><th>指令</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>放棄 working tree 的改動,還原到上次 commit</td>
-            <td><code>git restore &lt;file&gt;</code></td>
-          </tr>
-          <tr>
-            <td>把已 stage 的取消 stage (改動仍保留在 working tree)</td>
-            <td><code>git restore --staged &lt;file&gt;</code></td>
-          </tr>
-          <tr>
-            <td>把整個資料夾的改動全部還原</td>
-            <td><code>git restore .</code></td>
-          </tr>
-          <tr>
-            <td>從特定 commit 還原某個檔案</td>
-            <td><code>git restore --source=&lt;commit&gt; &lt;file&gt;</code></td>
-          </tr>
-        </tbody>
-      </table>
+      <h3>從特定 commit 還原某個檔案</h3>
+      <p>場景:三天前某筆 commit 的 <code>src/auth.ts</code> 是對的,後面幾筆把它改壞了。你不想 revert 整筆 commit (會連帶其他檔案),只想<strong>把這一個檔案的內容還原成那筆 commit 當時的樣子</strong>,其他檔案不動。</p>
 
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 改錯檔案,想丟掉所有未 commit 的改動</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> restore src/auth.ts
+<pre><code><span class="tk-cm"># 語法:從指定 commit 還原某個檔案到 working tree</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> restore <span class="tk-op">--source=</span>&lt;commit&gt; &lt;file&gt;
 
-<span class="tk-cm"># 不小心 add 錯檔案,把它從 staging 拿出來</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> restore <span class="tk-op">--staged</span> src/secret.env
+<span class="tk-cm"># 例 1:把 src/auth.ts 還原成 commit a1b2c3d 當時的內容</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> restore <span class="tk-op">--source=</span>a1b2c3d src/auth.ts
 
-<span class="tk-cm"># 整個資料夾的改動全部丟掉</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> restore .</code></pre>
+<span class="tk-cm"># 例 2:還原成「上一筆 commit 的上一筆」(HEAD~2) 的版本</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> restore <span class="tk-op">--source=</span>HEAD~2 src/auth.ts
+
+<span class="tk-cm"># 例 3:還原成 main 分支當前的版本</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> restore <span class="tk-op">--source=</span>main src/config.ts</code></pre>
+      </div>
+
+      <p>執行後檔案內容就被覆蓋成指定 commit 那個時間點的樣子,接著像平常一樣 <code>git add</code> + <code>git commit</code> 就能把這次「還原」變成新的一筆 commit。整段歷史不會被改寫,team 的人 pull 下來看到的是「你新加了一筆把 auth.ts 改回去的 commit」,完全乾淨。</p>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>怎麼找到 commit SHA?</strong>
+          用前面教的 <strong>Git Graph</strong>:在 VSCode 的 Git Graph 面板裡找到目標 commit,右鍵 → <em>Copy Commit Hash to Clipboard</em>,貼到指令裡就好。也可以用 <code>git log --oneline src/auth.ts</code> 只看影響過這個檔案的歷史,SHA 就在每行最前面。
+        </div>
       </div>
 
       <div class="callout callout-warn">
         <div class="callout-icon">!</div>
         <div class="callout-body">
-          <strong><code>git restore &lt;file&gt;</code> 會直接覆蓋 working tree,改動<strong>救不回來</strong></strong>
-          確認真的不要這些改動再執行。如果只是想暫時收起來,用前面教的 <code>git stash</code>。
+          <strong>會直接覆蓋 working tree,當前未 commit 的改動會不見</strong>
+          執行前先 <code>git status</code> 確認該檔案沒有未保存的修改,或先 <code>git stash</code> 收起來。
         </div>
       </div>
-    </section>
-
-    <section id="gitignore">
-      <span class="section-eyebrow">08 — .gitignore</span>
-      <h2>絕對不能 commit 進去的東西</h2>
-
-      <p>每個專案都該在第一個 commit 就放好 <code>.gitignore</code>，避免下面這些東西不小心進入版本控制：</p>
-
-      <div class="compare-grid">
-        <div class="compare-card compare-bad">
-          <div class="compare-label"><span class="compare-icon">✗</span>絕對不能進去</div>
-          <div class="compare-body">
-            <ul style="margin:0 0 0 1rem;font-size:13px;">
-              <li><code>.env</code> / <code>.env.local</code> — 含 API key 與密碼</li>
-              <li><code>*.pem</code> / <code>id_rsa</code> — 私鑰</li>
-              <li><code>node_modules/</code> — 數萬個檔案，靠 lock 檔還原即可</li>
-              <li><code>__pycache__/</code> / <code>*.pyc</code> — Python 編譯快取</li>
-              <li><code>dist/</code> / <code>build/</code> — 編譯產出</li>
-              <li><code>.DS_Store</code> / <code>Thumbs.db</code> — 作業系統垃圾</li>
-              <li><code>.idea/</code> / <code>.vscode/</code> (團隊不共用時)</li>
-            </ul>
-          </div>
-        </div>
-        <div class="compare-card compare-good">
-          <div class="compare-label"><span class="compare-icon">✓</span>應該進去</div>
-          <div class="compare-body">
-            <ul style="margin:0 0 0 1rem;font-size:13px;">
-              <li><code>.env.example</code> — 列出有哪些變數但不寫值</li>
-              <li><code>package-lock.json</code> / <code>pnpm-lock.yaml</code> 等鎖檔</li>
-              <li><code>.gitignore</code> 本身</li>
-              <li><code>.editorconfig</code> / <code>.prettierrc</code> 等共用設定</li>
-              <li>原始碼、測試、文件</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "<code>git diff --staged</code> 比的是哪兩個區？",
-    "options": [
-      "Working Tree 跟 Staging",
-      "Staging 跟 HEAD (最後一次 commit)",
-      "Working Tree 跟 HEAD",
-      "本地分支跟遠端分支"
-    ],
-    "answer": 1,
-    "explain": "<code>--staged</code> 是看「已經 add 進去、即將 commit 的內容跟最後一次 commit 的差異」。commit 前用它再檢查一次最有效。"
-  },
-  {
-    "question": "下列哪些情境<strong>不</strong>適合用 <code>git commit --amend</code>？(多選)",
-    "options": [
-      "剛 commit 完發現 typo，還沒 push",
-      "已經 push 出去、團隊其他人已 pull 過的 commit",
-      "想把 message 改得更清楚 (commit 還在本地)",
-      "已 merge 進 main 的歷史 commit"
-    ],
-    "answer": [1, 3],
-    "explain": "<code>--amend</code> 會改變 commit 的 SHA，等於改寫歷史。<strong>已經被別人看到/拉走的 commit 改寫，會讓他們的 git 抓狂、產生分歧歷史。</strong>只在自己分支沒 push 前用。"
-  },
-  {
-    "question": "下列哪一行<strong>不該</strong>放進 .gitignore？",
-    "options": [
-      "<code>node_modules/</code>",
-      "<code>.env</code>",
-      "<code>package-lock.json</code>",
-      "<code>__pycache__/</code>"
-    ],
-    "answer": 2,
-    "explain": "鎖檔 (<code>package-lock.json</code>、<code>pnpm-lock.yaml</code>、<code>Cargo.lock</code> 等) <strong>必須</strong>進版本控制，這樣團隊每個人裝出來的依賴版本才會一致。其他三個都是該忽略的。"
-  },
-  {
-    "question": "為什麼新版 Git 推薦用 <code>git restore</code> 和 <code>git switch</code> 取代 <code>git checkout</code>？",
-    "options": [
-      "<code>checkout</code> 已經被廢除",
-      "<code>checkout</code> 同時做切分支與還原檔案兩件事，容易誤操作；新指令各司其職",
-      "新指令速度比較快",
-      "舊指令只有英文，新指令支援中文"
-    ],
-    "answer": 1,
-    "explain": "Git 2.23 (2019) 引入 <code>restore</code> / <code>switch</code> 就是為了拆解 <code>checkout</code> 的兩種職責。<code>checkout</code> 還能用，但實務上新團隊都建議用新版避免誤操作。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">
@@ -677,9 +523,7 @@ stash@{1}: On feat/user-profile: WIP with new files
       <ul class="ref-list">
         <li><a href="https://git-scm.com/docs" target="_blank" rel="noopener">git-scm.com/docs</a><span class="ref-meta">官方指令參考</span></li>
         <li><a href="https://git-scm.com/book/zh-tw/v2" target="_blank" rel="noopener">Pro Git Book (繁中版)</a><span class="ref-meta">免費官方書</span></li>
-        <li><a href="https://github.com/github/gitignore" target="_blank" rel="noopener">github/gitignore</a><span class="ref-meta">.gitignore 官方範本庫</span></li>
         <li><a href="https://github.blog/2019-08-16-highlights-from-git-2-23/" target="_blank" rel="noopener">GitHub Blog: Git 2.23 — restore / switch 介紹</a><span class="ref-meta">新指令出處</span></li>
-        <li><a href="https://docs.github.com/zh/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository" target="_blank" rel="noopener">GitHub Docs: Removing sensitive data from a repository</a><span class="ref-meta">.env 救援</span></li>
       </ul>
     </section>
 

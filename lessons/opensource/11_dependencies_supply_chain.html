@@ -38,7 +38,6 @@
       <li><a class="toc-link" href="#cve">CVE / GHSA</a></li>
       <li><a class="toc-link" href="#security-md">SECURITY.md</a></li>
       <li><a class="toc-link" href="#sbom">SBOM / SLSA</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -384,62 +383,6 @@ node_modules/axios
           <p style="margin-top:0.6rem;font-size:13px;">應用程式：<code>^</code> 或 <code>~</code> + lock file 鎖定。Library：通常用 <code>^</code> 給使用者更大彈性。</p>
         </div>
       </details>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "下列哪些是 lock file 的<strong>正確</strong>用法？(多選)",
-    "options": [
-      "鎖檔 (<code>package-lock.json</code> 等) 必須 commit 進版本控制",
-      "本地 dev 用 <code>install</code>，CI 用 <code>npm ci</code> / <code>--frozen-lockfile</code>",
-      "鎖檔太大會拖慢 git，建議放進 .gitignore",
-      "鎖檔記錄整個依賴樹的精確版本與 hash"
-    ],
-    "answer": [0, 1, 3],
-    "explain": "鎖檔絕對要 commit。CI 用 frozen 模式確保版本完全一致。把鎖檔放進 gitignore = 災難 (Lesson 01 講過這是禁忌)。"
-  },
-  {
-    "question": "2024 年 xz utils 後門事件 (CVE-2024-3094) 給我們的最大教訓是什麼？",
-    "options": [
-      "Linux 不安全",
-      "開源專案的單一維護者是攻擊者下手點，社群需要重視 critical 專案的多人維護、SBOM、artifact signing",
-      "壓縮函式庫都應該禁用",
-      "Microsoft 不該發現這個漏洞"
-    ],
-    "answer": 1,
-    "explain": "攻擊者花 2 年偽裝成善意貢獻者取得維護權後植入後門。這事件後 OpenSSF / Linux Foundation 大力推動 critical 專案的多人維護、SBOM、Sigstore 等防護。"
-  },
-  {
-    "question": "為什麼專案應該放 <code>SECURITY.md</code>？",
-    "options": [
-      "GitHub 強制要求",
-      "讓安全研究員知道發現漏洞時該找誰、怎麼通報，避免直接公開 issue (zero-day) 反而傷害使用者",
-      "增加 repo 的星星數",
-      "完全沒必要"
-    ],
-    "answer": 1,
-    "explain": "Responsible disclosure 流程的起點。沒 SECURITY.md 的話，研究員可能直接公開 issue 暴露漏洞給攻擊者。配合 GitHub Private Vulnerability Reporting 可以有完整私下協作流程。"
-  },
-  {
-    "question": "下列哪個是處理 Dependabot 自動 PR 的<strong>最佳實務</strong>？",
-    "options": [
-      "全部直接點 merge，反正 CI 過了就好",
-      "全部關掉，自己手動更新",
-      "Patch / minor 升級看 CI + 快速掃 changelog；Major 升級必看 release notes 確認 breaking change",
-      "等到出大問題才更新"
-    ],
-    "answer": 2,
-    "explain": "Bot 開的 PR 要看分級處理。CI 抓不到所有 breaking change (例如新版改了某個 hook 的副作用)，major version 升級必看 release notes。長期不更新依賴會累積到「升級 = 災難」的程度。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

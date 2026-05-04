@@ -39,7 +39,6 @@
       <li><a class="toc-link" href="#worktree">worktree</a></li>
       <li><a class="toc-link" href="#reset-revert">reset vs revert</a></li>
       <li><a class="toc-link" href="#force">force-with-lease</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -181,11 +180,17 @@
       <details class="collapse">
         <summary><code>--autosquash</code>：自動排好 fixup commit <span class="collapse-tag">技巧</span></summary>
         <div class="collapse-body">
-<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># commit 的時候用 --fixup 指定要修哪個</span>
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="code-block-lang">bash</span>
+              <button class="code-copy-btn" type="button">複製</button>
+            </div>
+<pre><code><span class="tk-cm"># commit 的時候用 --fixup 指定要修哪個</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> commit <span class="tk-op">--fixup=a1b2c3d</span>
 
 <span class="tk-cm"># 之後 rebase 時加 --autosquash，git 自動排好順序</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase <span class="tk-op">-i --autosquash</span> origin/main</code></pre>
+          </div>
           <p style="margin-top:0.6rem;font-size:13px;">這個組合在邊寫程式邊修小錯時特別省力，不用手動拖動 fixup 行到目標 commit 旁邊。</p>
         </div>
       </details>
@@ -483,7 +488,13 @@ i7j8k9l HEAD@{2}: commit: fix(profile): handle empty name
         <summary><code>rerere</code>：自動記住衝突解法 <span class="collapse-tag">技巧</span></summary>
         <div class="collapse-body">
           <p style="margin-bottom:0.5rem;">「reuse recorded resolution」— 當你在 long-running rebase 反覆解同樣的衝突，<code>rerere</code> 會記住你怎麼解的，下次自動套用。</p>
-<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-pn">$</span> <span class="tk-fn">git</span> config <span class="tk-op">--global</span> rerere.enabled <span class="tk-st">true</span></code></pre>
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="code-block-lang">bash</span>
+              <button class="code-copy-btn" type="button">複製</button>
+            </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">git</span> config <span class="tk-op">--global</span> rerere.enabled <span class="tk-st">true</span></code></pre>
+          </div>
           <p style="margin-top:0.6rem;font-size:13px;">設好就忘了它存在，但它會默默幫你省下很多重複工作。</p>
         </div>
       </details>
@@ -492,7 +503,12 @@ i7j8k9l HEAD@{2}: commit: fix(profile): handle empty name
         <summary><code>submodule</code> 救命指令 <span class="collapse-tag">深入</span></summary>
         <div class="collapse-body">
           <p style="margin-bottom:0.5rem;">submodule 是 Git 給跨 repo 依賴用的，但很多新人 clone 完發現 submodule 是空的：</p>
-<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># clone 時就把 submodule 一起拉</span>
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="code-block-lang">bash</span>
+              <button class="code-copy-btn" type="button">複製</button>
+            </div>
+<pre><code><span class="tk-cm"># clone 時就把 submodule 一起拉</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> clone <span class="tk-op">--recurse-submodules</span> &lt;repo&gt;
 
 <span class="tk-cm"># 已經 clone 了，補拉 submodule</span>
@@ -500,76 +516,10 @@ i7j8k9l HEAD@{2}: commit: fix(profile): handle empty name
 
 <span class="tk-cm"># 把所有 submodule 更新到他們各自分支的最新</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> submodule update <span class="tk-op">--remote --merge</span></code></pre>
+          </div>
           <p style="margin-top:0.6rem;font-size:13px;color:var(--muted);">如果不是必要，現代專案多用 monorepo 或 package manager 取代 submodule，比較好維護。</p>
         </div>
       </details>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 5</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "下列哪個情境<strong>應該</strong>用 <code>git rebase</code> 而非 <code>git merge</code>？",
-    "options": [
-      "把自己還沒 push 的 feature 分支同步到最新 main",
-      "把同事正在用的 develop 分支整理掉幾個 commit",
-      "把 production 釋出版本的 hotfix 合進 main",
-      "main 分支歷史的整理"
-    ],
-    "answer": 0,
-    "explain": "Golden Rule：rebase 改寫 commit SHA，不能對「別人會用到」的公開分支做。只有自己 local、還沒 push 的分支可以放心 rebase。"
-  },
-  {
-    "question": "你 <code>git reset --hard HEAD~5</code> 之後突然發現第 4 個 commit 不該丟，怎麼救？",
-    "options": [
-      "已經 reset --hard 了，沒救",
-      "<code>git reflog</code> 找回那個 SHA，再 <code>git reset --hard &lt;SHA&gt;</code>",
-      "重新從 GitHub clone 一份",
-      "<code>git pull</code> 就會回來"
-    ],
-    "answer": 1,
-    "explain": "reflog 會記錄 HEAD 的所有移動，被 reset 的 commit 還在裡面 (預設保留 90 天)。這就是為什麼很多老手不太怕 reset --hard — 只要 reflog 還在就能救。"
-  },
-  {
-    "question": "<code>git revert a1b2c3d</code> 跟 <code>git reset --hard a1b2c3d~1</code> 的最大差別是？",
-    "options": [
-      "速度不同",
-      "revert 產生一個新 commit 不改寫歷史；reset 改寫歷史",
-      "revert 只能用在 main，reset 不限",
-      "兩者完全一樣，只是別名"
-    ],
-    "answer": 1,
-    "explain": "revert 適合已 push 的公開分支 (產生新 commit 不影響別人歷史)；reset --hard 改寫歷史，只在自己未 push 前用。"
-  },
-  {
-    "question": "下列哪些是 <code>--force-with-lease</code> 比 <code>--force</code> 安全的原因？(多選)",
-    "options": [
-      "會檢查遠端是否與本地上次 fetch 看到的相符",
-      "如果同事在期間 push 了新 commit，會擋下來警告",
-      "速度比較快",
-      "完全等同 <code>--force</code>，只是名字不同"
-    ],
-    "answer": [0, 1],
-    "explain": "<code>--force-with-lease</code> 會比對「我上次看到的遠端 SHA」跟「現在的遠端 SHA」是否一致，不一致就拒推 — 這正好攔下「同事在你 rebase 期間 push 新東西」的情境。"
-  },
-  {
-    "question": "interactive rebase 中，<code>fixup</code> 跟 <code>squash</code> 都是合併 commit，差別是什麼？",
-    "options": [
-      "fixup 比較快",
-      "squash 會打開編輯器讓你寫合併後的 message；fixup 直接丟掉這個 commit 的 message",
-      "fixup 只能合併 2 個，squash 可以合併多個",
-      "完全一樣"
-    ],
-    "answer": 1,
-    "explain": "「修 typo」「修 lint」這種補丁 commit 的 message 沒保留價值，用 <code>fixup</code> 直接丟掉；如果是兩個都有意義想合成一個更大的 commit，用 <code>squash</code> 寫新 message。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

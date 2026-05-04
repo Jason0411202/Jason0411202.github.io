@@ -36,7 +36,6 @@
       <li><a class="toc-link" href="#hash-tag">Hash Tag</a></li>
       <li><a class="toc-link" href="#decision">決策樹</a></li>
       <li><a class="toc-link" href="#hands-on">動手玩</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -299,62 +298,6 @@ OK
 <span class="tk-cm"># 用 hash tag 把多個 key 綁同 slot</span>
 <span class="tk-pn">$</span> <span class="tk-fn">redis-cli</span> -p 7001 -c MSET <span class="tk-op">{u:123}</span>:a <span class="tk-num">1</span> <span class="tk-op">{u:123}</span>:b <span class="tk-num">2</span></code></pre>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "你的 Redis 有 8 GB 資料，每秒 5000 寫入。需求是「master 掛掉時能自動切換、不要人工介入」。下列哪個方案<strong>最適合</strong>？",
-    "options": [
-      "1 master + 2 replica + 3 Sentinel",
-      "Redis Cluster 6 節點 (3 master + 3 replica)",
-      "Sentinel + Cluster 同時用",
-      "單機 + 開 AOF"
-    ],
-    "answer": 0,
-    "explain": "8 GB 一台機器塞得下，需求只是 HA 而非容量擴展 — 用 Sentinel 經典 topology (1 master + 2 replica + 3 Sentinel) 最簡單。Cluster 雖然也能用但複雜度高、不必要。Cluster + Sentinel 同時用是冗餘（Cluster 自帶 failover）。單機沒 HA。"
-  },
-  {
-    "question": "下列哪些<strong>正確</strong>描述 Redis Cluster 的 hash slot？(多選)",
-    "options": [
-      "用 CRC16(key) mod 16384 決定 key 在哪個 slot",
-      "16384 是因為 bitmap 表示節點責任範圍時 = 2 KB,gossip 流量小",
-      "slot 數量可以由使用者調整",
-      "單一指令的所有 key 必須在同一個 slot"
-    ],
-    "answer": [0, 1, 3],
-    "explain": "(0)(1)(3) 正確。(2) 錯：16384 是 Redis 寫死的常數，不能調整。Hash tag <code>{}</code> 是讓你「人為控制 key 落到同 slot」的機制，但 slot 總數固定。"
-  },
-  {
-    "question": "為什麼 Redis Cluster 要區分 <code>MOVED</code> 與 <code>ASK</code> redirect？",
-    "options": [
-      "MOVED 是「永久搬到新節點」(client 應更新自己的 slot map);ASK 是「resharding 中暫時去那邊問」(下次仍連原節點)",
-      "MOVED 是寫指令、ASK 是讀指令",
-      "只是同義詞，沒有區別",
-      "MOVED 只在 master 故障時出現"
-    ],
-    "answer": 0,
-    "explain": "兩個 redirect 解決不同問題。穩定狀態下，slot 移動完畢 → MOVED；resharding 進行中、key 正在被搬 → ASK（一次性，下次仍連原節點，因為其他 key 仍在原節點）。client lib 要正確處理才能在 resharding 期間穩定服務。"
-  },
-  {
-    "question": "下列關於 Hash Tag 的敘述，哪一項<strong>錯誤</strong>？",
-    "options": [
-      "Hash tag <code>{}</code> 內的內容會被單獨拿來算 slot",
-      "Hash tag 可讓多個相關 key 落同 slot,使 multi-key 指令可行",
-      "把所有 key 都用 {global}.xxx 加 hash tag 是好做法,確保所有 key 同 slot",
-      "Hash tag 是「綁定一小撮相關 key」的工具,不該濫用"
-    ],
-    "answer": 2,
-    "explain": "(2) 錯。如果所有 key 都用 <code>{global}.xxx</code>,所有資料會塞在同一個 slot、同一個 master,等於完全沒分片。其他三項都正確。Hash tag 應該只用於「真的需要原子操作」的相關 key 群（例如 user:123 的多個欄位）。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

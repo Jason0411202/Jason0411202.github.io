@@ -38,7 +38,6 @@
       <li><a class="toc-link" href="#semver">Semantic Versioning</a></li>
       <li><a class="toc-link" href="#changelog">Keep a Changelog</a></li>
       <li><a class="toc-link" href="#tools">自動化工具</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -283,12 +282,18 @@ Closes #999</code></pre>
       <details class="collapse">
         <summary>預發布版本 + Build metadata <span class="collapse-tag">深入</span></summary>
         <div class="collapse-body">
-<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;">2.0.0-alpha.1     ← 早期測試
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="code-block-lang">semver</span>
+              <button class="code-copy-btn" type="button">複製</button>
+            </div>
+<pre><code>2.0.0-alpha.1     ← 早期測試
 2.0.0-beta.3      ← 公測
 2.0.0-rc.1        ← release candidate (即將正式)
 2.0.0             ← 正式
 
-1.4.5+exp.sha.5114f85   ← + 後是 build metadata，<strong>不影響版本順序</strong></pre>
+1.4.5+exp.sha.5114f85   ← + 後是 build metadata，不影響版本順序</code></pre>
+          </div>
           <p style="margin-top:0.6rem;font-size:13px;">預發布版本排序：alpha &lt; beta &lt; rc &lt; (正式)。</p>
         </div>
       </details>
@@ -415,73 +420,6 @@ All notable changes to this project will be documented in this file.
           <p>實務上，<strong>Conventional Commits 是 2026 的事實標準</strong>，幾乎所有自動化工具都讀這個格式。</p>
         </div>
       </details>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 5</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "下列哪個 commit message 寫得<strong>最符合</strong> Conventional Commits？",
-    "options": [
-      "<code>fix bug</code>",
-      "<code>FIX: profile bug.</code>",
-      "<code>fix(profile): handle null avatar URL</code>",
-      "<code>修了 profile 的 bug</code>"
-    ],
-    "answer": 2,
-    "explain": "格式：<code>type(scope): subject</code>。type 小寫、有 scope 標明影響範圍、subject 用祈使句、結尾不加句點。"
-  },
-  {
-    "question": "你目前版號是 1.4.5，這次釋出含一個新功能 + 兩個 bug fix，下一版應該是？",
-    "options": [
-      "1.4.6",
-      "1.5.0",
-      "2.0.0",
-      "1.5.5"
-    ],
-    "answer": 1,
-    "explain": "新功能 = MINOR +1、bug fix = PATCH +1，但同一次 release 取最高的，所以 MINOR +1 = 1.5.0。注意 PATCH 要重設為 0。"
-  },
-  {
-    "question": "下列哪些是<strong>正確</strong>標記 BREAKING CHANGE 的方式？(多選)",
-    "options": [
-      "<code>feat(api)!: drop Node 16</code> (subject 後加驚嘆號)",
-      "在 footer 寫 <code>BREAKING CHANGE: ...</code>",
-      "在 commit message 開頭加 [BREAKING]",
-      "全部用大寫字母寫 message"
-    ],
-    "answer": [0, 1],
-    "explain": "Conventional Commits 規範只承認兩種：<code>!</code> 標記在 type/scope 後、或 footer 寫 <code>BREAKING CHANGE:</code>。其他寫法工具不認得。"
-  },
-  {
-    "question": "Keep a Changelog 規格固定的六種分類<strong>不</strong>包含？",
-    "options": [
-      "Added",
-      "Refactored",
-      "Deprecated",
-      "Security"
-    ],
-    "answer": 1,
-    "explain": "六種分類：Added / Changed / Deprecated / Removed / Fixed / Security。Refactored 不是其中之一 — 重構通常不寫進 changelog (對使用者沒有可見影響)。"
-  },
-  {
-    "question": "為什麼要嚴格遵守 Semantic Versioning？",
-    "options": [
-      "因為 Git 強制要求",
-      "因為使用者的 dependency 設定 (例如 <code>^1.4.0</code>) 假設你不會在小版本偷塞 breaking change，違反會炸到下游",
-      "為了讓版號好看",
-      "完全沒理由，只是慣例"
-    ],
-    "answer": 1,
-    "explain": "<code>^1.4.0</code> 表示「自動接受 1.x.y 任何更新」。如果作者在 1.4.5 偷塞 breaking change，所有下游 npm install 後都會炸。SemVer 是生態系運作的契約。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

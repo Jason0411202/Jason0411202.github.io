@@ -38,7 +38,6 @@
       <li><a class="toc-link" href="#dashboards">Dashboard</a></li>
       <li><a class="toc-link" href="#alerting">Alerting</a></li>
       <li><a class="toc-link" href="#production-ops">Production 維運</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -437,7 +436,12 @@ status:(500 OR 502 OR 503 OR 504)</code></pre>
       <details class="collapse">
         <summary>KQL 進階技巧 cheat sheet <span class="collapse-tag">深入</span></summary>
         <div class="collapse-body">
-<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># nested 欄位（k8s metadata 通常是 nested）</span>
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="code-block-lang">kql</span>
+              <button class="code-copy-btn" type="button">複製</button>
+            </div>
+<pre><code><span class="tk-cm"># nested 欄位（k8s metadata 通常是 nested）</span>
 kubernetes.labels.app:<span class="tk-st">"&lt;app&gt;"</span>
 
 <span class="tk-cm"># 多值欄位 array contain</span>
@@ -458,6 +462,7 @@ latency_ms:{100 TO 500}      <span class="tk-cm"># exclusive</span>
 
 <span class="tk-cm"># 判斷欄位「不存在」</span>
 NOT request_id:*</code></pre>
+          </div>
         </div>
       </details>
     </section>
@@ -800,7 +805,12 @@ DELETE &lt;app&gt;-test-2026.04.28</code></pre>
       <details class="collapse">
         <summary>常用 ES API cheat sheet <span class="collapse-tag">深入</span></summary>
         <div class="collapse-body">
-<pre style="background:#f5f4f0;padding:0.8rem;border-radius:8px;font-size:13px;line-height:1.6;"><code><span class="tk-cm"># 看 node / shard 分佈</span>
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="code-block-lang">es-api</span>
+              <button class="code-copy-btn" type="button">複製</button>
+            </div>
+<pre><code><span class="tk-cm"># 看 node / shard 分佈</span>
 GET _cat/nodes?v
 GET _cat/shards/&lt;app&gt;-*?v
 
@@ -824,6 +834,7 @@ POST &lt;app&gt;-*/_search
 <span class="tk-cm"># 改一個 index 的 number_of_replicas (省成本)</span>
 PUT &lt;app&gt;-2026.04.27/_settings
 { <span class="tk-st">"index.number_of_replicas"</span>: 0 }</code></pre>
+          </div>
         </div>
       </details>
 
@@ -837,62 +848,6 @@ PUT &lt;app&gt;-2026.04.27/_settings
           DevOps 不是工具堆疊，是 feedback loop。<strong>願你之後每次 push code，都有信心。</strong>
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "為什麼建議應用程式輸出 <strong>JSON 格式</strong>的 log，而不是純文字？",
-    "options": [
-      "JSON 比較好看",
-      "JSON 寫進 ES 後欄位會有型別，能做 range 查詢、聚合與 p95 之類的指標計算",
-      "JSON 比純文字檔案小",
-      "Fluent Bit 不支援純文字"
-    ],
-    "answer": 1,
-    "explain": "純文字 log 在 ES 裡只是一坨 <code>message</code> 字串。JSON 讓 ES 自動建 mapping，<code>status</code> 變 int、<code>latency_ms</code> 變 float，於是可以下 <code>status &gt;= 500</code>、可以對 <code>latency_ms</code> 算 percentile 95。Fluent Bit 純文字也能收，只是收完 ES 那邊看不出結構。"
-  },
-  {
-    "question": "想用 KQL 找所有 5xx，下列哪一個寫法<strong>正確</strong>？",
-    "options": [
-      "<code>status:5*</code>",
-      "<code>status >= 500</code>",
-      "<code>status:\"5xx\"</code>",
-      "<code>http.status:500*</code>"
-    ],
-    "answer": 1,
-    "explain": "<code>status</code> 在 mapping 裡是數字 (long / integer)，<strong>wildcard 只能用在 keyword/text 欄位</strong>。要找 500 - 599，只能寫 range：<code>status &gt;= 500</code>。或是 <code>status:(500 OR 502 OR 503 OR 504)</code> 列舉常見幾個。"
-  },
-  {
-    "question": "「日誌都沒出來」的標準三步排錯，<strong>第一步</strong>該檢查什麼？",
-    "options": [
-      "Kibana Data View 是不是 refresh field list 過了",
-      "ES 集群 cluster health 是不是 green",
-      "Fluent Bit DaemonSet 的 pod 是不是 Running，常見 CrashLoopBackOff 是 ConfigMap 寫錯",
-      "Slack connector 設定對不對"
-    ],
-    "answer": 2,
-    "explain": "管線最上游的搬運工是 Fluent Bit。Fluent Bit 死了，後面再怎麼配置都沒 log。九成「沒 log」死在這層；用 <code>kubectl -n logging get pods -l app=fluent-bit</code> 一秒看清楚。CrashLoopBackOff 多半是 ConfigMap YAML 縮排錯或 output endpoint 錯。"
-  },
-  {
-    "question": "ILM 三個典型階段中，下列哪些動作是<strong>可以</strong>做的？(多選)",
-    "options": [
-      "hot 階段：當 index 達到 50GB 或 1 天就 rollover 切新 index",
-      "warm 階段：降 replica 數量、force merge、移到便宜的 storage",
-      "delete 階段：把超過 30/60/90 天的老 index 刪掉",
-      "ILM 不能控制 replica 數量，只能 rollover"
-    ],
-    "answer": [0, 1, 2],
-    "explain": "ILM 把 index 的生命分成 hot / warm / cold / delete 四個階段。<strong>hot 階段做 rollover</strong>（達到大小或天數就切新 index）、<strong>warm 階段做降級</strong>（replica 從 2 降到 1、force merge 成一個 segment、搬到便宜 node）、<strong>delete 階段</strong>就是刪除。第四個選項錯：ILM 完全可以控制 replica。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

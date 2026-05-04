@@ -37,7 +37,6 @@
       <li><a class="toc-link" href="#actions">三種 review 結論</a></li>
       <li><a class="toc-link" href="#suggested">Suggested changes</a></li>
       <li><a class="toc-link" href="#codeowners">CODEOWNERS</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -344,62 +343,6 @@ const handleSubmit = async (event) =&gt; {
           <p><strong>Review fatigue 對策</strong>：① 一次 review 上限 60 分鐘 / 400 行 ② 大 PR 拆小 ③ reviewer rotation 不要永遠同幾個人 ④ 自動化 (linter / CI) 處理機械性檢查，讓人類 review 集中在真正重要的東西。</p>
         </div>
       </details>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "下列哪個<strong>不是</strong> code review 的主要目的？",
-    "options": [
-      "維護程式碼品質與可讀性",
-      "知識共享 (至少 2 個人懂這段程式碼)",
-      "把關 / 審判 author 的能力",
-      "建立團隊一致的程式碼風格與規範"
-    ],
-    "answer": 2,
-    "explain": "Reviewer 是 author 的合作者，不是審判者。「把關 / 審判」心態會破壞團隊文化、降低 PR 流速。Google Eng Practices 把 review 定義成知識共享 + 品質維護，不是審查。"
-  },
-  {
-    "question": "Reviewer 看完 PR 覺得只有風格上小問題，沒有實質錯誤。最佳做法是？",
-    "options": [
-      "Request changes，要求 author 全部修完",
-      "Approve，並用 nit: prefix 留下建議",
-      "故意不回應，讓 PR 卡著",
-      "Comment 一堆問題但不 approve 也不 request"
-    ],
-    "answer": 1,
-    "explain": "Request changes 留給真正 blocking 的問題。純風格 / nit 級別的建議用 Approve + nit: comment 比較好 — author 可以選擇採納，也不會擋住合併。"
-  },
-  {
-    "question": "Conventional Comments 的 <code>nit:</code> prefix 代表什麼？",
-    "options": [
-      "Must-fix，必須改",
-      "Nitpick，雞蛋裡挑骨頭，可選",
-      "Bug，發現的錯誤",
-      "New idea，新想法"
-    ],
-    "answer": 1,
-    "explain": "<code>nit:</code> 來自 nitpick (吹毛求疵)，明確標記「這個建議很小、可以不修也能合併」。對 author 是清楚的訊號 = 不要為這個重新跑一輪 review。"
-  },
-  {
-    "question": "下列哪些是 <code>CODEOWNERS</code> 檔案的好處？(多選)",
-    "options": [
-      "PR 改到特定目錄時自動指派 reviewer",
-      "搭配 branch protection 強制相關專家必須 review",
-      "完全取代 code review 流程",
-      "讓 maintainer 不用記哪些人懂哪些區域的程式碼"
-    ],
-    "answer": [0, 1, 3],
-    "explain": "CODEOWNERS 是把「哪個區域該找誰 review」自動化，但 review 流程本身還是要靠人。它<strong>強化</strong> review 流程，不是<strong>取代</strong>。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

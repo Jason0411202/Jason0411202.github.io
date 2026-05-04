@@ -37,7 +37,6 @@
       <li><a class="toc-link" href="#anti">反模式</a></li>
       <li><a class="toc-link" href="#metrics">關鍵指標</a></li>
       <li><a class="toc-link" href="#prod">Production 工具</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -376,62 +375,6 @@ redis.call(<span class="tk-st">'PEXPIRE'</span>, KEYS[1], window)
           走完這 6 堂後，你應該能：用 redis-cli 操作所有常見資料結構、看著 INFO 排查問題、選擇正確的 cache 模式、避開 KEYS *・big key・hot key、知道何時該選 Sentinel / Cluster、判斷向量場景該用 Redis Vector Set 還是 ES/Pinecone。<em>把這套放進 stockbot 的真實服務,Redis 該幫忙的地方就會清楚浮現。</em>
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "你的 cache 在每天凌晨 3 點(服務每天的 batch 重啟時)會出現 DB QPS 暴衝。最可能的原因與最直接解法是？",
-    "options": [
-      "Cache penetration ↔ 用 Bloom filter",
-      "Cache breakdown ↔ 用 distributed lock",
-      "Cache avalanche(大量 key 同時 TTL 過期) ↔ TTL 加隨機抖動 ±10%",
-      "Big key ↔ 把 key 拆小"
-    ],
-    "answer": 2,
-    "explain": "「服務重啟後同時寫入 → TTL 同時到期」是經典 Cache Avalanche 場景。最直接的解法是 TTL 加隨機抖動,讓過期分散在一段時間內。配合多級 cache、Redis HA 是進階防線。其他三個選項對應不同問題:penetration 是查不存在的 key、breakdown 是單一熱 key 過期、big key 是單 value 太大。"
-  },
-  {
-    "question": "下列關於分散式 lock 的敘述,哪些<strong>正確</strong>?(多選)",
-    "options": [
-      "單機 SET key value NX PX 30000 對 99% 場景已經夠用",
-      "釋放 lock 必須用 Lua 原子比對 value 後再 DEL,否則可能誤刪別人的 lock",
-      "Redlock 跨多機 Redis,Kleppmann 認為它對時鐘同步的依賴不可靠;實務真強互斥場景應改用 fencing token",
-      "value 可以是固定字串 (如 'locked')"
-    ],
-    "answer": [0, 1, 2],
-    "explain": "(0)(1)(2) 正確。(3) 錯：value 必須是<strong>隨機 unique value</strong>（如 UUID）— 否則釋放時無法分辨「這個 lock 是不是我拿的」,可能誤刪別人 lock 過期後重拿的同名 key。"
-  },
-  {
-    "question": "你發現 production Redis 的 <code>used_memory_rss / used_memory</code> 是 2.3,持續一段時間。這代表？",
-    "options": [
-      "資料佔用的記憶體比 OS 看到的多",
-      "記憶體碎片率高(物理記憶體用了 2.3 倍邏輯資料量),建議啟用 ACTIVE DEFRAG",
-      "Redis 已經 OOM",
-      "正常現象不用處理"
-    ],
-    "answer": 1,
-    "explain": "<code>mem_fragmentation_ratio</code> = used_memory_rss / used_memory。&gt; 1.5 表示碎片率高 — 物理 RAM 比邏輯資料量多很多。原因常是大量 key 寫入、刪除後留下無法被新分配利用的 holes。Redis 4.0+ 內建 ACTIVE DEFRAG (CONFIG SET activedefrag yes) 可線上整理。 &gt; 2.5 是緊急訊號。"
-  },
-  {
-    "question": "你接到緊急電話「production Redis 卡住了,所有 client timeout」。下列哪些是合理的<strong>第一步排查</strong>動作？(多選)",
-    "options": [
-      "看 slowlog (SLOWLOG GET 50) - 找正在跑的或剛跑過的長指令",
-      "立即 KEYS * 看資料量",
-      "看 INFO clients - 看是否有 blocked_clients 飆升",
-      "看 redis-cli --bigkeys - 找 big key"
-    ],
-    "answer": [0, 2],
-    "explain": "(0)(2) 是現場排查首要動作:slowlog 抓正在/剛跑的長指令(可能就是 KEYS、SUNIONSTORE 等);blocked_clients 飆升代表很多 client 在等(可能是 BLPOP / WAIT)。(1) 大忌:KEYS * 在 production 卡住時下,只會讓情況更慘 — 它本身就是經典反模式。(4) --bigkeys 會掃整個 keyspace,production 卡住時會雪上加霜,等危機過後再做。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

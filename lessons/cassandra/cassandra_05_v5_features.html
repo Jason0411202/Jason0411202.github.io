@@ -37,7 +37,6 @@
       <li><a class="toc-link" href="#ucs">UCS</a></li>
       <li><a class="toc-link" href="#capacity">10TB / Node</a></li>
       <li><a class="toc-link" href="#hands-on">動手玩</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -292,62 +291,6 @@ cqlsh:stockbot&gt; <span class="tk-kw">INSERT INTO</span> users_pii (id, email)
 cqlsh:stockbot&gt; <span class="tk-kw">SELECT</span> email <span class="tk-kw">FROM</span> users_pii;
 <span class="tk-cm">-- ja*************om   (除非 GRANT UNMASK)</span></code></pre>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "為什麼 Vector Search 用 <code>ORDER BY ... ANN OF [...]</code> 而不是 <code>WHERE embedding = [...]</code>？",
-    "options": [
-      "WHERE 子句不能用 vector 型態",
-      "ANN 查的是「最相似的前 N 個」是排序問題,不是相等問題",
-      "ANN 是 SQL 標準語法",
-      "因為 vector 型態太大,不能放在 WHERE"
-    ],
-    "answer": 1,
-    "explain": "ANN (Approximate Nearest Neighbor) 本質是「給我跟這個 query vector 最相似的前 N 個」 — 這是排序需求，不是「找等於某值」。所以放在 ORDER BY 並搭配 LIMIT N。寫成 WHERE 在語意上也說不通（沒有兩個 vector 會剛好相等）。"
-  },
-  {
-    "question": "下列哪些是 SAI 相對於傳統 secondary index (2i) 的優勢？(多選)",
-    "options": [
-      "與 SSTable 一起 flush / compact / drop,運維更乾淨",
-      "支援多種型態 (text/numeric range/collection/vector) 一個機制全包",
-      "查詢時可組合多個 SAI",
-      "SAI 完全沒有跨節點 scatter-gather 的成本"
-    ],
-    "answer": [0, 1, 2],
-    "explain": "(0)(1)(2) 都是 SAI 的真實優勢。(4) 錯：跨 partition 的 SAI 查詢仍是 scatter-gather (要問每個節點),這是分散式索引的本質。SAI 的優勢在於<em>單 SSTable 內</em>的索引效率高 + 機制統一，但要避免「無 partition key 又用 SAI 大量查詢」這種反模式。"
-  },
-  {
-    "question": "你升級了一個 4.x 叢集到 5.0，下列哪一項<strong>正確</strong>？",
-    "options": [
-      "原有的表會自動切到 UCS 並啟用 SAI",
-      "舊表的 compaction 策略不變,新建表預設 UCS;SAI 要明確 CREATE INDEX",
-      "所有 secondary index 自動升級為 SAI",
-      "升級後資料會被 re-encode"
-    ],
-    "answer": 1,
-    "explain": "Cassandra 升級<strong>不自動改既有表的設定</strong> — 設計上很保守。你升完版本後，舊表 compaction 仍是原來的策略；要切 UCS 要手動 ALTER。SAI 也是要明確 CREATE INDEX，不會自動把舊 2i 升級。這是為了避免升級造成預期外的行為改變。"
-  },
-  {
-    "question": "下列關於 Dynamic Data Masking 的敘述，哪一項<strong>錯誤</strong>？",
-    "options": [
-      "原始資料仍是明文儲存,只是查詢時依角色決定回傳是否遮罩",
-      "可以用 GRANT UNMASK 授予特定 role 看原始值",
-      "可避免 application 層忘記做 PII 遮罩",
-      "DDM 同時加密了磁碟資料,即使有人偷檔案也看不到原始值"
-    ],
-    "answer": 3,
-    "explain": "(3) 錯。DDM 是 <em>查詢時遮罩</em>，原始資料仍以明文儲存於 SSTable 與 commit log。要做 at-rest 加密請另用 Transparent Data Encryption (TDE)。DDM 解決的是「應用層或 BI 工具 join 時不該看到的人別看到」，不是儲存層加密。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

@@ -38,7 +38,6 @@
       <li><a class="toc-link" href="#index-options">索引選擇</a></li>
       <li><a class="toc-link" href="#anti">反模式</a></li>
       <li><a class="toc-link" href="#hands-on">動手玩</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -423,62 +422,6 @@
         <li><code>SELECT * FROM price_by_symbol WHERE ts &gt; '2026-04-27' ALLOW FILTERING;</code> ← 加上才允許，但是反模式</li>
         <li><code>SELECT * FROM price_by_symbol WHERE symbol='TSLA' AND price &gt; 280;</code> ← 沒 SAI 不行（5.0 可加 SAI 索引讓它變可行，C-05 講）</li>
       </ul>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "你要設計一張表存「每個用戶的所有訂單」，最常見查詢是「給我 user_id=X 最近 50 筆訂單」。下列哪一個 PK 設計<strong>最適合</strong>？",
-    "options": [
-      "PRIMARY KEY ((order_id))，再加 secondary index 在 user_id",
-      "PRIMARY KEY ((user_id), created_at, order_id) 並 ORDER BY created_at DESC",
-      "PRIMARY KEY ((user_id, order_id), created_at)",
-      "PRIMARY KEY ((created_at), user_id, order_id)"
-    ],
-    "answer": 1,
-    "explain": "最常見的查詢是「按 user_id 取最近 N 筆」 → user_id 當 partition key（同一 user 在同一節點）、created_at DESC 當 clustering key（最新優先、範圍取便宜）。(0) 用 secondary index 對熱點查詢效能差。(2) 把 user_id+order_id 都當 partition key 表示「指定一筆」才能 query，無法列表。(3) 按 created_at 分 partition 會跨多個 partition fan-out。"
-  },
-  {
-    "question": "下列哪些是 Cassandra 經典的<strong>反模式</strong>？(多選)",
-    "options": [
-      "把同一筆資料寫到 3 張不同設計的表（反正規化）",
-      "用 ALLOW FILTERING 做生產 query",
-      "讓單一 partition 累積數年資料，size 突破 1 GB",
-      "用 IN 子句一次帶 1000 個 partition key"
-    ],
-    "answer": [1, 2, 3],
-    "explain": "(0) 反正規化是 Cassandra 的<em>正確做法</em>，不是反模式。(1)(2)(3) 都是經典地雷：ALLOW FILTERING 等於宣告全表掃；unbounded partition 讀取暴慢；無界 IN 讓 coordinator 對上千 partition fan-out 容易超時。"
-  },
-  {
-    "question": "為什麼 Cassandra 5.0+ 推薦用 <strong>SAI</strong> 而不是傳統 secondary index (2i) 或 Materialized View？",
-    "options": [
-      "SAI 是與儲存引擎深度整合的索引，效能與彈性遠高於 2i；MV 有 race condition 與運維坑",
-      "2i 已經完全廢棄不能用",
-      "Materialized View 不支援多欄位",
-      "SAI 是付費功能，所以較強"
-    ],
-    "answer": 0,
-    "explain": "SAI（Storage-Attached Index）是 5.0 引入的新索引機制，與 SSTable / memtable 整合，可在大叢集穩定運作。2i 仍可用但跨大叢集 scatter-gather 效能差。MV 自 3.x 引入但<em>歷來有 race / 一致性問題</em>，社群多建議走應用層反正規化。SAI 是 OSS 功能，不需付費。"
-  },
-  {
-    "question": "看到下面這個 query，最大的問題是什麼？<br><code>SELECT * FROM events WHERE symbol IN ('AAPL', 'TSLA', ..., 共 800 個);</code>",
-    "options": [
-      "IN 子句語法錯誤",
-      "Cassandra 不支援 IN",
-      "coordinator 要對 800 個 partition fan-out 並聚合，極可能超時並拖慢叢集",
-      "IN 只能放數字"
-    ],
-    "answer": 2,
-    "explain": "IN 子句語法可用，但<strong>數量太大</strong>是 Cassandra 經典反模式。coordinator 要對每個 partition key 都發 read（800 個 partition、可能跨多台），收齊全部才能回 client。實務做法是<em>應用層自己拆成 N 條並行 query</em>（client driver 也可幫忙）。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">

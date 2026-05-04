@@ -36,7 +36,6 @@
       <li><a class="toc-link" href="#header-trailer">Header / Trailer</a></li>
       <li><a class="toc-link" href="#deadline">Deadline</a></li>
       <li><a class="toc-link" href="#cancel">Cancellation</a></li>
-      <li><a class="toc-link" href="#quiz">章末測驗</a></li>
     </ul>
   </div>
 </nav>
@@ -330,62 +329,6 @@ resp, err := client.SayHello(ctx, &amp;pb.HelloRequest{Name: <span class="tk-st"
           官方文件直白警告:<em>「Changes made before a cancellation are not rolled back.」</em> Cancellation 只代表「不再做新事」,已經寫進 DB 的東西<strong>不會自動回滾</strong>。如果你的 handler 中途寫了 DB 才被 cancel,要嘛用 transaction、要嘛接受可能有部分變更。
         </div>
       </div>
-    </section>
-
-    <section id="quiz" class="quiz-section">
-      <div class="quiz-header">
-        <div class="quiz-title">章末測驗</div>
-        <div class="quiz-progress">已答 <span>0 / 4</span></div>
-      </div>
-      <div class="quiz-list"></div>
-      <script type="application/json" id="quiz-data">
-[
-  {
-    "question": "Service A 收到 ctx (deadline 還剩 1.8 秒),要呼叫下游 Service B。下列做法<strong>正確</strong>的是?",
-    "options": [
-      "用 <code>context.Background()</code> 呼叫,讓 B 重新計算自己的 deadline",
-      "把上游 ctx 直接傳給 B,deadline 會自動 propagate(B 拿到的是剩餘時間)",
-      "重新 <code>WithTimeout(ctx, 5*time.Second)</code> 把 deadline 拉長一點",
-      "用 <code>ctx.Value()</code> 把 deadline 包成新的 ctx 傳"
-    ],
-    "answer": 1,
-    "explain": "<strong>把 ctx 原封不動傳下去</strong>是 gRPC 設計上的最佳實踐。Background 會丟失 deadline+cancellation;<code>WithTimeout(ctx, 5s)</code> 在 ctx 剩 1.8s 時也只剩 1.8s(WithTimeout 取較小者),但這樣寫毫無意義且容易誤導讀者。"
-  },
-  {
-    "question": "下列關於 metadata key 的描述,哪一項<strong>錯誤</strong>?",
-    "options": [
-      "key 大小寫不敏感",
-      "key 不能以 <code>grpc-</code> 開頭(該前綴 gRPC 自用)",
-      "傳二進位 value 時 key 必須以 <code>-bin</code> 結尾",
-      "同一個 key 只能對應一個 value"
-    ],
-    "answer": 3,
-    "explain": "metadata 是 <code>map[string][]string</code>,<strong>同 key 可有多 value</strong>。<code>md.Get(\"k\")</code> 回傳 <code>[]string</code>。其他三項描述都正確。"
-  },
-  {
-    "question": "Server 端在長時間 handler 裡,用什麼模式檢查 client 是否已取消?",
-    "options": [
-      "定期 <code>time.Sleep</code> 然後查 <code>ctx.Done()</code>",
-      "<code>if err := ctx.Err(); err != nil { return status.FromContextError(err).Err() }</code> 或 <code>select { case &lt;-ctx.Done(): ... }</code>",
-      "<code>if ctx == nil { ... }</code>",
-      "用全域變數 atomic 標記 cancellation"
-    ],
-    "answer": 1,
-    "explain": "正確模式是檢查 <code>ctx.Err()</code> 或 select <code>ctx.Done()</code>。<code>status.FromContextError</code> 把 <code>context.Canceled</code> / <code>context.DeadlineExceeded</code> 自動對應到正確的 gRPC status code。"
-  },
-  {
-    "question": "Client streaming 中,client 想送 authorization header,正確做法是?",
-    "options": [
-      "把 token 塞到 request message 的某個欄位",
-      "<code>ctx = metadata.AppendToOutgoingContext(ctx, \"authorization\", \"Bearer \"+token)</code>,再用這個 ctx 呼叫 RPC",
-      "用 <code>ctx.Value(\"token\", token)</code>",
-      "在 request message 加一個 <code>repeated string headers</code> 欄位"
-    ],
-    "answer": 1,
-    "explain": "認證 token、trace id 等橫切性資料應透過 metadata 傳遞,而非污染 message schema。用 <code>metadata.AppendToOutgoingContext</code> 是慣用做法,server 用 <code>metadata.FromIncomingContext</code> 取出。"
-  }
-]
-      </script>
     </section>
 
     <section class="references">
