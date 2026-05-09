@@ -31,8 +31,6 @@
     <span class="toc-label">章節</span>
     <ul class="toc-list">
       <li><a class="toc-link" href="#rebase">rebase</a></li>
-      <li><a class="toc-link" href="#interactive">互動 rebase</a></li>
-      <li><a class="toc-link" href="#rebase-vs-merge">rebase vs merge</a></li>
       <li><a class="toc-link" href="#cherry-pick">cherry-pick</a></li>
       <li><a class="toc-link" href="#reflog">reflog</a></li>
       <li><a class="toc-link" href="#bisect">bisect</a></li>
@@ -111,7 +109,7 @@
             <text x="680" y="160" fill="#7c3aed" font-size="10">Y'</text>
 
             <text x="560" y="280" text-anchor="middle" fill="#6b6b7e" font-size="11">X、Y 重新建立成 X'、Y' (新 SHA)</text>
-            <text x="560" y="298" text-anchor="middle" fill="#ff3d1f" font-size="11" font-weight="700">SHA 改變 = 改寫歷史 = 不能對公開分支做</text>
+            <text x="560" y="298" text-anchor="middle" fill="#ff3d1f" font-size="11" font-weight="700">SHA 改變 = 改寫歷史 = 別人在用的分支不要做</text>
           </g>
         </svg>
         <div class="diagram-caption">圖 2.1 — rebase 把 X、Y 重新接到最新 main 後面</div>
@@ -133,13 +131,12 @@
 <span class="tk-cm"># 不想繼續了 (回到 rebase 前狀態)</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase <span class="tk-op">--abort</span></code></pre>
       </div>
-    </section>
 
-    <section id="interactive">
-      <span class="section-eyebrow">02 — interactive rebase</span>
-      <h2>互動式 rebase：整理自己的歷史</h2>
+      <h3>互動式 rebase：整理自己的 commit 歷史</h3>
 
-      <p>送 PR 前最常用 — 把混亂的 commit 整理成乾淨的故事。</p>
+      <p><strong>這是 rebase 的另一個用法，跟前面「移植分支」是完全不同的場景。</strong>前面的 <code>git rebase main</code> 是把分支接到別的 base；這裡的 <code>git rebase -i</code> 是針對<strong>同一條分支上自己的 commit</strong>做修改 —— 合併、改 message、刪掉、重排順序。共通點只是底層都會「重新建立 commit」這個動作。</p>
+
+      <p>送 PR 前最常用 — 把混亂的 commit 整理成乾淨的故事。<span style="color:#6b6b7e;">（如果只想改最新一個 commit，用 <code>git commit --amend</code> 更快；rebase -i 是處理更早或一次多個 commit 的版本。）</span></p>
 
       <div class="code-block">
         <div class="code-block-header">
@@ -196,49 +193,8 @@
       </details>
     </section>
 
-    <section id="rebase-vs-merge">
-      <span class="section-eyebrow">03 — Golden Rule</span>
-      <h2><code>rebase</code> vs <code>merge</code>：黃金守則</h2>
-
-      <div class="callout callout-danger">
-        <div class="callout-icon">!</div>
-        <div class="callout-body">
-          <strong>The Golden Rule of Rebasing</strong>
-          <strong>不要對「已經 push 到別人會用的公開分支」做 rebase。</strong>因為 rebase 會改寫 commit SHA，等於從別人的角度看歷史突然變了，他們的本地 git 會迷路。
-        </div>
-      </div>
-
-      <table>
-        <thead>
-          <tr><th>情境</th><th>該用</th><th>原因</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>只有自己用的 feature branch，要跟上 main</td>
-            <td><code>rebase</code></td>
-            <td>歷史線性、乾淨</td>
-          </tr>
-          <tr>
-            <td>把 feature 合進 main</td>
-            <td><code>merge</code> (PR merge)</td>
-            <td>保留 PR 完整脈絡</td>
-          </tr>
-          <tr>
-            <td>合別人正在用的共用分支</td>
-            <td><code>merge</code></td>
-            <td>不能改寫別人的歷史</td>
-          </tr>
-          <tr>
-            <td>送 PR 前整理自己的 commit</td>
-            <td><code>rebase -i</code></td>
-            <td>清理混亂的 WIP commits</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
-
     <section id="cherry-pick">
-      <span class="section-eyebrow">04 — cherry-pick</span>
+      <span class="section-eyebrow">02 — cherry-pick</span>
       <h2><code>cherry-pick</code>：只挑一個 commit 搬到別處</h2>
 
       <p>典型場景：main 上有個 bugfix，你想把它 backport 到 v2 維護分支，但 v2 跟 main 已經差很多，沒辦法整支 merge。</p>
@@ -267,7 +223,7 @@
     </section>
 
     <section id="reflog">
-      <span class="section-eyebrow">05 — reflog</span>
+      <span class="section-eyebrow">03 — reflog</span>
       <h2><code>reflog</code>：救回任何「不見」的 commit</h2>
 
       <p><code>reflog</code> 記錄你的 HEAD 移動過的所有位置。<strong>就算 commit 從分支上消失、被 rebase 改寫、被 reset --hard 蓋掉，只要還沒 GC (預設 90 天)，它都還在 reflog 裡。</strong></p>
@@ -301,7 +257,7 @@ i7j8k9l HEAD@{2}: commit: fix(profile): handle empty name
     </section>
 
     <section id="bisect">
-      <span class="section-eyebrow">06 — bisect</span>
+      <span class="section-eyebrow">04 — bisect</span>
       <h2><code>bisect</code>：二分搜尋，找出哪個 commit 引入 bug</h2>
 
       <p>典型場景：「上週這個功能還能跑、今天壞了，但中間有 200 個 commit」 — 用 bisect 自動二分搜尋，最多 log₂(200) ≈ 8 次測試就找到兇手。</p>
@@ -345,7 +301,7 @@ i7j8k9l HEAD@{2}: commit: fix(profile): handle empty name
     </section>
 
     <section id="worktree">
-      <span class="section-eyebrow">07 — worktree</span>
+      <span class="section-eyebrow">05 — worktree</span>
       <h2><code>worktree</code>：同一個 repo 開多個工作目錄</h2>
 
       <p>你正在 feature 分支寫到一半，主管要你立刻 review 一個 PR。傳統做法是 <code>git stash</code> + <code>git switch pr/123</code>，但 stash 容易忘記、切回來還要解 IDE 重新索引。<code>worktree</code> 直接幫你開出第二個目錄，兩個分支同時存在不互相干擾。</p>
@@ -377,7 +333,7 @@ i7j8k9l HEAD@{2}: commit: fix(profile): handle empty name
     </section>
 
     <section id="reset-revert">
-      <span class="section-eyebrow">08 — reset vs revert</span>
+      <span class="section-eyebrow">06 — reset vs revert</span>
       <h2><code>reset</code> 跟 <code>revert</code> 的差別</h2>
 
       <p>兩個都能「取消 commit」，但機制完全不同：</p>
@@ -449,7 +405,7 @@ i7j8k9l HEAD@{2}: commit: fix(profile): handle empty name
     </section>
 
     <section id="force">
-      <span class="section-eyebrow">09 — 安全的 force push</span>
+      <span class="section-eyebrow">07 — 安全的 force push</span>
       <h2><code>--force-with-lease</code>：force push 的安全版</h2>
 
       <p>rebase 整理過自己的 PR 分支後，要把改寫過的歷史推上去，必須用 force push。但純 <code>--force</code> 有風險 — 如果同事在你 rebase 期間剛好 push 了東西到同一支分支，你會直接覆蓋掉他的工作。</p>
@@ -481,7 +437,7 @@ i7j8k9l HEAD@{2}: commit: fix(profile): handle empty name
     </section>
 
     <section id="extra">
-      <span class="section-eyebrow">10 — 加碼</span>
+      <span class="section-eyebrow">08 — 加碼</span>
       <h2>還有兩個進階技巧</h2>
 
       <details class="collapse">
