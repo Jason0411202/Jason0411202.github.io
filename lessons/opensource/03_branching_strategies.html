@@ -30,13 +30,10 @@
   <div class="sticky-nav-inner">
     <span class="toc-label">章節</span>
     <ul class="toc-list">
-      <li><a class="toc-link" href="#why">為什麼要策略</a></li>
       <li><a class="toc-link" href="#git-flow">Git Flow</a></li>
       <li><a class="toc-link" href="#github-flow">GitHub Flow</a></li>
       <li><a class="toc-link" href="#gitlab-flow">GitLab Flow</a></li>
-      <li><a class="toc-link" href="#trunk-based">Trunk-Based</a></li>
-      <li><a class="toc-link" href="#how-to-choose">怎麼選</a></li>
-      <li><a class="toc-link" href="#hotfix">Hotfix</a></li>
+      <li><a class="toc-link" href="#naming">分支命名</a></li>
     </ul>
   </div>
 </nav>
@@ -44,22 +41,13 @@
 <main class="lesson-main">
   <article class="lesson-article">
 
-    <section id="why">
-      <span class="section-eyebrow">01 — 為什麼要策略</span>
-      <h2>沒策略的後果</h2>
-      <p>沒有共識的分支策略，團隊會出現這些症狀：</p>
-      <ul>
-        <li><strong>每個人開分支命名都不一樣</strong> — <code>jason-fix</code>、<code>tmp</code>、<code>new</code>、<code>final-final-v2</code></li>
-        <li><strong>不知道哪個分支可以 deploy</strong> — main 上有 RC、staging 上有舊版</li>
-        <li><strong>合併衝突永遠存在</strong> — 大家分支活很久，最後 merge 像災難</li>
-        <li><strong>release 時找不到當時的 code</strong> — 沒打 tag、沒有 release branch</li>
-      </ul>
-      <p>分支策略就是團隊共同遵守的「分支該怎麼開、什麼時候合進去、什麼時候 deploy」的契約。</p>
-    </section>
+    <section id="flows">
+      <span class="section-eyebrow">01 — 三大分支策略</span>
+      <h2>三大主流分支策略 — Git Flow / GitHub Flow / GitLab Flow</h2>
+      <p>開源與商業團隊最常見的三套分支模型。差異主要在「<strong>分支層數</strong>」與「<strong>環境抽象</strong>」：Git Flow 用 5 條分支對應傳統長週期發布；GitHub Flow 砍到只剩主幹 + 短命 feature；GitLab Flow 在 GitHub Flow 上再補回環境分支。沒有最好，只有最適合團隊的。</p>
 
-    <section id="git-flow">
-      <span class="section-eyebrow">02 — Git Flow</span>
-      <h2>Git Flow (Vincent Driessen, 2010)</h2>
+      <div id="git-flow" class="flow-block">
+      <h3>Git Flow (Vincent Driessen, 2010)</h3>
       <p>最早被廣泛採用的策略，<strong>適合發布週期長、需要同時維護多版本的產品</strong> (例如桌面軟體、企業套裝軟體、需要支援舊版本的 SDK)。</p>
 
       <div class="diagram">
@@ -78,7 +66,8 @@
             <!-- release (橘) -->
             <line x1="500" y1="100" x2="600" y2="100" stroke="#ff3d1f" stroke-width="2"/>
             <line x1="500" y1="100" x2="500" y2="140" stroke="#ff3d1f" stroke-width="2"/>
-            <line x1="600" y1="60" x2="600" y2="100" stroke="#ff3d1f" stroke-width="2" stroke-dasharray="3 3"/>
+            <line x1="600" y1="100" x2="600" y2="60" stroke="#ff3d1f" stroke-width="2" stroke-dasharray="3 3"/>
+            <line x1="600" y1="100" x2="640" y2="140" stroke="#ff3d1f" stroke-width="2" stroke-dasharray="3 3"/>
             <text x="450" y="104" fill="#ff3d1f" font-weight="700">release</text>
 
             <!-- develop (紫) -->
@@ -99,6 +88,7 @@
             <!-- hotfix -->
             <line x1="200" y1="60" x2="320" y2="20" stroke="#92400e" stroke-width="2"/>
             <line x1="320" y1="20" x2="400" y2="60" stroke="#92400e" stroke-width="2" stroke-dasharray="3 3"/>
+            <line x1="320" y1="20" x2="470" y2="140" stroke="#92400e" stroke-width="2" stroke-dasharray="3 3"/>
             <text x="260" y="14" fill="#92400e" font-size="10" font-weight="700">hotfix/v1.0.1</text>
 
             <text x="360" y="260" text-anchor="middle" fill="#6b6b7e" font-size="11">5 種分支：master / develop / feature/* / release/* / hotfix/*</text>
@@ -111,22 +101,13 @@
         <li><strong>master</strong>：永遠是 production；每次釋出打 tag (v1.0、v1.1...)</li>
         <li><strong>develop</strong>：開發中的下一版本</li>
         <li><strong>feature/*</strong>：從 develop 開出去做功能，做完合回 develop</li>
-        <li><strong>release/*</strong>：要釋出時從 develop 拉出來，最後合進 master + develop</li>
-        <li><strong>hotfix/*</strong>：production 緊急修補，從 master 拉、合回 master + develop</li>
+        <li><strong>release/*</strong>：要釋出時從 develop 拉出來，最後合進 master + develop。<strong>把要釋出的內容凍結成快照</strong>，QA 在這上面驗收、修 bug、更版本號，同時 develop 可以繼續收下一版 feature，<strong>釋出準備和下一版開發能平行進行</strong>。</li>
+        <li><strong>hotfix/*</strong>：production 緊急修補。<strong>從正在線上的 release tag 開</strong> (不要從 master HEAD，免得帶到還沒部署的 commit)，只做最小修改 + 測試 (別順便 refactor)，修完合回 master 並打 patch tag (v1.0 → v1.0.1)，再<strong>合回 develop</strong>，否則下次發布這個 bug 會 regression。</li>
       </ul>
-
-      <div class="callout callout-warn">
-        <div class="callout-icon">!</div>
-        <div class="callout-body">
-          <strong>Git Flow 在 SaaS / Web 專案是過度設計</strong>
-          <strong>原作者 Vincent Driessen 在 2020 年自己跳出來說</strong> —— 對「持續部署的 Web 應用」來說 Git Flow 太重，建議改用 GitHub Flow 或類似的簡化策略。<a class="inline-link" href="https://nvie.com/posts/a-successful-git-branching-model/" target="_blank" rel="noopener">原文</a>。
-        </div>
       </div>
-    </section>
 
-    <section id="github-flow">
-      <span class="section-eyebrow">03 — GitHub Flow</span>
-      <h2>GitHub Flow — 大多數新創與 Web 團隊用這個</h2>
+      <div id="github-flow" class="flow-block">
+      <h3>GitHub Flow — 大多數新創與 Web 團隊用這個</h3>
 
       <p>把 Git Flow 砍到只剩兩件事：<strong>main 永遠可 deploy、其他都是 feature branch</strong>。</p>
 
@@ -171,7 +152,13 @@
         <div class="diagram-caption">圖 3.2 — GitHub Flow 拓樸 (一條主幹 + 多個短命 feature)</div>
       </div>
 
-      <h3>規則</h3>
+      <h4>分支類型</h4>
+      <ul>
+        <li><strong>main</strong>：永遠可 deploy 的主幹，<strong>合進來就能上線</strong></li>
+        <li><strong>短命分支 (從 main 開出去)</strong>：<strong>沒有正式分類</strong> — 不論是新功能、修 bug、緊急修補，流程完全一樣。社群慣用 <code>feat/</code>、<code>fix/</code>、<code>hotfix/</code>、<code>chore/</code> 這類前綴標記意圖 (見後面「分支命名」章節)，但這些只是命名約定，不是 GitHub Flow 本身定義的分支類型。</li>
+      </ul>
+
+      <h4>規則</h4>
       <ol>
         <li><code>main</code> 上的任何 commit 都必須能 deploy</li>
         <li>要做事就從 <code>main</code> 開分支 (短命，最好 1-3 天內合回去)</li>
@@ -179,19 +166,10 @@
         <li>PR 通過 review + CI 綠燈後合進 <code>main</code></li>
         <li>合進 <code>main</code> 後立刻 deploy</li>
       </ol>
-
-      <div class="callout callout-success">
-        <div class="callout-icon">✓</div>
-        <div class="callout-body">
-          <strong>適合大部分場景</strong>
-          80% 的 SaaS / Web 服務用 GitHub Flow 就夠了。它的優點是：簡單、好教新人、CI/CD 容易設定。
-        </div>
       </div>
-    </section>
 
-    <section id="gitlab-flow">
-      <span class="section-eyebrow">04 — GitLab Flow</span>
-      <h2>GitLab Flow — 加上環境分支</h2>
+      <div id="gitlab-flow" class="flow-block">
+      <h3>GitLab Flow — 加上環境分支</h3>
 
       <p>GitHub Flow 的延伸，補上「<strong>哪個分支對應哪個環境</strong>」的概念。適合有 staging / production 多環境，且 deploy 不是即時的場景。</p>
 
@@ -221,133 +199,173 @@
             <line x1="460" y1="120" x2="460" y2="180" stroke="#0a0a0f" stroke-width="1.5" stroke-dasharray="3 3"/>
             <circle cx="460" cy="180" r="5" fill="#0a0a0f"/>
 
-            <text x="360" y="210" text-anchor="middle" fill="#6b6b7e" font-size="11">main → pre-prod → prod，每階段都是 cherry-pick / merge 上來</text>
+            <!-- feature 分支 (在 main 上方) -->
+            <line x1="120" y1="50" x2="160" y2="10" stroke="#0f766e" stroke-width="2"/>
+            <line x1="160" y1="10" x2="200" y2="10" stroke="#0f766e" stroke-width="2"/>
+            <line x1="200" y1="10" x2="220" y2="50" stroke="#0f766e" stroke-width="2" stroke-dasharray="3 3"/>
+            <circle cx="160" cy="10" r="4" fill="#0f766e"/>
+            <circle cx="200" cy="10" r="4" fill="#0f766e"/>
+            <text x="245" y="14" fill="#0f766e" font-size="10">feat/login</text>
+
+            <line x1="340" y1="50" x2="380" y2="10" stroke="#0f766e" stroke-width="2"/>
+            <line x1="380" y1="10" x2="420" y2="10" stroke="#0f766e" stroke-width="2"/>
+            <line x1="420" y1="10" x2="460" y2="50" stroke="#0f766e" stroke-width="2" stroke-dasharray="3 3"/>
+            <circle cx="380" cy="10" r="4" fill="#0f766e"/>
+            <circle cx="420" cy="10" r="4" fill="#0f766e"/>
+            <text x="465" y="14" fill="#0f766e" font-size="10">feat/cart</text>
+
+            <text x="360" y="210" text-anchor="middle" fill="#6b6b7e" font-size="11">feature → main → pre-prod → prod，環境之間是 cherry-pick / merge 上去</text>
           </g>
         </svg>
-        <div class="diagram-caption">圖 3.3 — GitLab Flow 環境分支 (預備 → 正式)</div>
+        <div class="diagram-caption">圖 3.3 — GitLab Flow 拓樸 (feature → 環境分支鏈)</div>
       </div>
 
-      <p><code>main</code> 是「最新穩定」、<code>pre-prod</code> 是「即將上線的」、<code>prod</code> 是「正在線上的」。每個環境對應一個分支，要升級環境就把 commit 從前一條 cherry-pick 或 merge 過去。</p>
-    </section>
-
-    <section id="trunk-based">
-      <span class="section-eyebrow">05 — Trunk-Based</span>
-      <h2>Trunk-Based Development — Google / Meta 大規模採用</h2>
-
-      <p>把分支極簡化：<strong>所有人都直接 commit 到 main (trunk)，feature branch 活不超過 24-48 小時</strong>。沒做完的功能用 <strong>feature flag</strong> 包起來放進 main，等準備好再開關開啟。</p>
-
-      <div class="callout callout-info">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>為什麼大公司這樣做？</strong>
-          團隊上千人時，分支活越久衝突越可怕。Trunk-based 強迫所有人不停 sync 到最新，配合 feature flag 達成「程式碼 ship 跟功能 release 解耦」 — 程式碼天天上 main，但 feature 什麼時候開給使用者由 flag 控制。
-        </div>
-      </div>
-
-      <h3>Trunk-Based 的兩個核心配套</h3>
       <ul>
-        <li><strong>Feature flag</strong> — 半成品功能用 <code>if (flagOn('newCheckout'))</code> 包起來，在 main 上但對使用者隱形</li>
-        <li><strong>強大的自動化測試 + CI</strong> — main 隨時可 deploy 的前提是 CI 真的能擋下壞東西</li>
+        <li><strong>feature/*</strong>：跟 GitHub Flow 一樣，從 <code>main</code> 開短命分支做事，PR 過了就合回 <code>main</code></li>
+        <li><strong>main</strong>：「最新穩定版」— 通過 CI 與 review 的 commit 都在這</li>
+        <li><strong>pre-prod</strong> (或 <code>staging</code>)：「即將上線的」— 從 main merge / cherry-pick 過來，部到 staging 環境驗收</li>
+        <li><strong>prod</strong> (或 <code>production</code>)：「正在線上的」— 驗收通過才從 pre-prod 推上來，對應正式環境</li>
       </ul>
 
-      <div class="callout callout-warn">
-        <div class="callout-icon">!</div>
+      <p><strong>注意：沒有專屬的 release / hotfix 分支類型</strong>。版本發布的角色由「環境分支」(pre-prod / prod) 承擔，取代 Git Flow 的 <code>release/*</code>；緊急修補則是「從 main 開短命 fix 分支 → 合回 main → cherry-pick 到 prod」的<strong>流程</strong>，不會額外開一條 <code>hotfix/*</code>。</p>
+
+      <div class="callout">
+        <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>沒有自動化測試底子的團隊不要硬上</strong>
-          Trunk-based 把品質責任全壓在 CI 上。CI 不可靠的話 = 線上每天爆炸。先把 Lesson 09 的 CI / 測試打好基礎再考慮這個策略。
+          <strong>關鍵差異：GitLab Flow ≠ 砍掉 feature branch</strong>
+          它跟 GitHub Flow 上半段 (feature → main) 完全一樣，只是<strong>多疊了「環境分支」這層</strong>，讓 deploy 不是 main 一合就立刻上線，而是要走完 main → pre-prod → prod 的審核路徑。適合金融、醫療、政府等需要驗收窗口的場景。
         </div>
+      </div>
       </div>
     </section>
 
-    <section id="how-to-choose">
-      <span class="section-eyebrow">06 — 怎麼選</span>
-      <h2>怎麼選最適合自己團隊的策略？</h2>
+    <section id="naming">
+      <span class="section-eyebrow">02 — 分支命名</span>
+      <h2>分支命名原則 — <code>feature/</code> 後面該怎麼寫</h2>
 
+      <p>前面看到的 <code>feature/login</code>、<code>hotfix/v1.0.1</code>、<code>release/1.5.0</code>，<strong>斜線前的「類型」由策略決定，斜線後的「名字」由團隊約定</strong>。沒有約定就會出現 <code>jason-fix</code>、<code>tmp</code>、<code>final-final-v2</code> 這種誰都看不懂的災難。</p>
+
+      <h3>建議格式</h3>
+      <p style="font-family: 'JetBrains Mono', monospace; background: #f4f4f7; padding: 12px 16px; border-left: 3px solid #7c3aed; margin: 12px 0;">
+        &lt;type&gt;/&lt;issue-id&gt;-&lt;short-description&gt;
+      </p>
+      <ul>
+        <li><strong>type</strong> — 標記這個分支「在做哪一類事」，讓人從分支名一眼判斷意圖、優先級、要不要 review。常用詞如下表，跟 commit message 通常共用同一組詞彙（Lesson 06 Conventional Commits 會再講 commit 那邊的細節）。</li>
+        <li><strong>issue-id</strong> — 對應的 issue / ticket 編號，例如 <code>123</code>、<code>JIRA-456</code>。把分支跟工單綁起來，搜尋、追蹤、自動關閉 PR 都方便。</li>
+        <li><strong>short-description</strong> — <strong>kebab-case</strong>（小寫 + 連字號），3 - 5 個字描述要做什麼，不要寫小說。</li>
+      </ul>
+
+      <h4>常見的 type 一覽</h4>
       <table>
         <thead>
           <tr>
-            <th>條件</th>
-            <th>建議策略</th>
+            <th>type</th>
+            <th>用途</th>
+            <th>範例</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>需要長期維護多個歷史版本 (v1.x、v2.x)</td>
-            <td><strong>Git Flow</strong></td>
+            <td><code>feature</code>（或 <code>feat</code>）</td>
+            <td>新功能、新增能力。對使用者可見的「多了某件事」。</td>
+            <td><code>feature/123-add-cart</code></td>
           </tr>
           <tr>
-            <td>SaaS / Web 服務、團隊 5-50 人、CI 健全</td>
-            <td><strong>GitHub Flow</strong></td>
+            <td><code>fix</code></td>
+            <td>修一般的 bug — 不緊急、跟著正常 release 排程上線。</td>
+            <td><code>fix/456-login-redirect</code></td>
           </tr>
           <tr>
-            <td>有 staging → prod 階段、deploy 不是即時的</td>
-            <td><strong>GitLab Flow</strong></td>
+            <td><code>hotfix</code></td>
+            <td>線上爆炸的緊急修補，要插隊、最短路徑直送 production。流程見下一節「Hotfix」。</td>
+            <td><code>hotfix/v1.4.3-csrf-bypass</code></td>
           </tr>
           <tr>
-            <td>百人以上開發團隊、極致敏捷、有 feature flag 基建</td>
-            <td><strong>Trunk-Based</strong></td>
+            <td><code>refactor</code></td>
+            <td>重構 — <strong>行為不變</strong>，只動程式結構（改命名、抽函式、換實作）。沒有新功能、也沒有修 bug。</td>
+            <td><code>refactor/789-extract-auth-service</code></td>
           </tr>
           <tr>
-            <td>小型開源 library、貢獻者來來去去</td>
-            <td><strong>GitHub Flow</strong> (用 PR 過濾品質)</td>
+            <td><code>chore</code></td>
+            <td>雜務 — 升版套件、改 CI 設定、調 lint 規則、整理 .gitignore 這類「跟產品邏輯無關」的維運性改動。</td>
+            <td><code>chore/upgrade-node-20</code></td>
           </tr>
           <tr>
-            <td>剛起步、還在找方向</td>
-            <td><strong>GitHub Flow</strong> (簡單到不會錯)</td>
+            <td><code>docs</code></td>
+            <td>只動文件 — README、註解、API 文件、教學。<strong>沒碰到任何會影響執行結果的程式碼</strong>。</td>
+            <td><code>docs/update-readme-install</code></td>
+          </tr>
+          <tr>
+            <td><code>test</code></td>
+            <td>只加測試或改測試，沒改實作。常見於補強回歸測試、加 e2e 案例。</td>
+            <td><code>test/add-checkout-e2e</code></td>
+          </tr>
+          <tr>
+            <td><code>perf</code></td>
+            <td>效能優化 — 行為跟 refactor 一樣不變，但目的是讓它跑更快、用更少資源。</td>
+            <td><code>perf/optimize-search-index</code></td>
+          </tr>
+          <tr>
+            <td><code>release</code></td>
+            <td>專屬 Git Flow — 從 develop 拉出來凍結內容、做 QA 與版本號收尾的釋出分支。GitHub Flow / GitLab Flow 不會用到。</td>
+            <td><code>release/1.5.0</code></td>
           </tr>
         </tbody>
       </table>
 
+      <p><strong>不用全部都用</strong>。多數團隊只會挑其中 4 - 6 個來用（常見組合：<code>feature</code> / <code>fix</code> / <code>hotfix</code> / <code>chore</code> / <code>docs</code>），挑完寫進 CONTRIBUTING.md 跟 CI lint 裡，新人才不會自己發明 <code>improvement/</code>、<code>update/</code>、<code>misc/</code> 這種模糊字眼。</p>
+
+      <h3>好範例 vs 壞範例</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>✓ 好範例</th>
+            <th>✗ 壞範例</th>
+            <th>為什麼壞</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>feature/123-add-cart</code></td>
+            <td><code>jason-cart</code></td>
+            <td>用人名 — 換人接手就斷線</td>
+          </tr>
+          <tr>
+            <td><code>fix/456-login-redirect</code></td>
+            <td><code>tmp</code> / <code>new</code> / <code>test</code></td>
+            <td>無描述 — 看了等於沒看</td>
+          </tr>
+          <tr>
+            <td><code>hotfix/v1.4.3-csrf-bypass</code></td>
+            <td><code>final-final-v2</code></td>
+            <td>用版本後綴對抗自己 — 語意零</td>
+          </tr>
+          <tr>
+            <td><code>chore/upgrade-node-20</code></td>
+            <td><code>Feature/AddCart</code></td>
+            <td>大寫 / camelCase — case-insensitive 系統會踩雷</td>
+          </tr>
+          <tr>
+            <td><code>refactor/789-extract-auth-service</code></td>
+            <td><code>修登入bug</code></td>
+            <td>中文 / 空格 — Git 雖然能用但 CI、URL 會壞</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Git 本身的硬性限制</h3>
+      <p>就算團隊不在意命名美感，下列字元 Git 直接拒絕，要先知道：</p>
+      <ul>
+        <li>不能含 <code>~</code>、<code>^</code>、<code>:</code>、<code>?</code>、<code>*</code>、<code>[</code>、<code>\</code>、空白</li>
+        <li>不能有連續的 <code>..</code>，也不能以 <code>/</code> 或 <code>.lock</code> 結尾</li>
+        <li>不能以 <code>-</code>、<code>.</code> 開頭</li>
+      </ul>
+
       <div class="callout callout-tip">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>策略可以演進</strong>
-          團隊 5 人時用 GitHub Flow，長到 200 人發現衝突太多時自然會走向 Trunk-Based + feature flag。<strong>不要過度設計起手就上 Git Flow</strong>，等真的需要再升級。
-        </div>
-      </div>
-    </section>
-
-    <section id="hotfix">
-      <span class="section-eyebrow">07 — Hotfix</span>
-      <h2>Hotfix branch 何時該開</h2>
-
-      <p>無論用哪種策略，線上爆炸時的「緊急修補分支」流程都類似：</p>
-
-      <div class="timeline">
-        <div class="timeline-step">
-          <div class="timeline-num">1</div>
-          <div class="timeline-content">
-            <div class="timeline-title">從正在線上的 commit / tag 開分支</div>
-            <div class="timeline-desc">不是從 main 最新開 — 因為 main 上可能已經有還沒上線的東西。</div>
-          </div>
-        </div>
-        <div class="timeline-step">
-          <div class="timeline-num">2</div>
-          <div class="timeline-content">
-            <div class="timeline-title">命名 <code>hotfix/&lt;issue&gt;</code></div>
-            <div class="timeline-desc">明確標記這是緊急修補，CI 會跑、reviewer 會優先看。</div>
-          </div>
-        </div>
-        <div class="timeline-step">
-          <div class="timeline-num">3</div>
-          <div class="timeline-content">
-            <div class="timeline-title">最小修改 + 測試</div>
-            <div class="timeline-desc">只改要修的，不要順便 refactor。線上回穩才是優先。</div>
-          </div>
-        </div>
-        <div class="timeline-step">
-          <div class="timeline-num">4</div>
-          <div class="timeline-content">
-            <div class="timeline-title">合進 production 並打 patch tag</div>
-            <div class="timeline-desc">v1.4.2 → v1.4.3。SemVer 規則之後 Lesson 06 會講。</div>
-          </div>
-        </div>
-        <div class="timeline-step">
-          <div class="timeline-num">5</div>
-          <div class="timeline-content">
-            <div class="timeline-title">把修補也合回 main / develop</div>
-            <div class="timeline-desc">否則下次 deploy 時這個 bug 會再回來 (regression)。</div>
-          </div>
+          <strong>把規則寫進 CI，新人就會自動學會</strong>
+          很多團隊在 CI 加一條 lint：分支名不符合 <code>^(feature|fix|hotfix|chore|refactor|docs)/.+$</code> 就擋下 push 或 PR。比起在 review 時口頭糾正，自動化把規則內化得更快。
         </div>
       </div>
     </section>
@@ -358,7 +376,6 @@
         <li><a href="https://nvie.com/posts/a-successful-git-branching-model/" target="_blank" rel="noopener">nvie.com — A successful Git branching model (Vincent Driessen, 2010)</a><span class="ref-meta">Git Flow 原文</span></li>
         <li><a href="https://docs.github.com/en/get-started/quickstart/github-flow" target="_blank" rel="noopener">GitHub Docs: GitHub Flow</a><span class="ref-meta">官方說明</span></li>
         <li><a href="https://docs.gitlab.com/ee/topics/gitlab_flow.html" target="_blank" rel="noopener">GitLab Docs: GitLab Flow</a><span class="ref-meta">官方說明</span></li>
-        <li><a href="https://trunkbaseddevelopment.com" target="_blank" rel="noopener">trunkbaseddevelopment.com</a><span class="ref-meta">Paul Hammant 整理的 Trunk-Based 完整指南</span></li>
         <li><a href="https://martinfowler.com/articles/branching-patterns.html" target="_blank" rel="noopener">Martin Fowler — Patterns for Managing Source Code Branches</a><span class="ref-meta">分支策略大全</span></li>
       </ul>
     </section>
