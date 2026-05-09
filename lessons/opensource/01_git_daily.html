@@ -340,6 +340,14 @@ index 1a2b3c4..5d6e7f8 100644
           <code>--amend</code> 會改變 commit 的 SHA，等於 rewrite history。如果這個 commit 已經 push、別人已經 pull 走，他們的 git 會抓狂。
         </div>
       </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>真的要把 amend 過的 commit 推上去?用 <code>--force-with-lease</code></strong>
+          自己一人在用的 PR 分支,amend 後 push 會被 Git 擋下來(因為本地跟遠端對不上)。直接 <code>git push --force</code> 雖然能推,但會無條件覆蓋遠端 — 萬一同事剛好在這條分支上也 push 了東西就會被你蓋掉,而且不會有任何警告。改用 <code>git push --force-with-lease</code>:它會先比對「遠端目前的位置」跟「你上次 fetch 看到的位置」,一致才推、不一致直接拒絕並提醒你。是 force push 的安全版,養成預設用它的習慣 — 之後 Lesson 02 講 <code>rebase</code> 改寫歷史時也會用到。
+        </div>
+      </div>
     </section>
 
     <section id="stash">
