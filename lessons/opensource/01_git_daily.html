@@ -423,7 +423,10 @@ stash@{1}: On feat/user-profile: WIP with new files
           <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 套用最新一筆 stash@{0},stash 仍保留在列表</span>
+<pre><code><span class="tk-cm"># 套用前先看某筆 stash 改了什麼 (-p 顯示完整 diff)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash show <span class="tk-op">-p</span> stash@{0}
+
+<span class="tk-cm"># 套用最新一筆 stash@{0},stash 仍保留在列表</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> stash apply
 
 <span class="tk-cm"># 套用指定編號的 stash</span>
@@ -445,25 +448,6 @@ stash@{1}: On feat/user-profile: WIP with new files
         </div>
       </div>
 
-      <details class="collapse">
-        <summary>進階:stash 只暫存一部分檔案 <span class="collapse-tag">深入</span></summary>
-        <div class="collapse-body">
-          <div class="code-block">
-            <div class="code-block-header">
-              <span class="code-block-lang">bash</span>
-              <button class="code-copy-btn" type="button">複製</button>
-            </div>
-<pre><code><span class="tk-cm"># 只 stash 已 stage 的部分,working tree 的改動留著繼續寫</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash push <span class="tk-op">--staged</span> <span class="tk-op">-m</span> <span class="tk-st">"only staged"</span>
-
-<span class="tk-cm"># 指定要 stash 哪幾個檔案</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash push <span class="tk-op">-m</span> <span class="tk-st">"only profile"</span> src/profile.ts src/profile.test.ts
-
-<span class="tk-cm"># 看某筆 stash 改了什麼</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> stash show <span class="tk-op">-p</span> stash@{0}</code></pre>
-          </div>
-        </div>
-      </details>
     </section>
 
     <section id="restore">
