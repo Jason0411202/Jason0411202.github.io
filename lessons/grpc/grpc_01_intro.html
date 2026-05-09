@@ -387,8 +387,8 @@
         <li><strong>Protobuf Editions</strong> — 2024 年 GA(Edition 2024 隨 Protobuf v32.0 釋出),長期會取代 proto2/proto3,但 gRPC 官方目前文件仍以 proto3 為主。本課提一句即可,實務上先學會 proto3</li>
       </ul>
 
-      <div class="callout callout-tip">
-        <div class="callout-icon">i</div>
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
         <div class="callout-body">
           <strong>Source of Truth</strong>
           後續 9 堂課所有 API 與用法,以 <a class="inline-link" href="https://grpc.io/docs/" target="_blank" rel="noopener">grpc.io/docs</a> 與 <a class="inline-link" href="https://pkg.go.dev/google.golang.org/grpc" target="_blank" rel="noopener">pkg.go.dev/google.golang.org/grpc</a> 為準。網路上很多教學示範的 <code>grpc.Dial(...)</code> 已被 deprecated,本課全部使用<strong>新的 <code>grpc.NewClient(...)</code></strong>。

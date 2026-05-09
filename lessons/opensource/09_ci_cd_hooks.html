@@ -195,8 +195,8 @@
       - <span class="tk-kw">run</span>: pnpm build</code></pre>
       </div>
 
-      <div class="callout callout-tip">
-        <div class="callout-icon">i</div>
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
         <div class="callout-body">
           <strong>幾個業界慣例</strong>
           ① <code>install --frozen-lockfile</code> 確保 CI 用的依賴版本跟 lock 檔完全一致 ② 用 <code>cache: 'pnpm'</code> 加速 ③ matrix 跑多 Node 版本確保跨版本相容 ④ action 永遠 pin 主版號 (<code>@v4</code>)，不要 <code>@latest</code> 否則 breaking 會自動套上你 CI。
@@ -260,7 +260,7 @@
         </tbody>
       </table>
 
-      <div class="callout callout-tip">
+      <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong>Ruff 是 Python 生態的新霸主</strong>

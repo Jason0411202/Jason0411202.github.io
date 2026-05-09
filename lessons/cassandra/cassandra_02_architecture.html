@@ -104,8 +104,8 @@
         <li><strong>加減節點時資料搬移更平均</strong>：新節點加入時 16 個 vnode 各從不同既有 vnode 偷一塊資料；不會像舊版（單 token）只跟相鄰兩台搶。</li>
       </ul>
 
-      <div class="callout callout-tip">
-        <div class="callout-icon">i</div>
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
         <div class="callout-body">
           <strong>num_tokens 別亂改</strong>
           5.0 預設每台 16 個 vnode（過去 4.x 預設 256）。<em>16 是社群實測對 streaming repair 較友善的值</em>。新建叢集就用預設，不要因為網路文章說「設高一點」就改。
@@ -260,7 +260,7 @@
 
       <h3>強一致的公式</h3>
       <div class="callout callout-tip">
-        <div class="callout-icon">!</div>
+        <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong>R + W &gt; RF 即強一致</strong>
           假設 RF=3，<code>W=QUORUM=2</code> 並 <code>R=QUORUM=2</code>。最差情況下，寫入的 2 個 replica 跟讀取的 2 個 replica<em>必有交集</em>，所以一定能讀到最新值。<br>

@@ -148,8 +148,8 @@ auto-aof-rewrite-min-size 64mb</code></pre>
 
       <p>還原時，Redis 先讀 RDB 部分（快），再 replay 後段 AOF（覆蓋最近幾秒）。<strong>結合 RDB 的「載入快」和 AOF 的「掉資料少」</strong>。</p>
 
-      <div class="callout callout-tip">
-        <div class="callout-icon">i</div>
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
         <div class="callout-body">
           <strong>業界推薦組合</strong>
           <code>appendonly yes</code> + <code>appendfsync everysec</code> + <code>aof-use-rdb-preamble yes</code>（8.x 預設）。<em>另外</em>仍建議保留 RDB save 策略當二級備份（每天自動 snapshot 並備份到 S3 / NFS）。

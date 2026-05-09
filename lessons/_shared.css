@@ -314,7 +314,14 @@ a.inline-link:hover { color: var(--accent); border-bottom-color: var(--accent); 
   margin: 1.4rem 0;
 }
 
-/* ─────────── CALLOUT ─────────── */
+/* ─────────── CALLOUT ───────────
+ * 語義規則 (詳見專案根目錄 CLAUDE.md):
+ *   .callout-tip     紫 — 💡 核心訣竅 / 黃金法則 / Pro Tip (稀少使用)
+ *   .callout-info    青 — ℹ️ 補充說明 / 知識點 / How-to
+ *   .callout-success 綠 — ✓ 最佳實踐 / 推薦做法
+ *   .callout-warn    橙 — ⚠ 注意事項 / 容易踩坑
+ *   .callout-danger  紅 — ✗ 禁止 / 危險 / 不可逆
+ */
 .callout {
   border-radius: 12px;
   padding: 1rem 1.2rem 1rem 1.1rem;

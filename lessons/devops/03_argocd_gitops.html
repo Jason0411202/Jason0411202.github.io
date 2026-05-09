@@ -163,8 +163,8 @@
         <div class="diagram-caption">圖 1.1 — GitOps Pull-based 部署模型</div>
       </div>
 
-      <div class="callout callout-tip">
-        <div class="callout-icon">i</div>
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
         <div class="callout-body">
           <strong>code repo 與 manifest repo 通常分開</strong>
           一個 repo 放應用程式原始碼，另一個 repo 放 Kubernetes manifests / Helm values。CI 跑完 build 後 commit 到 manifest repo，Argo CD 才 watch manifest repo。這樣 image build 失敗時不會把舊版的 manifest 弄髒。小團隊也可以放在同一個 repo 不同資料夾，重點是 Argo CD watch 的 path 要清楚。
@@ -564,7 +564,7 @@
         <span class="tk-op">-</span> <span class="tk-st">'.spec.template.spec.containers[].image'</span>  <span class="tk-cm"># 例如 image 由其他工具改</span></code></pre>
       </div>
 
-      <div class="callout callout-tip">
+      <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong><code>ignoreDifferences</code> 不是逃避，是必要設計</strong>

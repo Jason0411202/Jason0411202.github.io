@@ -78,8 +78,8 @@
   <span class="tk-kw">WHERE</span> price &gt; <span class="tk-num">500</span>;</code></pre>
       </div>
 
-      <div class="callout callout-tip">
-        <div class="callout-icon">i</div>
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
         <div class="callout-body">
           <strong>SAI 是 5.0 的「預設 secondary index」</strong>
           官方文件已經把 SAI 列為主要索引。新 schema 一律用 <code>USING 'sai'</code>；舊的 2i 可逐步遷移（先建 SAI，等驗證後 drop 舊的）。

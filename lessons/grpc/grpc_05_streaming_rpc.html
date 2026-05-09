@@ -152,7 +152,7 @@
 }</code></pre>
       </div>
 
-      <div class="callout callout-tip">
+      <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong>真實場景:訂閱、log tail、cursor-based 分頁</strong>
@@ -311,8 +311,8 @@ stream.CloseSend()
 &lt;-done</code></pre>
       </div>
 
-      <div class="callout callout-tip">
-        <div class="callout-icon">i</div>
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
         <div class="callout-body">
           <strong>Bidi 的 thread-safety 規則</strong>
           <code>stream.Send</code> 與 <code>stream.Recv</code> 在不同方向是 thread-safe(可一個 goroutine 收、一個 goroutine 送),但<strong>同方向多個 goroutine 同時 Send 不是 thread-safe</strong>(同方向想多 goroutine 寫請自己加 mutex 或用 channel 串到單一 sender goroutine)。

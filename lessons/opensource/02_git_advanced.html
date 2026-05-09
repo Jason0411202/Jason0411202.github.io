@@ -151,14 +151,6 @@
 
       <p>跳出來的編輯器會列出這些 commit，每行最前面寫一個動作：</p>
 
-      <div class="callout callout-tip">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>怎麼操作這個編輯器</strong>
-          預設會開 Vim：<code>i</code> 進入編輯模式 → 把行首的 <code>pick</code> 改成 <code>squash</code> / <code>fixup</code> / <code>reword</code> 等動作（也可以整行上下拖移來改順序）→ 按 <code>Esc</code> 離開編輯模式 → 輸入 <code>:wq</code> 存檔離開。不熟 Vim 可以先 <code>git config --global core.editor "code --wait"</code> 換成 VS Code，存檔關掉分頁就會繼續。
-        </div>
-      </div>
-
       <table>
         <thead>
           <tr><th>動作</th><th>意思</th><th>用在哪</th></tr>
@@ -196,6 +188,14 @@ squash m0n1o2p tweak avatar size
 <span class="tk-cm"># 並再跳一次編輯器讓你確認最終的 commit message</span></code></pre>
       </div>
 
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>怎麼操作這個編輯器</strong>
+          預設會開 Vim：<code>i</code> 進入編輯模式 → 把行首的 <code>pick</code> 改成 <code>squash</code> / <code>fixup</code> / <code>reword</code> 等動作（也可以整行上下拖移來改順序）→ 按 <code>Esc</code> 離開編輯模式 → 輸入 <code>:wq</code> 存檔離開。不熟 Vim 可以先 <code>git config --global core.editor "code --wait"</code> 換成 VS Code，存檔關掉分頁就會繼續。
+        </div>
+      </div>
+
       <h3>把 rebase 過的 commit 推上去:<code>--force-with-lease</code></h3>
 
       <p>rebase 完成後,本地的 commit SHA 已經跟遠端對不起來,普通 <code>git push</code> 會被 Git 擋下來(它認為你會弄丟遠端的歷史)。要把改寫過的歷史推上去就得 force push,但<strong>純 <code>--force</code> 有風險</strong> — 如果同事在你 rebase 期間剛好 push 了東西到同一支分支,你會直接覆蓋掉他的工作。</p>
@@ -217,8 +217,8 @@ squash m0n1o2p tweak avatar size
         </div>
       </div>
 
-      <div class="callout callout-tip">
-        <div class="callout-icon">i</div>
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
         <div class="callout-body">
           <strong>建議設成預設 alias</strong>
           <code>git config --global alias.fpush "push --force-with-lease"</code> — 之後習慣性打 <code>git fpush</code>,徹底避開 <code>--force</code>。同樣的安全考量也適用於 <code>commit --amend</code>、<code>cherry-pick</code>、<code>reset</code> 等任何會改寫 commit SHA 的操作 — 只要你接下來要 push,就用 <code>--force-with-lease</code>。
@@ -255,7 +255,7 @@ squash m0n1o2p tweak avatar size
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> cherry-pick <span class="tk-op">--continue</span></code></pre>
       </div>
 
-      <div class="callout callout-tip">
+      <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong>cherry-pick 到底搬了什麼？</strong>

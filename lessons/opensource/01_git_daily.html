@@ -447,8 +447,8 @@ stash@{1}: On feat/user-profile: WIP with new files
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> stash clear</code></pre>
       </div>
 
-      <div class="callout callout-tip">
-        <div class="callout-icon">i</div>
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
         <div class="callout-body">
           <strong>新手建議養成 <code>apply</code> + <code>drop</code> 的習慣</strong>
           <code>pop</code> 在套用過程如果發生衝突,stash 還是會被刪掉,你需要靠 <code>git stash show -p stash@{0}</code> 從 reflog 找回來,很麻煩。<code>apply</code> 確認沒問題後再 <code>drop</code> 是更穩的流程。
@@ -462,13 +462,7 @@ stash@{1}: On feat/user-profile: WIP with new files
       <span class="section-eyebrow">07 — git restore</span>
       <h2>用 <code>restore</code> 從特定 commit 還原檔案</h2>
 
-      <div class="callout callout-tip">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>日常的取消改動,直接用 VSCode 的 Source Control 面板就好</strong>
-          像是「丟掉 working tree 的改動」、「把已 stage 的取消 stage」、「整個資料夾還原」這類操作,VSCode 的 Source Control 面板都有對應按鈕(改動旁邊的 <code>↶ Discard Changes</code>、<code>−</code> Unstage 等),不用記指令。terminal 真正會用到的場景,是<strong>從某個歷史 commit 把單一檔案還原回來</strong> —— 因為 GUI 對這個操作沒那麼順手。</p>
-        </div>
-      </div>
+      <p>日常的取消改動,直接用 VSCode 的 Source Control 面板就好。像是「丟掉 working tree 的改動」、「把已 stage 的取消 stage」、「整個資料夾還原」這類操作,VSCode 的 Source Control 面板都有對應按鈕(改動旁邊的 <code>↶ Discard Changes</code>、<code>−</code> Unstage 等),不用記指令。terminal 真正會用到的場景,是<strong>從某個歷史 commit 把單一檔案還原回來</strong> —— 因為 GUI 對這個操作沒那麼順手。</p>
 
       <h3>從特定 commit 還原某個檔案</h3>
       <p>場景:三天前某筆 commit 的 <code>src/auth.ts</code> 是對的,後面幾筆把它改壞了。你不想 revert 整筆 commit (會連帶其他檔案),只想<strong>把這一個檔案的內容還原成那筆 commit 當時的樣子</strong>,其他檔案不動。</p>
@@ -493,7 +487,7 @@ stash@{1}: On feat/user-profile: WIP with new files
 
       <p>執行後檔案內容就被覆蓋成指定 commit 那個時間點的樣子,接著像平常一樣 <code>git add</code> + <code>git commit</code> 就能把這次「還原」變成新的一筆 commit。整段歷史不會被改寫,team 的人 pull 下來看到的是「你新加了一筆把 auth.ts 改回去的 commit」,完全乾淨。</p>
 
-      <div class="callout callout-tip">
+      <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong>怎麼找到 commit SHA?</strong>
