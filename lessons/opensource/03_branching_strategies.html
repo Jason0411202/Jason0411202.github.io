@@ -228,14 +228,6 @@
       </ul>
 
       <p><strong>注意：沒有專屬的 release / hotfix 分支類型</strong>。版本發布的角色由「環境分支」(pre-prod / prod) 承擔，取代 Git Flow 的 <code>release/*</code>；緊急修補則是「從 main 開短命 fix 分支 → 合回 main → cherry-pick 到 prod」的<strong>流程</strong>，不會額外開一條 <code>hotfix/*</code>。</p>
-
-      <div class="callout">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>關鍵差異：GitLab Flow ≠ 砍掉 feature branch</strong>
-          它跟 GitHub Flow 上半段 (feature → main) 完全一樣，只是<strong>多疊了「環境分支」這層</strong>，讓 deploy 不是 main 一合就立刻上線，而是要走完 main → pre-prod → prod 的審核路徑。適合金融、醫療、政府等需要驗收窗口的場景。
-        </div>
-      </div>
       </div>
     </section>
 
@@ -243,7 +235,7 @@
       <span class="section-eyebrow">02 — 分支命名</span>
       <h2>分支命名原則 — <code>feature/</code> 後面該怎麼寫</h2>
 
-      <p>前面看到的 <code>feature/login</code>、<code>hotfix/v1.0.1</code>、<code>release/1.5.0</code>，<strong>斜線前的「類型」由策略決定，斜線後的「名字」由團隊約定</strong>。沒有約定就會出現 <code>jason-fix</code>、<code>tmp</code>、<code>final-final-v2</code> 這種誰都看不懂的災難。</p>
+      <p>前面看到的 <code>feature/login</code>、<code>hotfix/v1.0.1</code>、<code>release/1.5.0</code>，<strong>斜線前的「類型」由策略決定，斜線後的「名字」由團隊約定</strong>。</p>
 
       <h3>建議格式</h3>
       <p style="font-family: 'JetBrains Mono', monospace; background: #f4f4f7; padding: 12px 16px; border-left: 3px solid #7c3aed; margin: 12px 0;">
@@ -251,7 +243,7 @@
       </p>
       <ul>
         <li><strong>type</strong> — 標記這個分支「在做哪一類事」，讓人從分支名一眼判斷意圖、優先級、要不要 review。常用詞如下表，跟 commit message 通常共用同一組詞彙（Lesson 06 Conventional Commits 會再講 commit 那邊的細節）。</li>
-        <li><strong>issue-id</strong> — 對應的 issue / ticket 編號，例如 <code>123</code>、<code>JIRA-456</code>。把分支跟工單綁起來，搜尋、追蹤、自動關閉 PR 都方便。</li>
+        <li><strong>issue-id</strong> — 對應的 issue / ticket 編號，例如 <code>#34</code>、<code>JIRA-456</code>。把分支跟工單綁起來，搜尋、追蹤、自動關閉 PR 都方便。</li>
         <li><strong>short-description</strong> — <strong>kebab-case</strong>（小寫 + 連字號），3 - 5 個字描述要做什麼，不要寫小說。</li>
       </ul>
 
@@ -268,106 +260,52 @@
           <tr>
             <td><code>feature</code>（或 <code>feat</code>）</td>
             <td>新功能、新增能力。對使用者可見的「多了某件事」。</td>
-            <td><code>feature/123-add-cart</code></td>
+            <td><code>feature/#34-add-cart</code></td>
           </tr>
           <tr>
             <td><code>fix</code></td>
             <td>修一般的 bug — 不緊急、跟著正常 release 排程上線。</td>
-            <td><code>fix/456-login-redirect</code></td>
+            <td><code>fix/#56-login-redirect</code></td>
           </tr>
           <tr>
             <td><code>hotfix</code></td>
             <td>線上爆炸的緊急修補，要插隊、最短路徑直送 production。流程見下一節「Hotfix」。</td>
-            <td><code>hotfix/v1.4.3-csrf-bypass</code></td>
+            <td><code>hotfix/#101-csrf-bypass</code></td>
           </tr>
           <tr>
             <td><code>refactor</code></td>
             <td>重構 — <strong>行為不變</strong>，只動程式結構（改命名、抽函式、換實作）。沒有新功能、也沒有修 bug。</td>
-            <td><code>refactor/789-extract-auth-service</code></td>
+            <td><code>refactor/#78-extract-auth-service</code></td>
           </tr>
           <tr>
             <td><code>chore</code></td>
             <td>雜務 — 升版套件、改 CI 設定、調 lint 規則、整理 .gitignore 這類「跟產品邏輯無關」的維運性改動。</td>
-            <td><code>chore/upgrade-node-20</code></td>
+            <td><code>chore/#42-upgrade-node-20</code></td>
           </tr>
           <tr>
             <td><code>docs</code></td>
             <td>只動文件 — README、註解、API 文件、教學。<strong>沒碰到任何會影響執行結果的程式碼</strong>。</td>
-            <td><code>docs/update-readme-install</code></td>
+            <td><code>docs/#15-update-readme-install</code></td>
           </tr>
           <tr>
             <td><code>test</code></td>
             <td>只加測試或改測試，沒改實作。常見於補強回歸測試、加 e2e 案例。</td>
-            <td><code>test/add-checkout-e2e</code></td>
+            <td><code>test/#88-add-checkout-e2e</code></td>
           </tr>
           <tr>
             <td><code>perf</code></td>
             <td>效能優化 — 行為跟 refactor 一樣不變，但目的是讓它跑更快、用更少資源。</td>
-            <td><code>perf/optimize-search-index</code></td>
+            <td><code>perf/#62-optimize-search-index</code></td>
           </tr>
           <tr>
             <td><code>release</code></td>
-            <td>專屬 Git Flow — 從 develop 拉出來凍結內容、做 QA 與版本號收尾的釋出分支。GitHub Flow / GitLab Flow 不會用到。</td>
+            <td>專屬 Git Flow — 從 develop 拉出來凍結內容、做 QA 與版本號收尾的釋出分支，命名以版本號為主（例：<code>release/1.5.0</code>），不套用 issue-id 格式。GitHub Flow / GitLab Flow 不會用到。</td>
             <td><code>release/1.5.0</code></td>
           </tr>
         </tbody>
       </table>
 
       <p><strong>不用全部都用</strong>。多數團隊只會挑其中 4 - 6 個來用（常見組合：<code>feature</code> / <code>fix</code> / <code>hotfix</code> / <code>chore</code> / <code>docs</code>），挑完寫進 CONTRIBUTING.md 跟 CI lint 裡，新人才不會自己發明 <code>improvement/</code>、<code>update/</code>、<code>misc/</code> 這種模糊字眼。</p>
-
-      <h3>好範例 vs 壞範例</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>✓ 好範例</th>
-            <th>✗ 壞範例</th>
-            <th>為什麼壞</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><code>feature/123-add-cart</code></td>
-            <td><code>jason-cart</code></td>
-            <td>用人名 — 換人接手就斷線</td>
-          </tr>
-          <tr>
-            <td><code>fix/456-login-redirect</code></td>
-            <td><code>tmp</code> / <code>new</code> / <code>test</code></td>
-            <td>無描述 — 看了等於沒看</td>
-          </tr>
-          <tr>
-            <td><code>hotfix/v1.4.3-csrf-bypass</code></td>
-            <td><code>final-final-v2</code></td>
-            <td>用版本後綴對抗自己 — 語意零</td>
-          </tr>
-          <tr>
-            <td><code>chore/upgrade-node-20</code></td>
-            <td><code>Feature/AddCart</code></td>
-            <td>大寫 / camelCase — case-insensitive 系統會踩雷</td>
-          </tr>
-          <tr>
-            <td><code>refactor/789-extract-auth-service</code></td>
-            <td><code>修登入bug</code></td>
-            <td>中文 / 空格 — Git 雖然能用但 CI、URL 會壞</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h3>Git 本身的硬性限制</h3>
-      <p>就算團隊不在意命名美感，下列字元 Git 直接拒絕，要先知道：</p>
-      <ul>
-        <li>不能含 <code>~</code>、<code>^</code>、<code>:</code>、<code>?</code>、<code>*</code>、<code>[</code>、<code>\</code>、空白</li>
-        <li>不能有連續的 <code>..</code>，也不能以 <code>/</code> 或 <code>.lock</code> 結尾</li>
-        <li>不能以 <code>-</code>、<code>.</code> 開頭</li>
-      </ul>
-
-      <div class="callout callout-success">
-        <div class="callout-icon">✓</div>
-        <div class="callout-body">
-          <strong>把規則寫進 CI，新人就會自動學會</strong>
-          很多團隊在 CI 加一條 lint：分支名不符合 <code>^(feature|fix|hotfix|chore|refactor|docs)/.+$</code> 就擋下 push 或 PR。比起在 review 時口頭糾正，自動化把規則內化得更快。
-        </div>
-      </div>
     </section>
 
     <section class="references">
