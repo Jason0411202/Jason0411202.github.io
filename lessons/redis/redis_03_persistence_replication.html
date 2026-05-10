@@ -314,16 +314,6 @@ auto-aof-rewrite-min-size 64mb</code></pre>
       <p><strong>挑戰</strong>：殺掉 master 之前，先在 client 跑一個迴圈寫 key1, key2, ... 然後在某時間點 <code>docker stop master</code>。觀察 replica 上少了哪些 key。這就是非同步複製的本質。</p>
     </section>
 
-    <section class="references">
-      <h2>官方參考資料</h2>
-      <ul class="ref-list">
-        <li><a href="https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/" target="_blank" rel="noopener">Redis Persistence</a><span class="ref-meta">RDB / AOF / Hybrid</span></li>
-        <li><a href="https://redis.io/docs/latest/operate/oss_and_stack/management/replication/" target="_blank" rel="noopener">Redis Replication</a><span class="ref-meta">主從、partial resync</span></li>
-        <li><a href="https://redis.io/docs/latest/commands/wait/" target="_blank" rel="noopener">WAIT command</a><span class="ref-meta">同步寫保證</span></li>
-        <li><a href="https://redis.io/docs/latest/operate/oss_and_stack/management/admin/" target="_blank" rel="noopener">Admin: Linux THP / overcommit</a><span class="ref-meta">production tuning</span></li>
-      </ul>
-    </section>
-
     <nav class="lesson-nav" aria-label="上一課/下一課">
       <a class="lesson-nav-card lesson-nav-prev" href="redis_02_advanced_ds.html">
         <div class="lesson-nav-eyebrow">← 上一課</div>
