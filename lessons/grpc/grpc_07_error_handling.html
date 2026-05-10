@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 07 · 錯誤處理</div>
     <h1 class="hero-title">錯誤處理與<span>Status Codes</span></h1>
-    <p class="hero-desc">gRPC 有自己的 16 種錯誤碼,選對代碼比寫詳細 message 重要。<strong>學會這個,client 才能依錯誤類型決定:retry、prompt user、抑或記 log 就好。</strong></p>
+    <p class="hero-desc">gRPC 定義 16 種錯誤碼，選擇正確的代碼較撰寫詳細的 message 更為重要。<strong>掌握此設計後，client 才能依錯誤類型決定後續處理：retry、提示使用者，或僅記錄 log。</strong></p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 7 / 10 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 13 分鐘</span>
@@ -52,7 +52,7 @@
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong>選對 code,client 才能正確反應</strong>
-          每個 code 暗示<strong>retry 策略</strong>:<code>UNAVAILABLE</code> 可以馬上 retry、<code>FAILED_PRECONDITION</code> 要等系統狀態改變才該重試、<code>NOT_FOUND</code> retry 也沒用。Server 端隨便丟個 <code>INTERNAL</code>,client 永遠不知道該怎麼辦。
+          每個 code 隱含<strong>對應的 retry 策略</strong>：<code>UNAVAILABLE</code> 可立即 retry、<code>FAILED_PRECONDITION</code> 須等待系統狀態改變後再行 retry、<code>NOT_FOUND</code> 則 retry 無效。若 server 端一律回傳 <code>INTERNAL</code>，client 將無從判斷後續的處理方式。
         </div>
       </div>
     </section>
@@ -86,7 +86,7 @@
         </tbody>
       </table>
 
-      <h3>容易搞混的三組</h3>
+      <h3>容易混淆的三組</h3>
 
       <div class="compare-grid">
         <div class="compare-card compare-good">

@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 06 · 運行期核心</div>
     <h1 class="hero-title">Context、Metadata、<span>Deadline、Cancellation</span></h1>
-    <p class="hero-desc"><code>ctx</code> 是 gRPC 每支 RPC 的中樞神經 — 它帶 deadline、metadata、cancellation 訊號。<strong>學完這堂能正確控制超時、做認證 token 傳遞、處理 client 取消。</strong></p>
+    <p class="hero-desc"><code>ctx</code> 為 gRPC 每支 RPC 的核心——承載 deadline、metadata 與 cancellation 訊號。<strong>完成此堂後，即可正確控制 timeout、傳遞認證 token 並處理 client 取消。</strong></p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 6 / 10 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
@@ -75,8 +75,8 @@
       <div class="callout callout-tip">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>不要把資料偷偷塞 <code>ctx</code></strong>
-          <code>ctx.Value()</code> 設計上只用來傳 request-scoped 控制資料(authn 結果、trace id)。<strong>業務資料應該走 request struct,不要塞 ctx</strong>。Go community 的共識:<em>「ctx is not your bag」</em>。
+          <strong>不應將資料任意置入 <code>ctx</code></strong>
+          <code>ctx.Value()</code> 的設計用途為傳遞 request-scoped 的控制資料（authn 結果、trace id）。<strong>業務資料應透過 request struct 傳遞，不應置入 ctx</strong>。Go community 對此的共識為：<em>「ctx is not your bag」</em>。
         </div>
       </div>
     </section>

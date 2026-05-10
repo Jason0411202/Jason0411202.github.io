@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 10 · 完結篇</div>
     <h1 class="hero-title">連線生命週期:<span>Channel · Keepalive · LB · Health</span></h1>
-    <p class="hero-desc">把 ClientConn 的狀態機、長連線維護、客戶端負載均衡、健康檢查、retry policy 一次補完。<strong>學完整套 10 堂 gRPC 系列就有能力把服務上線跑了。</strong></p>
+    <p class="hero-desc">完整補齊 ClientConn 的狀態機、長連線維護、客戶端負載均衡、健康檢查與 retry policy。<strong>完成 10 堂 gRPC 系列課程後，即具備將服務上線運行的能力。</strong></p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 10 / 10 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 18 分鐘</span>
@@ -134,7 +134,7 @@ conn.WaitForStateChange(ctx, currentState)</code></pre>
     <section id="keepalive">
       <span class="section-eyebrow">02 — Keepalive</span>
       <h2>偵測「半開」死連線</h2>
-      <p>長連線最大的敵人是「半開」(half-open):雙方 TCP 看似還在,但中間 NAT/LB 已把連線狀態 GC 掉。沒 keepalive 你會在下一支 RPC 才發現「咦,這條死了」 — 而 RPC 已經失敗。</p>
+      <p>長連線最大的隱患為「半開」（half-open）狀態：雙方的 TCP 看似仍存在，但中間的 NAT 或 LB 已將連線狀態回收。若無 keepalive，將於下一次 RPC 才察覺連線已失效——此時 RPC 已經失敗。</p>
 
       <h3>Client 端</h3>
       <div class="code-block">

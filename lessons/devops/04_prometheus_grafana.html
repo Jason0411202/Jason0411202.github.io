@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 04 · DevOps 實務篇</div>
     <h1 class="hero-title">Prometheus + Grafana <span>指標監控與儀表板</span></h1>
-    <p class="hero-desc">從 pull-based 心智模型出發,把 metric type、PromQL、Grafana dashboard、告警規則一次串起來。<strong>不是逐字唸 doc,是讓你今天就能在 cluster 裡看到自家服務的 p95 latency。</strong></p>
+    <p class="hero-desc">由 pull-based 心智模型出發，串接 metric type、PromQL、Grafana dashboard 與告警規則。<strong>本課著重實務應用，可立即於 cluster 中觀察自家服務的 p95 latency。</strong></p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 4 / 5 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 75 分鐘</span>
@@ -255,7 +255,7 @@
 
     <section id="promql-five">
       <span class="section-eyebrow">03 — PromQL 入門五式</span>
-      <h2>會這五種寫法,能應付 80% 的 dashboard</h2>
+      <h2>掌握五種寫法，可應付 80% 的 dashboard 需求</h2>
       <p>PromQL 看起來很可怕,但實務上 dashboard 跟 alert 反覆出現的就那幾個 pattern。我們依照「先建立 vector 心智 → 學 rate → 學 histogram_quantile → 學聚合 → 學 recording rule」的順序串起來。</p>
 
       <h3>第 1 式 — Instant vector vs range vector</h3>
@@ -643,7 +643,7 @@ histogram_quantile(<span class="tk-num">0.95</span>,
       <span class="section-eyebrow">07 — Dashboard as Code</span>
       <h2>把 dashboard 放進 Git,而不是只存在 Grafana DB 裡</h2>
 
-      <p>UI 點得開心,然後一次升級或重建 cluster,所有 dashboard 全消失 — 這是新團隊都會踩到的雷。Dashboard as code 的解法是把 JSON Model 包進 ConfigMap,kube-prometheus-stack 的 Grafana sidecar 會自動載入。</p>
+      <p>於 UI 上設定的 dashboard 若無備份，一旦 cluster 升級或重建，所有 dashboard 將會消失——此為新團隊常見的陷阱。Dashboard as code 的解法是將 JSON Model 包入 ConfigMap，kube-prometheus-stack 的 Grafana sidecar 會自動載入。</p>
 
       <div class="timeline">
         <div class="timeline-step">
@@ -967,7 +967,7 @@ histogram_quantile(<span class="tk-num">0.95</span>,
           <p style="margin:0.4rem 0;font-weight:700;">絕對不要把以下東西放進 label:</p>
           <ul style="margin:0.4rem 0 0.6rem 1.2rem;font-size:13px;line-height:1.7;">
             <li><code>user_id</code> / <code>email</code> — 每個用戶一條 series,百萬用戶 = 百萬 series</li>
-            <li><code>request_id</code> / <code>trace_id</code> / <code>session_id</code> — 每個請求一條,直接爆炸</li>
+            <li><code>request_id</code> / <code>trace_id</code> / <code>session_id</code> — 每個請求新增一條 series，將迅速失控</li>
             <li>完整 URL 含 query string 或 path 變數(<code>/users/12345</code>) — 應改成 route pattern <code>/users/:id</code></li>
             <li>使用者輸入的字串(搜尋詞、自由文字)</li>
             <li>IP address(雖然有限,但常見有上萬個)</li>
@@ -987,7 +987,7 @@ histogram_quantile(<span class="tk-num">0.95</span>,
 <pre><code><span class="tk-cm"># 數一下 orders_* 一共有多少條 series</span>
 count({__name__=~<span class="tk-st">"orders_.*"</span>})
 
-<span class="tk-cm"># 看 cluster 內 series 最多的前 10 個 metric — 排查爆炸源</span>
+<span class="tk-cm"># 列出 cluster 內 series 數量最多的前 10 個 metric — 用於追溯異常成因</span>
 topk(<span class="tk-num">10</span>, count by (__name__) ({__name__!=<span class="tk-st">""</span>}))
 
 <span class="tk-cm"># 看每個 job 的 series 量 — 哪個服務貢獻最多</span>

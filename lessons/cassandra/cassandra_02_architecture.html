@@ -269,7 +269,7 @@
       </div>
 
       <h3>多 DC：用 LOCAL_QUORUM 而不是 QUORUM</h3>
-      <p>跨 DC 網路 RTT 動輒 50ms 以上。如果用 <code>QUORUM</code>，每次寫入都要等遠端 DC 回應，延遲爆炸。實務上幾乎一律用 <code>LOCAL_QUORUM</code>：本地強一致、跨 DC 用<em>非同步複寫</em>達成最終一致。</p>
+      <p>跨 DC 網路 RTT 動輒 50ms 以上。若採用 <code>QUORUM</code>，每次寫入皆需等待遠端 DC 回應，延遲將顯著增加。實務上幾乎一律採用 <code>LOCAL_QUORUM</code>：本地強一致，跨 DC 透過<em>非同步複寫</em>達成最終一致。</p>
     </section>
 
     <section id="pacelc">

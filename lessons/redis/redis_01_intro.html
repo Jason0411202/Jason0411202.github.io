@@ -52,7 +52,7 @@
         <li><strong>cache 一個熱資料</strong>：要嘛自己包 Memcached（純 KV、沒結構），要嘛去 hit 資料庫，每次 5–50ms。</li>
         <li><strong>排行榜</strong>：MySQL 排序 1000 萬筆每秒幾百次？硬碟跟 index 都會冒煙。</li>
         <li><strong>輕量級訊息佇列</strong>：用 RabbitMQ 太重、用 MySQL polling 太慢。</li>
-        <li><strong>分散式 lock</strong>：自己用 DB 的 row lock 寫，慘不忍睹。</li>
+        <li><strong>分散式 lock</strong>：以 DB 的 row lock 自行實作，效能與正確性皆不佳。</li>
       </ul>
       <p>Redis（<strong>RE</strong>mote <strong>DI</strong>ctionary <strong>S</strong>erver）由 Salvatore Sanfilippo 創造、Antirez 為其代名。它的「驚人」之處不是「把資料放在記憶體」（這個 Memcached 早就做了），而是 — </p>
 
@@ -100,7 +100,7 @@
         <div class="diagram-caption">圖 R1.1 — Redis 把記憶體中的資料結構搬到網路另一端，多進程共享</div>
       </div>
 
-      <p>所以「cache 一個 user object」只是 Redis 能做的最簡單一件事。看到「排行榜」就用 Sorted Set；看到「最近 100 筆事件」就用 Stream；看到「附近 1km 的店家」就用 Geo；看到「使用者連續 30 天簽到」就用 Bitmap — 這些都是<strong>原生指令直接搞定，不用拉資料回來自己算</strong>。</p>
+      <p>因此「快取 user object」僅為 Redis 最基礎的應用之一。遇到「排行榜」採用 Sorted Set；遇到「最近 100 筆事件」採用 Stream；遇到「附近 1km 的店家」採用 Geo；遇到「使用者連續 30 天簽到」採用 Bitmap——皆可<strong>透過原生指令直接處理，無須將資料拉回應用層自行計算</strong>。</p>
     </section>
 
     <section id="single-thread">
@@ -110,7 +110,7 @@
 
       <ul>
         <li><strong>沒有 lock 競爭</strong>：所有指令依序執行，每個指令都是原子的。你要做一個原子計數器？<code>INCR counter</code>。要原子地拿出最舊的訊息？<code>LPOP list</code>。完全不需要自己處理 race condition。</li>
-        <li><strong>記憶體比 CPU 慢得多</strong>：對 KV 操作來說，瓶頸是 RAM access、不是 CPU。多緒能加多少？實測加 4 倍 thread 只快 1.5 倍，但複雜度爆炸。</li>
+        <li><strong>記憶體存取速度遠低於 CPU</strong>：對 KV 操作而言，瓶頸在於 RAM access 而非 CPU。多執行緒能帶來多少效益？實測增加 4 倍 thread 僅提升 1.5 倍效能，但複雜度顯著上升。</li>
         <li><strong>I/O multiplexing</strong>：用 epoll / kqueue 在單一 thread 處理數萬條連線。網路是非同步的，CPU 永遠不會閒著。</li>
       </ul>
 
@@ -248,7 +248,7 @@
               <li><strong>儲存大物件（單一 value &gt; 100KB）</strong>：阻塞單緒、複寫變慢。</li>
               <li><strong>需要強一致 + 高可用</strong>：Redis 主從是非同步複製，failover 可能掉資料（R-03 會講）。</li>
               <li><strong>需要複雜查詢 / 全文搜尋（大規模）</strong>：可用 RediSearch，但 ElasticSearch 仍是更好的選項。</li>
-              <li><strong>非常大的 dataset</strong>（&gt; 100GB）：記憶體成本爆炸。考慮 KV on-disk 解（如 RocksDB）或加 Cluster。</li>
+              <li><strong>超大規模 dataset</strong>（&gt; 100GB）：記憶體成本將大幅攀升，建議改用 KV on-disk 方案（如 RocksDB）或導入 Cluster。</li>
             </ul>
           </div>
         </div>

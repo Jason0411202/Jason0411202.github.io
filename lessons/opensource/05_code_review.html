@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 05 · 協作工作流篇</div>
     <h1 class="hero-title">Code Review<span> 文化與技巧</span></h1>
-    <p class="hero-desc">Code review 不是「揪錯」，是<strong>知識傳遞 + 風險控管</strong>。這堂教你怎麼當好 reviewer 與好 author，以及業界共通的留言規範。</p>
+    <p class="hero-desc">Code review 並非「挑錯」，而是<strong>知識傳遞與風險控管</strong>。本課將介紹擔任 reviewer 與 author 的角色職責，以及業界共通的留言規範。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 5 / 12 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 12 分鐘</span>
@@ -46,101 +46,101 @@
 
     <section id="why">
       <span class="section-eyebrow">01 — 為什麼要 review</span>
-      <h2>Code review 的真正目的</h2>
+      <h2>Code review 的核心目的</h2>
 
-      <p>很多人以為 review 是來「找 bug」的。其實找 bug 只是<strong>副產物</strong>。Google Engineering Practices 對 review 目的的官方說法：</p>
+      <p>許多人誤以為 review 的主要任務是「找 bug」。實際上找 bug 只是<strong>副產物</strong>。Google Engineering Practices 對 review 目的的官方定義如下：</p>
 
       <ol>
-        <li><strong>維護程式碼品質</strong> — 不只正確，還要可讀、可維護</li>
-        <li><strong>知識共享</strong> — 至少有 2 個人懂這段程式碼</li>
-        <li><strong>建立團隊規範</strong> — 透過討論累積一致風格</li>
-        <li><strong>傳承</strong> — 新人看 review 學資深者的思考</li>
+        <li><strong>維護程式碼品質</strong>——不僅追求正確性，更須具備可讀性與可維護性</li>
+        <li><strong>知識共享</strong>——確保至少有 2 位成員理解該段程式碼</li>
+        <li><strong>建立團隊規範</strong>——透過討論累積一致的撰寫風格</li>
+        <li><strong>傳承</strong>——新人透過 review 過程學習資深成員的思考方式</li>
       </ol>
 
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>Reviewer 不是把關者，是合作者</strong>
-          Reviewer 跟 author 是同一隊的，目標都是讓程式碼變好。如果用「審判 vs 被審判」心態做 review，整個團隊文化就崩了。
+          <strong>Reviewer 是合作者而非把關者</strong>
+          Reviewer 與 author 站在同一陣線，目標皆為提升程式碼品質。若以「審判」心態進行 review，將破壞團隊協作文化。
         </div>
       </div>
     </section>
 
     <section id="reviewer">
       <span class="section-eyebrow">02 — Reviewer 心法</span>
-      <h2>當 Reviewer 該注意什麼</h2>
+      <h2>Reviewer 的工作要點</h2>
 
-      <h3>Reviewer 的優先順序 (Google Style Guide)</h3>
+      <h3>Reviewer 的審查優先順序（Google Style Guide）</h3>
       <ol>
-        <li><strong>設計</strong> — 整體架構與這次改動的取捨對嗎？</li>
-        <li><strong>功能性</strong> — 行為符合需求嗎？邊界情況處理了嗎？</li>
-        <li><strong>複雜度</strong> — 有沒有 over-engineer？讀的人能理解嗎？</li>
-        <li><strong>測試</strong> — 有測試嗎？測試本身寫得好嗎？</li>
-        <li><strong>命名</strong> — 變數 / 函式 / 檔案命名清楚嗎？</li>
-        <li><strong>註解</strong> — 註解解釋「為什麼」(WHY) 而非「做什麼」(WHAT)？</li>
-        <li><strong>風格</strong> — 符合 style guide？(這個應該是 linter 自動處理)</li>
+        <li><strong>設計</strong>——整體架構與此次改動的取捨是否合理？</li>
+        <li><strong>功能性</strong>——行為是否符合需求？邊界情況是否已處理？</li>
+        <li><strong>複雜度</strong>——是否存在 over-engineering？是否便於後續閱讀？</li>
+        <li><strong>測試</strong>——是否包含測試？測試本身的撰寫品質如何？</li>
+        <li><strong>命名</strong>——變數、函式、檔案命名是否清晰？</li>
+        <li><strong>註解</strong>——註解是否解釋「為什麼」（WHY）而非「做什麼」（WHAT）？</li>
+        <li><strong>風格</strong>——是否符合 style guide？（此項應交由 linter 自動處理）</li>
       </ol>
 
-      <h3>Reviewer 速度</h3>
-      <p>Google 的內部標準：<strong>收到 review 請求後 1 個工作天內要給回應</strong>。即使做不完整 review，也要先 ack「收到，X 點前回覆」。</p>
+      <h3>Reviewer 的回應時效</h3>
+      <p>Google 的內部標準：<strong>收到 review 請求後須於 1 個工作天內給予回應</strong>。即使無法完成完整 review，也應先回覆「已收到，將於 X 時前回覆」。</p>
 
       <div class="callout callout-warn">
         <div class="callout-icon">!</div>
         <div class="callout-body">
-          <strong>不要拖延 review</strong>
-          PR 卡在 review 越久，author 越痛苦：① 衝突越來越多 ② 上下文記憶流失 ③ 後面工作被擋住。<strong>review 不是「我有空再做」的事，是團隊輸出速度的關鍵環節。</strong>
+          <strong>避免延遲 review</strong>
+          PR 卡在 review 階段時間越長，對 author 的影響越大：① 衝突日益累積；② 上下文記憶流失；③ 後續工作受阻。<strong>review 並非「有空再處理」的工作，而是影響團隊產出速度的關鍵環節。</strong>
         </div>
       </div>
 
-      <h3>找不到問題該怎麼做？</h3>
-      <p>Reviewer 不需要「至少挑一個毛病」。如果整份 PR 看起來都好，<strong>直接 approve 並寫一句肯定的話</strong>就好。Google 內部規定：「如果一個 reviewer 覺得整份 CL (change list) 至少跟現有 codebase 一樣好，就應該 LGTM (Looks Good To Me)」。</p>
+      <h3>未發現問題時的處理方式</h3>
+      <p>Reviewer 並無「至少挑出一個問題」的義務。若整份 PR 內容良好，<strong>直接 approve 並附上一句肯定的留言</strong>即可。Google 內部規範：「若 reviewer 認為整份 CL（change list）至少與現有 codebase 同等優秀，即應給予 LGTM（Looks Good To Me）」。</p>
     </section>
 
     <section id="author">
       <span class="section-eyebrow">03 — Author 禮儀</span>
-      <h2>當 Author 怎麼讓自己 PR 順利通過</h2>
+      <h2>Author 提升 PR 通過率的做法</h2>
 
       <div class="timeline">
         <div class="timeline-step">
           <div class="timeline-num">1</div>
           <div class="timeline-content">
-            <div class="timeline-title">PR 越小越好</div>
-            <div class="timeline-desc">理想 PR：&lt; 400 行 diff。超過 1000 行的 PR review 品質會急速下降，建議拆成多個。</div>
+            <div class="timeline-title">PR 規模越小越佳</div>
+            <div class="timeline-desc">理想 PR 規模：低於 400 行 diff。超過 1000 行的 PR，review 品質將顯著下降，建議拆分。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">2</div>
           <div class="timeline-content">
-            <div class="timeline-title">寫好 PR 描述</div>
-            <div class="timeline-desc">背景 / 改動 / 怎麼測 / 是否 breaking — Lesson 04 的範本。</div>
+            <div class="timeline-title">完整撰寫 PR 描述</div>
+            <div class="timeline-desc">包含背景、改動內容、測試方式、是否為 breaking change——可參考 Lesson 04 的範本。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">3</div>
           <div class="timeline-content">
-            <div class="timeline-title">先自己 review 一遍</div>
-            <div class="timeline-desc">送出前自己看一次 GitHub diff 介面，常會發現 debug print、TODO、命名問題。</div>
+            <div class="timeline-title">送出前先自我 review</div>
+            <div class="timeline-desc">送出前於 GitHub diff 介面再次檢視，往往能發現 debug print、TODO 與命名問題。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">4</div>
           <div class="timeline-content">
-            <div class="timeline-title">回覆每一個 comment</div>
-            <div class="timeline-desc">不要靜默改完就 push。每條 comment 至少回 <em>Done</em> / <em>Won't fix because...</em> / <em>Discussed with X offline</em>。</div>
+            <div class="timeline-title">回覆每一條 comment</div>
+            <div class="timeline-desc">勿在無回覆下逕自修改後 push。每條 comment 至少回覆 <em>Done</em>、<em>Won't fix because...</em> 或 <em>Discussed with X offline</em>。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">5</div>
           <div class="timeline-content">
-            <div class="timeline-title">不同意時 push back，但禮貌</div>
-            <div class="timeline-desc">Reviewer 也會錯。有理由就提出來討論，不是無條件接受所有建議。</div>
+            <div class="timeline-title">不同意時提出討論，並保持禮貌</div>
+            <div class="timeline-desc">Reviewer 亦可能有誤。具備合理依據時應提出討論，而非無條件接受所有建議。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">6</div>
           <div class="timeline-content">
-            <div class="timeline-title">避免被 review 後再大改</div>
-            <div class="timeline-desc">review 通過後再大改範圍，整個流程要重來，等於浪費 reviewer 的時間。</div>
+            <div class="timeline-title">避免 review 通過後又大幅改動</div>
+            <div class="timeline-desc">review 通過後若再大幅改動範圍，整個流程須重新進行，將造成 reviewer 的時間浪費。</div>
           </div>
         </div>
       </div>
@@ -148,31 +148,31 @@
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>不要把 review 當成個人攻擊</strong>
-          Reviewer 是針對「程式碼」不是「你」。即使留言用詞犀利，把焦點拉回 — 這段程式碼有什麼可以更好的？大多數時候你會發現意見很合理。
+          <strong>勿將 review 視為個人攻擊</strong>
+          Reviewer 針對的是「程式碼」而非「個人」。即使留言用詞較為直接，仍應將焦點拉回——此段程式碼是否仍有可改進之處？多數情況下，建議皆具合理性。
         </div>
       </div>
     </section>
 
     <section id="conventional">
       <span class="section-eyebrow">04 — 留言規範</span>
-      <h2>Conventional Comments — 用 prefix 表達意圖</h2>
+      <h2>Conventional Comments——以 prefix 表達意圖</h2>
 
-      <p>同樣是 review 留言，下面這兩個的訊號完全不同：</p>
+      <p>同樣是 review 留言，以下兩種寫法傳達的訊息截然不同：</p>
 
       <div class="compare-grid">
         <div class="compare-card compare-bad">
-          <div class="compare-label"><span class="compare-icon">✗</span>含糊</div>
+          <div class="compare-label"><span class="compare-icon">✗</span>模糊</div>
           <div class="compare-body">
-            <code>這裡名字不太好</code>
-            <p style="font-size:13px;margin-top:0.4rem;">Author 不知道這是 must-fix 還是建議？要改成什麼？必要嗎？</p>
+            <code>這個命名不太好</code>
+            <p style="font-size:13px;margin-top:0.4rem;">Author 無從判斷這是必須修正還是僅為建議？應改為什麼？是否為合併的必要條件？</p>
           </div>
         </div>
         <div class="compare-card compare-good">
           <div class="compare-label"><span class="compare-icon">✓</span>明確</div>
           <div class="compare-body">
-            <code>nit: <code>handle</code> → <code>handleSubmit</code> 會更明確，可選</code>
-            <p style="font-size:13px;margin-top:0.4rem;"><code>nit:</code> = 雞蛋裡挑骨頭、可選；author 知道不必修也能合併。</p>
+            <code>nit: <code>handle</code> → <code>handleSubmit</code> 會更明確，非必要</code>
+            <p style="font-size:13px;margin-top:0.4rem;"><code>nit:</code> 表示細節建議、可選；author 即可判斷不修改亦能合併。</p>
           </div>
         </div>
       </div>
@@ -181,38 +181,38 @@
 
       <table>
         <thead>
-          <tr><th>Prefix</th><th>意思</th><th>範例</th></tr>
+          <tr><th>Prefix</th><th>含義</th><th>範例</th></tr>
         </thead>
         <tbody>
           <tr>
             <td><code>blocking:</code></td>
-            <td>必須改，否則不能合併</td>
-            <td><em>blocking: 這會讓 production 上的 user 看到 stack trace</em></td>
+            <td>必須修正，否則不應合併</td>
+            <td><em>blocking: 此寫法會使 production 上的使用者看到 stack trace</em></td>
           </tr>
           <tr>
             <td><code>suggestion:</code></td>
-            <td>建議改，author 可以選擇接受</td>
-            <td><em>suggestion: 用 Map 取代 if-else 鏈會更好維護</em></td>
+            <td>建議修改，author 可自行決定是否採納</td>
+            <td><em>suggestion: 以 Map 取代 if-else 鏈將更易於維護</em></td>
           </tr>
           <tr>
             <td><code>nit:</code></td>
-            <td>(nitpick) 雞蛋裡挑骨頭、純風格</td>
-            <td><em>nit: 這個變數可以早一行宣告</em></td>
+            <td>（nitpick）細節建議，純風格層面</td>
+            <td><em>nit: 此變數可提前一行宣告</em></td>
           </tr>
           <tr>
             <td><code>question:</code></td>
-            <td>提問，不是要你改</td>
-            <td><em>question: 這個 timeout 設 5 秒的理由是？</em></td>
+            <td>提問，並非要求修改</td>
+            <td><em>question: 此處將 timeout 設為 5 秒的理由為何？</em></td>
           </tr>
           <tr>
             <td><code>thought:</code></td>
-            <td>想到的點，純分享</td>
-            <td><em>thought: 之後可能可以抽成 hook</em></td>
+            <td>想法分享，無修改要求</td>
+            <td><em>thought: 後續或可抽成 hook</em></td>
           </tr>
           <tr>
             <td><code>praise:</code></td>
-            <td>稱讚 (鼓勵 reviewer 也寫這種!)</td>
-            <td><em>praise: 這段抽象做得很乾淨 👍</em></td>
+            <td>稱讚（鼓勵 reviewer 多加使用）</td>
+            <td><em>praise: 此處的抽象設計相當乾淨</em></td>
           </tr>
         </tbody>
       </table>
@@ -220,37 +220,37 @@
       <div class="callout callout-success">
         <div class="callout-icon">✓</div>
         <div class="callout-body">
-          <strong>praise 留言其實很重要</strong>
-          Code review 文化不是只批評。看到好的設計記得說出來 — author 知道自己做對了什麼，整個團隊 morale 也會好。研究顯示「正面 review 留言」跟「員工留任率」高度相關。
+          <strong>praise 留言不可或缺</strong>
+          Code review 文化不應僅止於批評。看到良好的設計時應主動表達——author 得以了解自身做得正確的部分，亦能提升整體團隊士氣。研究顯示，正面的 review 留言與員工留任率呈現高度相關。
         </div>
       </div>
     </section>
 
     <section id="actions">
       <span class="section-eyebrow">05 — 三種 review 結論</span>
-      <h2>Approve / Request changes / Comment 怎麼選</h2>
+      <h2>Approve / Request changes / Comment 的選用</h2>
 
-      <p>GitHub PR review 有三個按鈕，各自意義：</p>
+      <p>GitHub PR review 提供三個按鈕，各自的意義如下：</p>
 
       <table>
         <thead>
-          <tr><th>選項</th><th>效果</th><th>什麼時候用</th></tr>
+          <tr><th>選項</th><th>效果</th><th>適用情境</th></tr>
         </thead>
         <tbody>
           <tr>
             <td><strong>Approve</strong></td>
-            <td>+1 通過票，CI / 設定到位後可合併</td>
-            <td>看完了沒問題；或只剩 nit 不影響合併</td>
+            <td>+1 通過票，CI 與設定到位後即可合併</td>
+            <td>檢視後並無問題；或僅剩 nit 級別建議，不影響合併</td>
           </tr>
           <tr>
             <td><strong>Request changes</strong></td>
-            <td>擋住 merge 直到 author 解決並再次 review</td>
-            <td>有 blocking 問題，沒改不能合</td>
+            <td>阻擋 merge，直至 author 處理完畢並再次 review</td>
+            <td>存在 blocking 問題，未修正前不應合併</td>
           </tr>
           <tr>
             <td><strong>Comment</strong></td>
             <td>留下意見但不投票</td>
-            <td>路過想說兩句、無法完整 review、提問</td>
+            <td>偶然瀏覽提出建議、無法完整 review、純粹提問</td>
           </tr>
         </tbody>
       </table>
@@ -258,17 +258,17 @@
       <div class="callout callout-warn">
         <div class="callout-icon">!</div>
         <div class="callout-body">
-          <strong>Request changes 要慎用</strong>
-          有些團隊文化把 request changes 當成「強烈反對」。如果只是 nit 級別的問題，用 <strong>Approve</strong> + <strong>內含 nit comment</strong> 比較好 — 表示「這些是建議，可以採納可以不採納，但不擋你合」。Request changes 留給真正會破壞東西的問題。
+          <strong>Request changes 應審慎使用</strong>
+          部分團隊文化將 request changes 視為「強烈反對」。若僅為 nit 級別的問題，建議使用 <strong>Approve</strong> 並附上 <strong>nit comment</strong>——傳達「以下為建議，可採納或不採納，但不阻擋合併」之意。Request changes 應保留予確實會造成破壞性影響的問題。
         </div>
       </div>
     </section>
 
     <section id="suggested">
       <span class="section-eyebrow">06 — Suggested changes</span>
-      <h2>GitHub Suggested Changes — 一鍵接受改動</h2>
+      <h2>GitHub Suggested Changes——一鍵接受改動</h2>
 
-      <p>GitHub 留言時用一個特殊 code block 寫建議的修改，author 就能在網頁上直接 commit：</p>
+      <p>於 GitHub 留言時使用特殊的 code block 撰寫建議修改內容，author 即可於網頁上直接 commit：</p>
 
       <div class="code-block">
         <div class="code-block-header">
@@ -283,13 +283,13 @@ const handleSubmit = async (event) =&gt; {
 <span class="tk-cm">```</span></code></pre>
       </div>
 
-      <p>Author 看到後會出現一個按鈕「Add suggestion to batch」或「Commit suggestion」，按下去就直接 push 一個 commit，不用本地操作。</p>
+      <p>Author 將看到「Add suggestion to batch」或「Commit suggestion」按鈕，點擊後即可直接 push 一筆 commit，無須本地操作。</p>
 
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>什麼時候用 suggestion 最好</strong>
-          Typo、命名建議、簡單重構 — 反正比文字描述更精準。複雜邏輯不適合用 suggestion，因為 author 應該理解後自己寫，不是無腦接受。
+          <strong>suggestion 的適用時機</strong>
+          適合用於 typo、命名建議、簡單重構等場景，較文字描述精確。複雜邏輯不建議使用 suggestion，因為 author 應在理解後自行撰寫，而非無條件採納。
         </div>
       </div>
     </section>
@@ -298,49 +298,49 @@ const handleSubmit = async (event) =&gt; {
       <span class="section-eyebrow">07 — CODEOWNERS</span>
       <h2><code>CODEOWNERS</code>：自動指派 reviewer</h2>
 
-      <p>大型專案會在 repo 根目錄或 <code>.github/</code> 放一個 <code>CODEOWNERS</code> 檔，定義「哪個目錄改動時自動找誰 review」：</p>
+      <p>大型專案會在 repo 根目錄或 <code>.github/</code> 下放置一個 <code>CODEOWNERS</code> 檔，用於定義「特定目錄變動時自動指派由誰 review」：</p>
 
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">codeowners</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 預設所有改動都要這個團隊 review</span>
+<pre><code><span class="tk-cm"># 預設所有改動皆由此團隊 review</span>
 *       @your-org/core-team
 
-<span class="tk-cm"># 前端目錄找前端團隊</span>
+<span class="tk-cm"># 前端目錄指派前端團隊</span>
 /web/   @your-org/frontend
 /mobile/ @your-org/mobile
 
-<span class="tk-cm"># 安全相關必須找安全團隊</span>
+<span class="tk-cm"># 安全相關必須由安全團隊 review</span>
 /auth/  @your-org/security
 *.pem   @your-org/security
 
-<span class="tk-cm"># 文件可以任何 docs 團隊成員</span>
+<span class="tk-cm"># 文件由 docs 團隊任一成員 review 即可</span>
 /docs/  @your-org/docs</code></pre>
       </div>
 
-      <p>當 PR 改到對應目錄，GitHub 會自動加那些人 / 團隊到 reviewer。配合 branch protection 的 <strong>Require review from Code Owners</strong>，可以強制必須由相關專家 review 才能合併。</p>
+      <p>當 PR 改動對應目錄時，GitHub 將自動將相關人員或團隊加為 reviewer。搭配 branch protection 的 <strong>Require review from Code Owners</strong>，可強制要求由相關領域專家 review 後方能合併。</p>
 
       <details class="collapse">
-        <summary>進階：CODEOWNERS 語法陷阱 <span class="collapse-tag">深入</span></summary>
+        <summary>進階：CODEOWNERS 的語法注意事項 <span class="collapse-tag">深入</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:13px;">
-            <li><strong>後寫的優先</strong> — 跟 .gitignore 一樣，下面的規則覆蓋上面的</li>
-            <li><strong>路徑開頭的 <code>/</code> 表示 repo 根目錄</strong> — <code>/auth/</code> 只匹配根的 auth/，不匹配 <code>src/auth/</code></li>
-            <li><strong>沒有開頭 <code>/</code> 表示任何位置</strong> — <code>auth/</code> 會匹配 <code>src/auth/</code> 也會匹配 <code>tests/auth/</code></li>
-            <li><strong>個人 owner 必須有寫權限</strong> — 沒寫權限的人不能成為 code owner</li>
+            <li><strong>後寫者優先</strong>——與 .gitignore 相同，下方規則會覆蓋上方規則</li>
+            <li><strong>路徑開頭的 <code>/</code> 代表 repo 根目錄</strong>——<code>/auth/</code> 僅匹配根目錄下的 auth/，不會匹配 <code>src/auth/</code></li>
+            <li><strong>未加開頭 <code>/</code> 代表任意位置</strong>——<code>auth/</code> 將同時匹配 <code>src/auth/</code> 與 <code>tests/auth/</code></li>
+            <li><strong>個人 owner 須具備寫入權限</strong>——無寫入權限者不得成為 code owner</li>
           </ul>
         </div>
       </details>
 
       <details class="collapse">
-        <summary>Async vs Sync review、Pair review、Review fatigue <span class="collapse-tag">深入</span></summary>
+        <summary>Async 與 Sync review、Pair review 與 Review fatigue <span class="collapse-tag">深入</span></summary>
         <div class="collapse-body">
-          <p style="margin-bottom:0.5rem;"><strong>Async review (大多數)</strong>：reviewer 自己有空時看，留 comment，author 改完再請 reviewer 看。適合分散團隊。</p>
-          <p style="margin-bottom:0.5rem;"><strong>Sync review</strong>：兩人坐一起 (或視訊) 一行一行討論。適合複雜 / 高風險改動，一次解掉所有疑問。</p>
-          <p style="margin-bottom:0.5rem;"><strong>Pair review</strong>：兩人一起寫程式 + review，適合新人 onboarding。</p>
-          <p><strong>Review fatigue 對策</strong>：① 一次 review 上限 60 分鐘 / 400 行 ② 大 PR 拆小 ③ reviewer rotation 不要永遠同幾個人 ④ 自動化 (linter / CI) 處理機械性檢查，讓人類 review 集中在真正重要的東西。</p>
+          <p style="margin-bottom:0.5rem;"><strong>Async review（最常採用）</strong>：reviewer 於可用時段自行檢視並留下 comment，author 修改後再請 reviewer 複查。適合分散式團隊。</p>
+          <p style="margin-bottom:0.5rem;"><strong>Sync review</strong>：雙方共處（或視訊）逐行討論。適合複雜或高風險的改動，可一次釐清所有疑問。</p>
+          <p style="margin-bottom:0.5rem;"><strong>Pair review</strong>：兩人共同撰寫並進行 review，適用於新人 onboarding。</p>
+          <p><strong>Review fatigue 的緩解措施</strong>：① 單次 review 控制在 60 分鐘或 400 行以內；② 將大 PR 拆解為較小的 PR；③ 進行 reviewer rotation，避免長期集中於少數成員；④ 透過自動化工具（linter、CI）處理機械性檢查，讓人工 review 聚焦於真正重要的部分。</p>
         </div>
       </details>
     </section>

@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 01 · gRPC 概念篇</div>
     <h1 class="hero-title">gRPC 是什麼:<span>HTTP/2 上的 RPC</span></h1>
-    <p class="hero-desc">先建立詞彙與心智模型,理解「遠端呼叫」是個漏抽象,以及 gRPC 為什麼挑 HTTP/2 + Protobuf 這個組合。<strong>這堂課完全不寫 code,目標是讓後面 9 堂讀起來都很順。</strong></p>
+    <p class="hero-desc">先建立詞彙與心智模型，理解「遠端呼叫」屬於漏抽象（leaky abstraction），以及 gRPC 採用 HTTP/2 加 Protobuf 此一組合的原因。<strong>本課不涉及程式撰寫，目的在於為後續 9 堂奠定基礎。</strong></p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 1 / 10 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
@@ -57,7 +57,7 @@
         </div>
       </div>
 
-      <p>聽起來很美,但這是個<strong>漏抽象</strong>(leaky abstraction)。本地函式呼叫不會失敗、不會超時、不會中途斷線、不會序列化錯誤;遠端呼叫每一項都會。所以實務上 RPC 框架要解決的不是「讓你忘記它在遠端」,而是<strong>把那些「遠端會發生的麻煩事」變成可控的工具</strong>。gRPC 之所以值得學,是因為它把這些麻煩事都處理得不錯:序列化、傳輸、錯誤、超時、取消、重試、認證、串流 — 都有官方的標準做法。</p>
+      <p>此理念雖具吸引力，但屬於<strong>漏抽象</strong>（leaky abstraction）。本地函式呼叫不會失敗、不會超時、不會中途斷線、不會發生序列化錯誤；遠端呼叫則皆有可能。實務上 RPC 框架的目標並非「使開發者忽略遠端的存在」，而是<strong>將「遠端執行所衍生的問題」轉化為可控的工具</strong>。gRPC 值得學習的原因，在於其對下列各項皆提供官方的標準做法：序列化、傳輸、錯誤處理、超時、取消、重試、認證與串流。</p>
 
       <div class="diagram">
         <svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" aria-label="RPC 呼叫流程圖">
@@ -213,7 +213,7 @@
       <h2>Protobuf:契約即程式碼</h2>
       <p>Protocol Buffers(簡稱 protobuf)是 Google 2008 開源的<strong>序列化格式 + IDL</strong>(Interface Definition Language)。gRPC 預設用 protobuf,但兩者是分開的東西 — gRPC 也可以用 JSON,protobuf 也可以脫離 gRPC 單獨用。</p>
 
-      <h3>protobuf 給你的三個東西</h3>
+      <h3>protobuf 提供的三項核心能力</h3>
       <ol>
         <li><strong>跨語言型別契約</strong> — 寫一份 <code>.proto</code>,用 <code>protoc</code> 編譯出 Go / Java / Python / TypeScript 的型別定義。前後端、跨服務不會再為「這個欄位是 int 還是 string」吵架。</li>
         <li><strong>緊湊二進位</strong> — 一個 <code>int32</code> 多數情況用 1–5 byte(varint 編碼),JSON 至少要 1 byte 的引號 + N byte 的數字字串 + key 字串。同樣訊息 protobuf 通常比 JSON 小 30–50%。</li>

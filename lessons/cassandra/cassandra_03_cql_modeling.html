@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Cassandra 03 · 資料建模</div>
     <h1 class="hero-title">CQL 與<span>Query-First 建模</span></h1>
-    <p class="hero-desc">Cassandra 最容易踩坑的地方就是「以為 CQL 是 SQL」。本堂把 partition key / clustering key、wide row、反正規化、為什麼不能 join 一次說清楚。</p>
+    <p class="hero-desc">Cassandra 最常見的誤解便是「將 CQL 視為 SQL」。本堂將完整說明 partition key、clustering key、wide row、反正規化，以及無法 join 的原因。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 3 / 6 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 16 分鐘</span>
@@ -197,7 +197,7 @@
     <span class="tk-kw">AND</span> ts &gt;= <span class="tk-st">'2026-04-27 09:30'</span>
     <span class="tk-kw">AND</span> ts &lt;  <span class="tk-st">'2026-04-27 16:00'</span>;
 
-<span class="tk-cm">-- 但這個爆炸 — 沒指定 partition key</span>
+<span class="tk-cm">-- 但此查詢將失敗——未指定 partition key</span>
 <span class="tk-kw">SELECT</span> * <span class="tk-kw">FROM</span> price_by_symbol
   <span class="tk-kw">WHERE</span> ts &gt;= <span class="tk-st">'2026-04-27 09:30'</span>;
 <span class="tk-cm">-- ↑ 沒給 symbol → Cassandra 要掃所有 partition,拒絕</span></code></pre>
@@ -234,7 +234,7 @@
         <div class="timeline-step">
           <div class="timeline-num">4</div>
           <div class="timeline-content">
-            <div class="timeline-title">驗證 partition size 不會炸</div>
+            <div class="timeline-title">驗證 partition size 不致超出限制</div>
             <div class="timeline-desc">每個 partition 估算大小，目標 &lt; 100 MB、&lt; 100 萬個 cell。超過就要切 bucket。</div>
           </div>
         </div>

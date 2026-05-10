@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Redis 04 · 高可用與分片</div>
     <h1 class="hero-title">Sentinel vs <span>Cluster</span>:解決什麼問題</h1>
-    <p class="hero-desc">兩個常被混為一談的東西：Sentinel 解決<em>可用性</em>(自動 failover)；Cluster 解決<em>容量/吞吐</em>(水平分片)。本堂讓你能正確選擇。</p>
+    <p class="hero-desc">兩種常被混為一談的方案：Sentinel 解決<em>可用性</em>（自動 failover）；Cluster 解決<em>容量與吞吐</em>（水平分片）。本堂協助讀者正確選擇適用方案。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 4 / 6 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
@@ -46,7 +46,7 @@
     <section id="problem">
       <span class="section-eyebrow">01 — 切清楚</span>
       <h2>兩個完全不同的問題</h2>
-      <p>新手最常搞混的：</p>
+      <p>新手最容易混淆的概念：</p>
       <ul>
         <li><strong>「我的 master 掛了想要自動切到 replica」</strong> → Sentinel 的問題（HA / 高可用）</li>
         <li><strong>「我的資料量超過一台機器的記憶體」</strong> → Cluster 的問題（水平擴展）</li>

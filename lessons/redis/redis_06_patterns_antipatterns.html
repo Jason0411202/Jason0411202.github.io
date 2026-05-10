@@ -16,8 +16,8 @@
   <div class="hero-inner">
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Redis 06 · 上工 Checklist</div>
-    <h1 class="hero-title">把 Redis 真正<span>用對</span>的最後一堂</h1>
-    <p class="hero-desc">Cache 三大災難、Distributed Lock 的爭議真相(Redlock vs SET NX)、Sliding window rate limiter、production 反模式、關鍵指標 — 這 6 堂的收尾。</p>
+    <h1 class="hero-title">正確運用 Redis 的<span>最後一堂</span></h1>
+    <p class="hero-desc">Cache 三大經典問題、Distributed Lock 的爭議解析（Redlock vs SET NX）、Sliding window rate limiter、production 反模式與關鍵指標——本系列 6 堂課程的收斂。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 6 / 6 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 15 分鐘</span>
@@ -31,7 +31,7 @@
     <span class="toc-label">章節</span>
     <ul class="toc-list">
       <li><a class="toc-link" href="#cache-patterns">Cache Patterns</a></li>
-      <li><a class="toc-link" href="#three-disaster">三大災難</a></li>
+      <li><a class="toc-link" href="#three-disaster">三大經典問題</a></li>
       <li><a class="toc-link" href="#lock">分散式 Lock</a></li>
       <li><a class="toc-link" href="#rate-limit">Rate Limiter</a></li>
       <li><a class="toc-link" href="#anti">反模式</a></li>
@@ -112,8 +112,8 @@
     </section>
 
     <section id="three-disaster">
-      <span class="section-eyebrow">02 — 三大災難</span>
-      <h2>Cache 三大經典事故與解法</h2>
+      <span class="section-eyebrow">02 — 三大經典問題</span>
+      <h2>Cache 的三大經典問題與解法</h2>
 
       <h3>Cache Penetration（快取穿透）</h3>
       <p><strong>問題</strong>：query 一個「DB 也沒有」的 key（例如惡意爬蟲試 user:9999999999），cache 永遠 miss → 每次都打 DB。</p>
@@ -305,7 +305,7 @@ redis.call(<span class="tk-st">'PEXPIRE'</span>, KEYS[1], window)
         </div>
       </div>
 
-      <p>第五個常見地雷：<strong>用 Redis 當訊息佇列但用 Pub/Sub</strong>。Pub/Sub 沒持久化、subscriber 離線即丟訊息。需要可靠佇列請用 Streams（R-02）。</p>
+      <p>第五個常見問題：<strong>以 Redis 作為訊息佇列卻採用 Pub/Sub</strong>。Pub/Sub 不具備持久化能力，subscriber 離線即遺失訊息。需要可靠佇列時應採用 Streams（R-02）。</p>
     </section>
 
     <section id="metrics">
@@ -329,7 +329,7 @@ redis.call(<span class="tk-st">'PEXPIRE'</span>, KEYS[1], window)
         </tbody>
       </table>
 
-      <p><strong>Slowlog</strong> 是排查地雷的金鑰：</p>
+      <p><strong>Slowlog</strong> 為排查問題的關鍵工具：</p>
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">redis-cli</span>

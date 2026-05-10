@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Cassandra 06 · 上工 Checklist</div>
     <h1 class="hero-title">運維實務與<span>上工 Checklist</span></h1>
-    <p class="hero-desc">把前 5 堂收成一份「拿來上工就能用」的清單:nodetool 必背、關鍵 metrics、備份還原、容量規劃、常見地雷、production 工具帶過。</p>
+    <p class="hero-desc">將前 5 堂的內容收斂為一份可立即運用的實務清單：必備的 nodetool 指令、關鍵 metrics、備份還原、容量規劃、常見陷阱與 production 工具的概覽。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 6 / 6 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 13 分鐘</span>
@@ -75,7 +75,7 @@
           <ol>
             <li><code>nodetool status</code> — 看有沒有 DN 節點</li>
             <li><code>nodetool tpstats | grep -E '(Pending|Blocked)'</code> — 看 thread pool 是否塞車</li>
-            <li><code>nodetool compactionstats</code> — 看 compaction debt 是否爆炸</li>
+            <li><code>nodetool compactionstats</code> — 檢視 compaction debt 是否累積過多</li>
           </ol>
           排成 cron 每分鐘跑、結果丟 Prometheus / Slack。
         </div>
@@ -190,7 +190,7 @@ Requested creating snapshot(s) for [stockbot] with snapshot name [backup-2026-04
 
     <section id="pitfall">
       <span class="section-eyebrow">06 — 地雷</span>
-      <h2>讓你變生產事故的 5 個地雷</h2>
+      <h2>常導致生產事故的 5 個陷阱</h2>
 
       <div class="compare-grid">
         <div class="compare-card compare-bad">

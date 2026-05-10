@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 04 · 協作工作流篇</div>
     <h1 class="hero-title">Fork、Upstream、<span>PR 完整流程</span></h1>
-    <p class="hero-desc">從你按下 Fork 按鈕開始，到 PR 被 maintainer merge — 中間每一步業界都怎麼做。</p>
+    <p class="hero-desc">從按下 Fork 按鈕開始，到 PR 被 maintainer merge——逐步說明業界的標準做法。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 4 / 12 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
@@ -67,13 +67,13 @@
             <!-- Your fork -->
             <rect x="40" y="180" width="170" height="80" rx="10" fill="#fafaf8" stroke="#7c3aed" stroke-width="2"/>
             <text x="125" y="210" text-anchor="middle" fill="#7c3aed" font-weight="700" font-size="13">Your Fork</text>
-            <text x="125" y="230" text-anchor="middle" fill="#6b6b7e" font-size="10">你的分身</text>
+            <text x="125" y="230" text-anchor="middle" fill="#6b6b7e" font-size="10">個人副本</text>
             <text x="125" y="245" text-anchor="middle" fill="#7c3aed" font-size="10">github.com/you/repo</text>
 
             <!-- Local clone -->
             <rect x="280" y="180" width="170" height="80" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
             <text x="365" y="210" text-anchor="middle" fill="#4c1d95" font-weight="700" font-size="13">Local Clone</text>
-            <text x="365" y="230" text-anchor="middle" fill="#6b6b7e" font-size="10">你電腦裡的</text>
+            <text x="365" y="230" text-anchor="middle" fill="#6b6b7e" font-size="10">本機目錄</text>
             <text x="365" y="245" text-anchor="middle" fill="#4c1d95" font-size="10">~/projects/repo</text>
 
             <!-- PR -->
@@ -85,7 +85,7 @@
             <!-- Branch -->
             <rect x="510" y="180" width="170" height="80" rx="10" fill="#dcfce7" stroke="#15803d" stroke-width="2"/>
             <text x="595" y="210" text-anchor="middle" fill="#14532d" font-weight="700" font-size="13">Feature Branch</text>
-            <text x="595" y="230" text-anchor="middle" fill="#6b6b7e" font-size="10">在你 fork 上</text>
+            <text x="595" y="230" text-anchor="middle" fill="#6b6b7e" font-size="10">位於 fork 上</text>
             <text x="595" y="245" text-anchor="middle" fill="#15803d" font-size="10">feat/add-button</text>
 
             <!-- 箭頭 -->
@@ -115,26 +115,26 @@
 
     <section id="fork-clone">
       <span class="section-eyebrow">02 — Fork & Clone</span>
-      <h2>第一步：Fork 到自己帳號 + Clone 到本地</h2>
+      <h2>第一步：Fork 至個人帳號並 Clone 至本機</h2>
 
-      <p>Fork 是 GitHub 的「複製整個 repo 到自己帳號下」按鈕。為什麼需要 fork？因為你對別人的 repo 沒有 push 權限，要先複製一份才能改。</p>
+      <p>Fork 是 GitHub 提供的「將整個 repo 複製至個人帳號下」功能。之所以需要 fork，是因為對他人 repo 不具備 push 權限，必須先複製一份才能進行修改。</p>
 
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 在 GitHub 網頁按右上角的 Fork 按鈕</span>
-<span class="tk-cm"># 然後 clone 你 fork 過去那份</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> clone git@github.com:<span class="tk-st">&lt;你的帳號&gt;</span>/repo.git
+<pre><code><span class="tk-cm"># 於 GitHub 網頁右上角點選 Fork 按鈕</span>
+<span class="tk-cm"># 接著 clone 個人 fork 後的版本</span>
+<span class="tk-pn">$</span> <span class="tk-fn">git</span> clone git@github.com:<span class="tk-st">&lt;個人帳號&gt;</span>/repo.git
 <span class="tk-pn">$</span> <span class="tk-fn">cd</span> repo</code></pre>
       </div>
 
       <div class="callout callout-success">
         <div class="callout-icon">✓</div>
         <div class="callout-body">
-          <strong>用 SSH 還是 HTTPS？</strong>
-          推薦 SSH (<code>git@github.com:...</code>) — 一次設好 key 後就不用每次輸密碼。HTTPS 雖然方便起步，長期會被 push 時要求 token 煩死。
+          <strong>SSH 或 HTTPS 的選擇</strong>
+          推薦使用 SSH（<code>git@github.com:...</code>）——一次設定好 key 後即無需每次輸入密碼。HTTPS 雖便於起步，但長期使用會頻繁被要求輸入 token，影響操作流暢度。
         </div>
       </div>
     </section>
@@ -143,21 +143,21 @@
       <span class="section-eyebrow">03 — upstream</span>
       <h2>關鍵步驟：設定 upstream remote</h2>
 
-      <p>Clone 完之後，你的本地預設只有一個 remote 叫 <code>origin</code>，指向<strong>你 fork 過的版本</strong>。但原始專案可能還在持續更新，你需要一個指向「上游 (原始) 專案」的 remote 來追蹤更新 — 慣例上叫 <code>upstream</code>。</p>
+      <p>Clone 完成後，本地預設僅有一個名為 <code>origin</code> 的 remote，指向<strong>個人 fork 後的版本</strong>。然而原始專案可能仍持續更新，因此需建立一個指向「上游（原始）專案」的 remote 以追蹤更新——慣例上命名為 <code>upstream</code>。</p>
 
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 加上 upstream remote 指向原始專案</span>
+<pre><code><span class="tk-cm"># 新增 upstream remote 指向原始專案</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> remote add upstream git@github.com:<span class="tk-st">&lt;原始作者&gt;</span>/repo.git
 
-<span class="tk-cm"># 確認設好了</span>
+<span class="tk-cm"># 確認設定完成</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> remote <span class="tk-op">-v</span>
 
-origin    git@github.com:你的帳號/repo.git (fetch)
-origin    git@github.com:你的帳號/repo.git (push)
+origin    git@github.com:個人帳號/repo.git (fetch)
+origin    git@github.com:個人帳號/repo.git (push)
 upstream  git@github.com:原始作者/repo.git (fetch)
 upstream  git@github.com:原始作者/repo.git (push)</code></pre>
       </div>
@@ -166,44 +166,44 @@ upstream  git@github.com:原始作者/repo.git (push)</code></pre>
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong>命名慣例</strong>
-          <code>origin</code> = 你 fork 的；<code>upstream</code> = 原始專案。這是業界通用慣例，不要自己亂改名字以免之後在文件 / Stack Overflow 看到指令時搞混。
+          <code>origin</code> 指向個人 fork；<code>upstream</code> 指向原始專案。此為業界通用慣例，不建議自行修改名稱，以免日後參照文件或 Stack Overflow 上的指令時產生混淆。
         </div>
       </div>
     </section>
 
     <section id="sync">
       <span class="section-eyebrow">04 — 同步上游</span>
-      <h2>讓自己的 fork 跟上原始專案</h2>
+      <h2>同步個人 fork 與原始專案</h2>
 
-      <p>原始專案可能每天有人 commit。如果你的 fork 跟它落差太多再開分支，等等 PR 會充滿衝突。<strong>每次開新工作前先同步</strong>：</p>
+      <p>原始專案可能每日皆有 commit 進入。若 fork 與原始專案落差過大才切出分支，後續 PR 將容易產生大量衝突。<strong>建議每次開始新工作前先進行同步</strong>：</p>
 
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 1. 切回 main</span>
+<pre><code><span class="tk-cm"># 1. 切換回 main</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> switch main
 
-<span class="tk-cm"># 2. 從 upstream 拉最新</span>
+<span class="tk-cm"># 2. 自 upstream 取得最新內容</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> fetch upstream
 
-<span class="tk-cm"># 3. 把本地 main 跟上 upstream/main</span>
+<span class="tk-cm"># 3. 將本地 main 與 upstream/main 同步</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase upstream/main
-<span class="tk-cm"># 或 git merge upstream/main，兩者都可</span>
+<span class="tk-cm"># 或使用 git merge upstream/main，兩者皆可</span>
 
-<span class="tk-cm"># 4. 推回自己的 fork (origin)，讓 GitHub 上的 fork 也是最新</span>
+<span class="tk-cm"># 4. 推送回個人 fork（origin），使 GitHub 上的 fork 同步至最新</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> push origin main
 
-<span class="tk-cm"># 5. 從最新的 main 開新分支做事</span>
+<span class="tk-cm"># 5. 自最新的 main 切出新分支進行開發</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> switch <span class="tk-op">-c</span> feat/add-button</code></pre>
       </div>
 
       <details class="collapse">
-        <summary>GitHub 網頁版的 Sync fork 按鈕 <span class="collapse-tag">小撇步</span></summary>
+        <summary>GitHub 網頁版的 Sync fork 按鈕 <span class="collapse-tag">補充說明</span></summary>
         <div class="collapse-body">
-          <p>GitHub 在 fork 頁面有「Sync fork」按鈕，可以一鍵把 GitHub 上的 fork 跟 upstream main 同步。<strong>但要記得做完按鈕後要回到本地 <code>git pull</code> 一次</strong>，否則本地還是舊的。</p>
-          <p style="margin-top:0.6rem;">這個按鈕適合「完全沒在自己 fork 上加東西」的情況。如果你 fork 上已經有改動，還是用上面的指令流程比較安全。</p>
+          <p>GitHub 在 fork 頁面提供「Sync fork」按鈕，可一鍵將 GitHub 上的 fork 與 upstream main 同步。<strong>使用該按鈕後，仍須回到本地執行 <code>git pull</code></strong>，否則本地版本仍為舊版。</p>
+          <p style="margin-top:0.6rem;">此按鈕適用於「fork 上未進行任何修改」的情況。若 fork 已有改動，建議仍採用前述指令流程，較為穩妥。</p>
         </div>
       </details>
     </section>
@@ -216,36 +216,36 @@ upstream  git@github.com:原始作者/repo.git (push)</code></pre>
         <div class="timeline-step">
           <div class="timeline-num">1</div>
           <div class="timeline-content">
-            <div class="timeline-title">寫程式 + commit</div>
-            <div class="timeline-desc">commit message 用 Conventional Commits 格式 (Lesson 06 會講)。</div>
+            <div class="timeline-title">編寫程式並 commit</div>
+            <div class="timeline-desc">commit message 採用 Conventional Commits 格式（Lesson 06 將詳述）。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">2</div>
           <div class="timeline-content">
-            <div class="timeline-title">push 到自己的 fork</div>
+            <div class="timeline-title">推送至個人 fork</div>
             <div class="timeline-desc"><code>git push -u origin feat/add-button</code></div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">3</div>
           <div class="timeline-content">
-            <div class="timeline-title">GitHub 顯示橫幅，按下 Compare & pull request</div>
-            <div class="timeline-desc">推完之後重整 GitHub 頁面，會看到「你的分支領先 main N commits, Compare & pull request」橫幅。</div>
+            <div class="timeline-title">GitHub 顯示橫幅後點選 Compare & pull request</div>
+            <div class="timeline-desc">推送完成後重新整理 GitHub 頁面，將出現「分支領先 main N commits, Compare & pull request」橫幅。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">4</div>
           <div class="timeline-content">
-            <div class="timeline-title">填好 PR 描述</div>
-            <div class="timeline-desc">下一節會詳細講格式。專案有 PR template 的話會自動帶出來。</div>
+            <div class="timeline-title">填寫 PR 描述</div>
+            <div class="timeline-desc">下一節將詳述格式。若專案配置了 PR template，將自動帶入。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">5</div>
           <div class="timeline-content">
-            <div class="timeline-title">如果還沒準備好被 review，開成 Draft PR</div>
-            <div class="timeline-desc">下拉選 <strong>Create draft pull request</strong> — 表示「請先看 CI 跑得如何，不要叫人 review」。</div>
+            <div class="timeline-title">尚未準備接受 review 時，建立 Draft PR</div>
+            <div class="timeline-desc">下拉選單選擇 <strong>Create draft pull request</strong>，表示「請先觀察 CI 執行結果，暫不需 review」。</div>
           </div>
         </div>
       </div>
@@ -253,8 +253,8 @@ upstream  git@github.com:原始作者/repo.git (push)</code></pre>
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>什麼時候用 Draft PR？</strong>
-          <strong>① 想先看 CI 結果</strong>但程式還沒寫完；<strong>② 想公開展示進度</strong>讓相關人員預覽；<strong>③ 跨時區協作</strong>，先放上去早起的同事可以看。準備好了按 <em>Ready for review</em> 即可。
+          <strong>Draft PR 的適用時機</strong>
+          <strong>① 希望先觀察 CI 結果</strong>但程式碼尚未完成；<strong>② 希望公開展示進度</strong>供相關人員預覽；<strong>③ 跨時區協作</strong>，先行推送以便不同時區的成員檢視。準備就緒後按 <em>Ready for review</em> 即可。
         </div>
       </div>
     </section>
@@ -263,12 +263,12 @@ upstream  git@github.com:原始作者/repo.git (push)</code></pre>
       <span class="section-eyebrow">06 — PR 描述</span>
       <h2>業界通用的 PR 描述格式</h2>
 
-      <p>大型開源專案 (Kubernetes、React、TypeScript) 的 PR 描述通常包含這幾個區塊：</p>
+      <p>大型開源專案（Kubernetes、React、TypeScript 等）的 PR 描述通常包含以下幾個區塊：</p>
 
       <div class="section-card">
         <h4 style="margin-top:0;">PR 描述標準範本</h4>
 <pre style="background:var(--paper2);padding:0.9rem 1.1rem;border-radius:8px;font-size:13px;line-height:1.7;font-family:var(--mono);overflow-x:auto;">## 背景 / 動機
-為什麼要做這個改動？解決什麼問題？
+此次改動的目的為何？解決了什麼問題？
 
 Closes #234
 
@@ -277,37 +277,37 @@ Closes #234
 - 修改 `Form.tsx` 整合新的 Button props
 - 補上對應的 unit test
 
-## 怎麼測試
+## 測試方式
 1. `pnpm test src/components/Button.test.tsx`
-2. `pnpm dev` 然後到 /demo/button 手動點擊測試
+2. `pnpm dev` 後於 /demo/button 進行手動點擊測試
 
 ## 截圖 / 影片
 | 改動前 | 改動後 |
 |--|--|
 | (圖) | (圖) |
 
-## 是否 Breaking Change
-否。Button 新增的 prop 都有 default 值。
+## 是否為 Breaking Change
+否。Button 新增的 prop 皆有 default 值。
 
 ## Checklist
-- [x] 補了測試
-- [x] 跑過 lint / type check
-- [ ] 更新 docs (這個 PR 不需要，下個會補)</pre>
+- [x] 已補上測試
+- [x] 已通過 lint / type check
+- [ ] 更新 docs（本 PR 不涉及，將於下一 PR 補上）</pre>
       </div>
 
       <div class="compare-grid">
         <div class="compare-card compare-bad">
-          <div class="compare-label"><span class="compare-icon">✗</span>糟糕的 PR 描述</div>
+          <div class="compare-label"><span class="compare-icon">✗</span>不佳的 PR 描述</div>
           <div class="compare-body">
             <code>fix bug</code>
-            <p style="font-size:13px;margin-top:0.4rem;">沒有任何上下文，reviewer 完全不知道在 fix 什麼 bug、怎麼測、影響範圍。</p>
+            <p style="font-size:13px;margin-top:0.4rem;">缺乏上下文，reviewer 無從得知所修補的 bug、測試方式或影響範圍。</p>
           </div>
         </div>
         <div class="compare-card compare-good">
-          <div class="compare-label"><span class="compare-icon">✓</span>好的 PR 描述</div>
+          <div class="compare-label"><span class="compare-icon">✓</span>良好的 PR 描述</div>
           <div class="compare-body">
             <code>fix(auth): clear stale token on logout (Closes #234)</code>
-            <p style="font-size:13px;margin-top:0.4rem;">含背景 / 改動 / 測試方式 / 截圖 / 是否 breaking。Reviewer 可以快速進入狀況。</p>
+            <p style="font-size:13px;margin-top:0.4rem;">包含背景、改動、測試方式、截圖、是否為 breaking change。Reviewer 可迅速掌握全貌。</p>
           </div>
         </div>
       </div>
@@ -315,27 +315,27 @@ Closes #234
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>沒寫描述 = 拒絕被 review</strong>
-          很多 maintainer 看到空白 PR 描述會直接退回「請補描述」。對他們來說「不知道改什麼為什麼改」沒辦法 review。多花 5 分鐘寫描述能省掉好幾天的來回。
+          <strong>缺少描述等同於拒絕被 review</strong>
+          多數 maintainer 看到空白的 PR 描述會直接退回並要求補上描述。對 reviewer 而言，「不清楚改了什麼、為何要改」便無法進行 review。撰寫描述所花的數分鐘，可避免後續多日的來回溝通。
         </div>
       </div>
     </section>
 
     <section id="link-issue">
       <span class="section-eyebrow">07 — 連結 issue</span>
-      <h2>用關鍵字自動關聯 / 關閉 issue</h2>
+      <h2>透過關鍵字自動關聯與關閉 issue</h2>
 
-      <p>在 PR 描述或 commit message 中寫這些關鍵字 + issue 編號，GitHub 會自動建立連結；當 PR 合併進主分支時，issue 會被自動關閉：</p>
+      <p>於 PR 描述或 commit message 中以下列關鍵字搭配 issue 編號，GitHub 將自動建立連結；當 PR 合併進主分支時，對應的 issue 會被自動關閉：</p>
 
       <table>
         <thead>
-          <tr><th>關鍵字</th><th>會自動關閉 issue?</th><th>用在哪</th></tr>
+          <tr><th>關鍵字</th><th>是否自動關閉 issue</th><th>適用情境</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>Closes #234</code></td><td>✓ 會</td><td>這個 PR 完整解決了 #234</td></tr>
-          <tr><td><code>Fixes #234</code></td><td>✓ 會</td><td>修 bug 時用</td></tr>
-          <tr><td><code>Resolves #234</code></td><td>✓ 會</td><td>解 feature request 時用</td></tr>
-          <tr><td><code>Refs #234</code></td><td>✗ 不會</td><td>「相關但只是部分解」</td></tr>
+          <tr><td><code>Closes #234</code></td><td>✓ 會</td><td>本 PR 完整解決了 #234</td></tr>
+          <tr><td><code>Fixes #234</code></td><td>✓ 會</td><td>修補 bug 時使用</td></tr>
+          <tr><td><code>Resolves #234</code></td><td>✓ 會</td><td>處理 feature request 時使用</td></tr>
+          <tr><td><code>Refs #234</code></td><td>✗ 不會</td><td>「相關但僅為部分解決」</td></tr>
           <tr><td><code>See #234</code></td><td>✗ 不會</td><td>單純引用，不負責關閉</td></tr>
         </tbody>
       </table>
@@ -343,58 +343,58 @@ Closes #234
       <div class="callout callout-tip">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>跨 repo 也能用</strong>
-          <code>Closes owner/repo#234</code> 可以從另一個 repo 的 PR 關閉指定 repo 的 issue (需要寫權限)。
+          <strong>支援跨 repo 引用</strong>
+          <code>Closes owner/repo#234</code> 可由另一個 repo 的 PR 關閉指定 repo 的 issue（需具備寫入權限）。
         </div>
       </div>
     </section>
 
     <section id="conflict">
       <span class="section-eyebrow">08 — 處理衝突</span>
-      <h2>PR 出現衝突怎麼辦</h2>
+      <h2>PR 發生衝突的處理方式</h2>
 
-      <p>你的 PR 在 GitHub 顯示 <em>This branch has conflicts that must be resolved</em> 時，<strong>不要按網頁的 Resolve conflicts 按鈕</strong> — 那只能處理超簡單的衝突，且編輯體驗很糟。在本地解：</p>
+      <p>當 PR 在 GitHub 顯示 <em>This branch has conflicts that must be resolved</em> 時，<strong>不建議使用網頁的 Resolve conflicts 按鈕</strong>——其僅能處理極為單純的衝突，且編輯體驗欠佳。建議於本地解決：</p>
 
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 1. 切到自己的 PR 分支</span>
+<pre><code><span class="tk-cm"># 1. 切換至個人 PR 分支</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> switch feat/add-button
 
-<span class="tk-cm"># 2. 把 upstream/main 拉下來</span>
+<span class="tk-cm"># 2. 取得 upstream/main 最新內容</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> fetch upstream
 
-<span class="tk-cm"># 3. rebase 到最新 upstream/main 上 (推薦) 或 merge</span>
+<span class="tk-cm"># 3. rebase 至最新 upstream/main（推薦）或 merge</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase upstream/main
 
-<span class="tk-cm"># 4. 解衝突 (用 IDE 或 git mergetool)</span>
-<span class="tk-cm">#    解完後</span>
+<span class="tk-cm"># 4. 解決衝突（透過 IDE 或 git mergetool）</span>
+<span class="tk-cm">#    解決後執行</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> add &lt;files&gt;
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase <span class="tk-op">--continue</span>
 
-<span class="tk-cm"># 5. 因為 rebase 改寫了歷史，要 force push 更新 PR</span>
+<span class="tk-cm"># 5. rebase 改寫歷史，需透過 force push 更新 PR</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> push <span class="tk-op">--force-with-lease</span></code></pre>
       </div>
 
       <div class="callout callout-warn">
         <div class="callout-icon">!</div>
         <div class="callout-body">
-          <strong>用 <code>--force-with-lease</code> 不要用 <code>--force</code></strong>
-          這條規則 Lesson 02 講過了 — 同事剛好在你 rebase 期間 push 了東西，<code>--force</code> 會直接覆蓋；<code>--force-with-lease</code> 會擋下來警告。
+          <strong>應使用 <code>--force-with-lease</code> 而非 <code>--force</code></strong>
+          此規則於 Lesson 02 已說明——若同事於 rebase 期間 push 了內容，<code>--force</code> 會直接覆蓋；<code>--force-with-lease</code> 則會拒絕推送並提示。
         </div>
       </div>
     </section>
 
     <section id="update">
       <span class="section-eyebrow">09 — 更新 PR</span>
-      <h2>review 後改完，怎麼推上去</h2>
+      <h2>review 後修改完成的推送方式</h2>
 
-      <p>Reviewer 留了一些 comment 要你改，你照建議改完後：</p>
+      <p>Reviewer 留下 comment 後，依其建議修改完畢的處理方式：</p>
 
-      <h3>狀況 A：純粹 push 新 commit</h3>
-      <p>最簡單也最常用。新 commit 會自動加進這個 PR。</p>
+      <h3>狀況 A：直接 push 新 commit</h3>
+      <p>最簡便且最常使用的方式。新 commit 將自動納入該 PR。</p>
 
       <div class="code-block">
         <div class="code-block-header">
@@ -406,41 +406,41 @@ Closes #234
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> push</code></pre>
       </div>
 
-      <h3>狀況 B：用 fixup 保留歷史乾淨</h3>
-      <p>review 都過了，等 maintainer merge 前想把歷史整理乾淨：</p>
+      <h3>狀況 B：以 fixup 保持歷史整潔</h3>
+      <p>review 完成後、maintainer merge 前，希望整理 commit 歷史時：</p>
 
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 提交 fixup 修小東西 (Lesson 02 學過的)</span>
+<pre><code><span class="tk-cm"># 以 fixup 提交小修改（Lesson 02 已介紹）</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> commit <span class="tk-op">--fixup=&lt;原 commit SHA&gt;</span>
 
-<span class="tk-cm"># 之後 squash 收乾淨</span>
+<span class="tk-cm"># 後續以 squash 整併</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase <span class="tk-op">-i --autosquash</span> upstream/main
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> push <span class="tk-op">--force-with-lease</span></code></pre>
       </div>
 
       <h3>狀況 C：合併方式由 maintainer 決定</h3>
-      <p>不同專案有不同合併政策：</p>
+      <p>不同專案採用不同的合併政策：</p>
 
       <table>
         <thead>
           <tr><th>合併模式</th><th>結果</th><th>常見專案</th></tr>
         </thead>
         <tbody>
-          <tr><td><strong>Merge commit</strong></td><td>所有 commit 保留 + 一個 merge commit</td><td>Linux Kernel、Git 本身</td></tr>
-          <tr><td><strong>Squash and merge</strong></td><td>整個 PR 壓成一個 commit</td><td>多數新創、Vercel、Next.js</td></tr>
-          <tr><td><strong>Rebase and merge</strong></td><td>所有 commit 接在 main 後 (無 merge commit)</td><td>偏好線性歷史的團隊</td></tr>
+          <tr><td><strong>Merge commit</strong></td><td>所有 commit 完整保留並新增一筆 merge commit</td><td>Linux Kernel、Git 本身</td></tr>
+          <tr><td><strong>Squash and merge</strong></td><td>整個 PR 壓縮為單一 commit</td><td>多數新創公司、Vercel、Next.js</td></tr>
+          <tr><td><strong>Rebase and merge</strong></td><td>所有 commit 線性接續至 main 後（不產生 merge commit）</td><td>偏好線性歷史的團隊</td></tr>
         </tbody>
       </table>
 
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>所以你 PR 內 commit 要不要整理乾淨？</strong>
-          看專案政策。如果是 squash and merge，你 PR 內 100 個 commit 最後也只會變 main 上 1 個，commit message 不重要。如果是 merge commit / rebase，每個 commit 都會出現在 main 歷史，那就值得花時間整理。<strong>看專案的 CONTRIBUTING.md，或者觀察最近合併的 PR 是哪種模式。</strong>
+          <strong>PR 內的 commit 是否需整理？</strong>
+          視專案政策而定。若採用 squash and merge，PR 內的 100 筆 commit 最終於 main 上僅顯示為 1 筆，commit message 影響有限。若採用 merge commit 或 rebase，每筆 commit 皆會出現於 main 歷史中，便值得投入時間整理。<strong>建議參閱專案的 CONTRIBUTING.md，或觀察最近合併的 PR 採用何種模式。</strong>
         </div>
       </div>
     </section>

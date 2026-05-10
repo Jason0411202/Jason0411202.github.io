@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 12 · 大型專案實務篇</div>
     <h1 class="hero-title">第一次<span> 貢獻實戰</span></h1>
-    <p class="hero-desc">前 11 堂收尾。<strong>從零開始送出第一個被合併的 PR</strong> — 完整 checklist、選專案、判斷適合度、踩雷預防、畢業任務。</p>
+    <p class="hero-desc">作為前 11 堂的總結。<strong>從零開始送出第一個被合併的 PR</strong>——包含完整 checklist、選擇專案、評估適合度、常見陷阱與畢業任務。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 12 / 12 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
@@ -49,20 +49,20 @@
 
     <section id="find">
       <span class="section-eyebrow">01 — 找專案</span>
-      <h2>哪裡找適合貢獻的專案</h2>
+      <h2>適合貢獻專案的取得管道</h2>
 
       <table>
         <thead>
-          <tr><th>來源</th><th>適合誰</th></tr>
+          <tr><th>來源</th><th>適用對象</th></tr>
         </thead>
         <tbody>
           <tr>
             <td><a class="inline-link" href="https://firstcontributions.github.io" target="_blank" rel="noopener">firstcontributions.github.io</a></td>
-            <td><strong>第一次練手</strong> — 不是真實貢獻，但走完一次 fork → PR → merge 流程</td>
+            <td><strong>初次練習</strong>——並非真實貢獻，但可完整體驗 fork → PR → merge 流程</td>
           </tr>
           <tr>
             <td><a class="inline-link" href="https://goodfirstissue.dev" target="_blank" rel="noopener">goodfirstissue.dev</a></td>
-            <td>依語言聚合所有專案的 <code>good first issue</code> 標籤</td>
+            <td>依語言彙整各專案的 <code>good first issue</code> 標籤</td>
           </tr>
           <tr>
             <td><a class="inline-link" href="https://github.com/topics/good-first-issue" target="_blank" rel="noopener">github.com/topics/good-first-issue</a></td>
@@ -70,11 +70,11 @@
           </tr>
           <tr>
             <td><a class="inline-link" href="https://hacktoberfest.com" target="_blank" rel="noopener">Hacktoberfest</a></td>
-            <td>每年 10 月活動，4 個合格 PR 拿紀念品</td>
+            <td>每年 10 月舉辦的活動，提交 4 個合格 PR 即可獲得紀念品</td>
           </tr>
           <tr>
-            <td>你日常用的工具</td>
-            <td><strong>最佳起點</strong> — 你天天用，知道 pain point；找其中你修得動的 issue</td>
+            <td>日常使用的工具</td>
+            <td><strong>最佳起點</strong>——日常使用時即累積使用經驗與痛點，可選擇可勝任的 issue 著手</td>
           </tr>
         </tbody>
       </table>
@@ -82,57 +82,57 @@
       <div class="callout callout-success">
         <div class="callout-icon">✓</div>
         <div class="callout-body">
-          <strong>從你天天用的工具開始</strong>
-          你已經對它有領域知識、有實際 use case、知道哪裡好用哪裡爛。比挑陌生熱門專案來得快上手得多。
+          <strong>建議從日常使用的工具著手</strong>
+          已具備該工具的領域知識、實際 use case 與優缺點認知，相較於選擇陌生的熱門專案，可顯著縮短入手時間。
         </div>
       </div>
     </section>
 
     <section id="evaluate">
       <span class="section-eyebrow">02 — 判斷專案</span>
-      <h2>5 分鐘判斷一個專案值不值得貢獻</h2>
+      <h2>5 分鐘評估一個專案是否值得貢獻</h2>
 
       <div class="timeline">
         <div class="timeline-step">
           <div class="timeline-num">1</div>
           <div class="timeline-content">
-            <div class="timeline-title">看 CONTRIBUTING.md 是否清楚</div>
-            <div class="timeline-desc">沒有 = 流程不明，貢獻過程容易卡住。寫得越詳細越友善。</div>
+            <div class="timeline-title">檢視 CONTRIBUTING.md 是否清晰</div>
+            <div class="timeline-desc">缺少此文件代表流程不明，貢獻過程容易受阻。內容越詳盡越友善。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">2</div>
           <div class="timeline-content">
-            <div class="timeline-title">看最近 30 天是否有活動</div>
-            <div class="timeline-desc">commit / PR / issue 留言頻率。死寂的專案 = 你 PR 送出去也沒人看。</div>
+            <div class="timeline-title">檢視最近 30 天的活動量</div>
+            <div class="timeline-desc">觀察 commit、PR 與 issue 的留言頻率。長期無動靜的專案，PR 提交後恐無人處理。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">3</div>
           <div class="timeline-content">
-            <div class="timeline-title">看 PR 平均合併時間</div>
-            <div class="timeline-desc">點 Pull requests → 看最近合併的 PR 從開到合多久。一週內 = 好；一個月以上 = 你可能要等很久。</div>
+            <div class="timeline-title">檢視 PR 的平均合併時間</div>
+            <div class="timeline-desc">點選 Pull requests，檢視近期合併 PR 從開啟至合併的時間。一週內較佳；一個月以上代表等候時間可能較長。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">4</div>
           <div class="timeline-content">
-            <div class="timeline-title">看 Issue 是否有人回應</div>
-            <div class="timeline-desc">最近 10 個 issue 是否有 maintainer 留過言？如果都是石沉大海 = 不友善。</div>
+            <div class="timeline-title">檢視 Issue 的回應狀況</div>
+            <div class="timeline-desc">最近 10 個 issue 是否有 maintainer 留言？若皆無回應，代表貢獻友善度較低。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">5</div>
           <div class="timeline-content">
-            <div class="timeline-title">看 CI 通過率</div>
-            <div class="timeline-desc">點 Actions tab。如果每個 build 都紅，代表專案維護混亂，你的 PR 也很難綠。</div>
+            <div class="timeline-title">檢視 CI 通過率</div>
+            <div class="timeline-desc">點選 Actions tab。若多數 build 皆失敗，代表專案維護不穩定，自身的 PR 也難以通過。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">6</div>
           <div class="timeline-content">
-            <div class="timeline-title">看社群氛圍</div>
-            <div class="timeline-desc">隨機看 5 個 issue / PR 的留言。Maintainer 是否禮貌？是否常拒絕新人貢獻？把氛圍嚴重不友善的專案排除。</div>
+            <div class="timeline-title">檢視社群氛圍</div>
+            <div class="timeline-desc">隨機檢視 5 個 issue 或 PR 的留言。Maintainer 是否禮貌？是否頻繁拒絕新進貢獻者？應排除氛圍明顯不友善的專案。</div>
           </div>
         </div>
       </div>
@@ -140,44 +140,44 @@
 
     <section id="license">
       <span class="section-eyebrow">03 — 授權</span>
-      <h2>授權快速辨識 (5 個常見族群)</h2>
+      <h2>授權快速辨識（5 種常見族群）</h2>
 
       <table>
         <thead>
-          <tr><th>授權</th><th>核心限制</th><th>適合做什麼</th></tr>
+          <tr><th>授權</th><th>核心限制</th><th>適用場景</th></tr>
         </thead>
         <tbody>
-          <tr><td><strong>MIT</strong></td><td>幾乎沒有 (僅需保留 copyright)</td><td>個人 / 商業隨意用，最寬鬆</td></tr>
-          <tr><td><strong>Apache 2.0</strong></td><td>類似 MIT 但加上專利條款</td><td>大型專案 (k8s / Apache 系列)</td></tr>
-          <tr><td><strong>BSD-2 / BSD-3</strong></td><td>類似 MIT</td><td>BSD / 學術圈傳統</td></tr>
-          <tr><td><strong>GPL v2 / v3</strong></td><td><strong>copyleft</strong> — 改作品也必須開源 GPL</td><td>Linux Kernel、Bash 等</td></tr>
-          <tr><td><strong>AGPL v3</strong></td><td>GPL 加強版 — 連<strong>網路服務也要開源</strong></td><td>MongoDB (舊版)、Grafana (舊版)</td></tr>
+          <tr><td><strong>MIT</strong></td><td>幾乎無限制（僅需保留 copyright）</td><td>個人或商業皆可自由使用，限制最寬鬆</td></tr>
+          <tr><td><strong>Apache 2.0</strong></td><td>類似 MIT，並加上專利條款</td><td>大型專案（k8s、Apache 系列）</td></tr>
+          <tr><td><strong>BSD-2 / BSD-3</strong></td><td>類似 MIT</td><td>BSD 系統與學術界傳統</td></tr>
+          <tr><td><strong>GPL v2 / v3</strong></td><td><strong>copyleft</strong>——衍生作品亦須以 GPL 開源</td><td>Linux Kernel、Bash 等</td></tr>
+          <tr><td><strong>AGPL v3</strong></td><td>GPL 強化版——連<strong>網路服務亦須開源</strong></td><td>MongoDB（舊版）、Grafana（舊版）</td></tr>
         </tbody>
       </table>
 
       <div class="callout callout-warn">
         <div class="callout-icon">!</div>
         <div class="callout-body">
-          <strong>商業使用要小心 GPL / AGPL</strong>
-          公司專案使用 GPL 函式庫 = 整個專案可能被要求開源。AGPL 影響更大 — 連你內部 SaaS 服務都要開原始碼。<strong>商業案大多選 MIT / Apache 2.0 授權的依賴</strong>。但這不影響你貢獻 GPL 專案 — 只是要清楚授權含義。
+          <strong>商業使用須留意 GPL 與 AGPL</strong>
+          公司專案使用 GPL 函式庫，整個專案可能須一併開源。AGPL 的影響更為廣泛——連內部 SaaS 服務的原始碼也須公開。<strong>商業專案多選擇 MIT 或 Apache 2.0 授權的依賴</strong>。但此並不影響貢獻 GPL 專案，僅須清楚理解授權的內涵。
         </div>
       </div>
 
-      <p>不確定怎麼選授權給自己的開源專案：<a class="inline-link" href="https://choosealicense.com" target="_blank" rel="noopener">choosealicense.com</a> 是 GitHub 官方做的決策樹。</p>
+      <p>若不確定如何為自身開源專案選擇授權：<a class="inline-link" href="https://choosealicense.com" target="_blank" rel="noopener">choosealicense.com</a> 是 GitHub 官方提供的決策樹工具。</p>
     </section>
 
     <section id="read">
       <span class="section-eyebrow">04 — 必讀檔案</span>
-      <h2>送 PR 前必須先讀的 5 個檔案</h2>
+      <h2>送出 PR 前必讀的 5 個檔案</h2>
 
       <table>
         <thead>
-          <tr><th>檔案</th><th>看什麼</th></tr>
+          <tr><th>檔案</th><th>檢視重點</th></tr>
         </thead>
         <tbody>
           <tr>
             <td><strong>README.md</strong></td>
-            <td>專案在做什麼、怎麼起手 dev、誰在用</td>
+            <td>專案的目的、開發環境設定方式、使用者群</td>
           </tr>
           <tr>
             <td><strong>CONTRIBUTING.md</strong></td>
@@ -185,15 +185,15 @@
           </tr>
           <tr>
             <td><strong>CODE_OF_CONDUCT.md</strong></td>
-            <td>社群行為準則。多數專案用 <a class="inline-link" href="https://www.contributor-covenant.org" target="_blank" rel="noopener">Contributor Covenant</a></td>
+            <td>社群行為準則。多數專案採用 <a class="inline-link" href="https://www.contributor-covenant.org" target="_blank" rel="noopener">Contributor Covenant</a></td>
           </tr>
           <tr>
             <td><strong>SECURITY.md</strong></td>
-            <td>發現漏洞怎麼通報 (Lesson 11)</td>
+            <td>發現漏洞時的通報方式（Lesson 11）</td>
           </tr>
           <tr>
             <td><strong>LICENSE</strong></td>
-            <td>授權條款 (上面學過)</td>
+            <td>授權條款（前述已介紹）</td>
           </tr>
         </tbody>
       </table>
@@ -201,153 +201,153 @@
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>DCO (Developer Certificate of Origin)</strong>
-          某些專案 (Linux Kernel、Docker、CNCF 系列) 要求 <code>git commit -s</code> 加上 <code>Signed-off-by:</code> footer，表示「我有權貢獻這段程式碼」。看 CONTRIBUTING 是否有提到。
+          <strong>DCO（Developer Certificate of Origin）</strong>
+          部分專案（Linux Kernel、Docker、CNCF 系列）要求使用 <code>git commit -s</code> 加上 <code>Signed-off-by:</code> footer，以聲明「貢獻者具備提交此段程式碼的權利」。應確認 CONTRIBUTING 中是否有相關規範。
         </div>
       </div>
     </section>
 
     <section id="claim">
       <span class="section-eyebrow">05 — 認領 issue</span>
-      <h2>怎麼認領 issue 不被搶</h2>
+      <h2>避免認領 issue 時撞單的方式</h2>
 
-      <p>看到一個 <code>good first issue</code>，怎麼避免「我寫到一半，發現有人也在做」？</p>
+      <p>看到一個 <code>good first issue</code> 時，如何避免「實作到一半發現他人亦在進行」？</p>
 
       <ol>
-        <li><strong>看 issue 留言區</strong> — 確認沒有人說 "I'm working on this"</li>
-        <li><strong>看 Linked PRs</strong> — 是否已有 draft PR 連結到這個 issue</li>
-        <li><strong>留言說「我想做這個，預計 N 天內送 PR」</strong> — 等 maintainer 確認後再開工</li>
-        <li><strong>如果一兩天沒回應就直接做</strong> — 大型專案 maintainer 可能很忙；Open Source 是行動派的世界，做出來通常比等著更有效</li>
+        <li><strong>檢視 issue 留言區</strong>——確認尚無人聲明 "I'm working on this"</li>
+        <li><strong>檢視 Linked PRs</strong>——確認是否已有 draft PR 連結至該 issue</li>
+        <li><strong>留言聲明「將著手處理此 issue，預計 N 天內提交 PR」</strong>——等 maintainer 確認後再動工</li>
+        <li><strong>若一兩天無回應可直接動工</strong>——大型專案 maintainer 可能事務繁忙；Open Source 重視行動，付諸實作通常較持續等待更有效益</li>
       </ol>
 
       <div class="callout callout-warn">
         <div class="callout-icon">!</div>
         <div class="callout-body">
-          <strong>不要過度承諾</strong>
-          如果你只是「有興趣可能會做」，<strong>不要</strong>留 "I'll work on this" 然後消失。這會讓 issue 卡住沒人能做。實際開始動工才認領。
+          <strong>避免過度承諾</strong>
+          若僅為「有興趣或許會嘗試」，<strong>不應</strong>輕易留下 "I'll work on this" 後即無下文。此舉會使 issue 凍結，他人無法接手。實際動工後才宜認領。
         </div>
       </div>
     </section>
 
     <section id="checklist">
       <span class="section-eyebrow">06 — 完整 Checklist</span>
-      <h2>從零到 PR 被合併的完整 Checklist</h2>
+      <h2>從零至 PR 被合併的完整 Checklist</h2>
 
-      <p>把前 11 堂的所有東西收成一張可執行的清單。每一條都有對應 Lesson 編號。</p>
+      <p>將前 11 堂的內容彙整為一份可執行的清單，每項皆對應特定 Lesson 編號。</p>
 
       <details class="collapse" open>
-        <summary>① 起手準備 (Lesson 04) <span class="collapse-tag">10 分鐘</span></summary>
+        <summary>① 起手準備（Lesson 04） <span class="collapse-tag">10 分鐘</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:14px;">
-            <li>□ 在 GitHub 按 Fork 按鈕 fork 到自己帳號</li>
-            <li>□ <code>git clone</code> 自己 fork 過的版本</li>
+            <li>□ 於 GitHub 點選 Fork 按鈕，fork 至個人帳號</li>
+            <li>□ <code>git clone</code> 個人 fork 後的版本</li>
             <li>□ <code>git remote add upstream &lt;原始 repo&gt;</code></li>
-            <li>□ <code>git remote -v</code> 確認 origin / upstream 都在</li>
+            <li>□ <code>git remote -v</code> 確認 origin 與 upstream 皆已設定</li>
           </ul>
         </div>
       </details>
 
       <details class="collapse">
-        <summary>② 同步上游 (Lesson 04) <span class="collapse-tag">2 分鐘</span></summary>
+        <summary>② 同步上游（Lesson 04） <span class="collapse-tag">2 分鐘</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:14px;">
             <li>□ <code>git switch main</code></li>
             <li>□ <code>git fetch upstream</code></li>
             <li>□ <code>git rebase upstream/main</code></li>
-            <li>□ <code>git push origin main</code> (讓自己 GitHub 上的 fork 也是最新)</li>
+            <li>□ <code>git push origin main</code>（使 GitHub 上的個人 fork 同步至最新）</li>
           </ul>
         </div>
       </details>
 
       <details class="collapse">
-        <summary>③ 開分支 + 設定本地環境 (Lesson 01, 09) <span class="collapse-tag">~30 分鐘</span></summary>
+        <summary>③ 切分支並設定本地環境（Lesson 01、09） <span class="collapse-tag">約 30 分鐘</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:14px;">
-            <li>□ 從最新 main 開 feature 分支 <code>git switch -c fix/issue-234</code></li>
-            <li>□ 看 README 安裝依賴 (<code>npm ci</code> / <code>poetry install</code> 等)</li>
-            <li>□ 跑現有測試確認環境 OK (<code>npm test</code>)</li>
-            <li>□ 看是否有 Husky / pre-commit 自動 install — 沒有就 <code>pnpm prepare</code> 或 <code>pre-commit install</code></li>
+            <li>□ 自最新 main 切出 feature 分支 <code>git switch -c fix/issue-234</code></li>
+            <li>□ 依 README 安裝依賴（<code>npm ci</code>、<code>poetry install</code> 等）</li>
+            <li>□ 執行現有測試以確認環境正常（<code>npm test</code>）</li>
+            <li>□ 確認是否需手動安裝 Husky 或 pre-commit——若無自動安裝，須執行 <code>pnpm prepare</code> 或 <code>pre-commit install</code></li>
           </ul>
         </div>
       </details>
 
       <details class="collapse">
-        <summary>④ 動工 — TDD 流程 (Lesson 08) <span class="collapse-tag">主要時間</span></summary>
+        <summary>④ 動工——TDD 流程（Lesson 08） <span class="collapse-tag">主要時間</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:14px;">
-            <li>□ 先寫一個失敗的測試 (RED)</li>
-            <li>□ 寫最少實作讓測試通過 (GREEN)</li>
-            <li>□ 整理程式碼 (REFACTOR)</li>
-            <li>□ 重複，直到功能完整</li>
-            <li>□ 跑全套測試確認沒打到別的東西</li>
+            <li>□ 先撰寫一個失敗的測試（RED）</li>
+            <li>□ 以最小幅度的實作通過測試（GREEN）</li>
+            <li>□ 整理程式碼（REFACTOR）</li>
+            <li>□ 重複前述循環，直至功能完成</li>
+            <li>□ 執行全套測試，確認未影響其他部分</li>
           </ul>
         </div>
       </details>
 
       <details class="collapse">
-        <summary>⑤ 寫 commit (Lesson 06) <span class="collapse-tag">5 分鐘</span></summary>
+        <summary>⑤ 撰寫 commit（Lesson 06） <span class="collapse-tag">5 分鐘</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:14px;">
-            <li>□ <code>git status</code> 確認改了哪些檔案</li>
-            <li>□ <code>git add &lt;file&gt;</code> 一個一個加 (避免 debug 殘留)</li>
-            <li>□ <code>git diff --staged</code> 最後檢查</li>
-            <li>□ Conventional Commits 格式：<code>fix(scope): subject</code></li>
-            <li>□ 如果是 breaking change 加 <code>!</code> 或 footer 寫 BREAKING CHANGE</li>
-            <li>□ Body 寫清楚 why (不是 what)</li>
-            <li>□ Footer 加 <code>Closes #234</code></li>
+            <li>□ <code>git status</code> 確認異動的檔案</li>
+            <li>□ <code>git add &lt;file&gt;</code> 逐檔加入（避免 debug 殘留）</li>
+            <li>□ <code>git diff --staged</code> 進行最終檢查</li>
+            <li>□ 採用 Conventional Commits 格式：<code>fix(scope): subject</code></li>
+            <li>□ 如為 breaking change，加上 <code>!</code> 或於 footer 寫入 BREAKING CHANGE</li>
+            <li>□ Body 清楚說明 why（而非 what）</li>
+            <li>□ Footer 加上 <code>Closes #234</code></li>
           </ul>
         </div>
       </details>
 
       <details class="collapse">
-        <summary>⑥ Push + 開 PR (Lesson 04) <span class="collapse-tag">10 分鐘</span></summary>
+        <summary>⑥ Push 並開啟 PR（Lesson 04） <span class="collapse-tag">10 分鐘</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:14px;">
             <li>□ <code>git push -u origin fix/issue-234</code></li>
-            <li>□ GitHub 上點 "Compare & pull request"</li>
-            <li>□ 用標準 PR 描述格式：背景 / 改動 / 測試方式 / 截圖 / 是否 breaking</li>
-            <li>□ 連結 issue: <code>Closes #234</code></li>
-            <li>□ 還沒準備好被 review → 開成 Draft PR</li>
-            <li>□ 確認 CI 全綠</li>
+            <li>□ 於 GitHub 點選 "Compare & pull request"</li>
+            <li>□ 採用標準 PR 描述格式：背景、改動、測試方式、截圖、是否為 breaking</li>
+            <li>□ 連結 issue：<code>Closes #234</code></li>
+            <li>□ 尚未準備好被 review 時，建立 Draft PR</li>
+            <li>□ 確認 CI 全部通過</li>
           </ul>
         </div>
       </details>
 
       <details class="collapse">
-        <summary>⑦ 處理 Code Review (Lesson 05) <span class="collapse-tag">~數天</span></summary>
+        <summary>⑦ 處理 Code Review（Lesson 05） <span class="collapse-tag">數天</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:14px;">
-            <li>□ 收到留言不要急著回應，先全部讀完</li>
-            <li>□ 每條 comment 至少留 Done / Won't fix because... / Discussed offline</li>
-            <li>□ 不同意的有理由就提出討論，不是無條件接受</li>
-            <li>□ 改完 push 新 commit (不要改寫歷史，等 review 通過再整理)</li>
-            <li>□ 全部 comment 解掉後留 "Ready for re-review"</li>
+            <li>□ 收到留言後不急於回覆，先完整閱讀所有 comment</li>
+            <li>□ 每條 comment 至少回覆 Done、Won't fix because... 或 Discussed offline</li>
+            <li>□ 不同意時若具備合理依據應提出討論，而非無條件接受</li>
+            <li>□ 修改完成後 push 新 commit（暫不改寫歷史，待 review 通過再整理）</li>
+            <li>□ 所有 comment 處理完畢後留下 "Ready for re-review"</li>
           </ul>
         </div>
       </details>
 
       <details class="collapse">
-        <summary>⑧ 處理衝突 (Lesson 02, 04) <span class="collapse-tag">看狀況</span></summary>
+        <summary>⑧ 處理衝突（Lesson 02、04） <span class="collapse-tag">視情況而定</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:14px;">
             <li>□ <code>git fetch upstream</code></li>
             <li>□ <code>git rebase upstream/main</code></li>
-            <li>□ 在 IDE 解衝突</li>
+            <li>□ 於 IDE 解決衝突</li>
             <li>□ <code>git add &lt;files&gt;</code> + <code>git rebase --continue</code></li>
-            <li>□ <code>git push --force-with-lease</code> (不要用 --force)</li>
+            <li>□ <code>git push --force-with-lease</code>（不應使用 --force）</li>
           </ul>
         </div>
       </details>
 
       <details class="collapse">
-        <summary>⑨ 合併 + 慶祝 <span class="collapse-tag">5 分鐘</span></summary>
+        <summary>⑨ 合併與完成 <span class="collapse-tag">5 分鐘</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:14px;">
-            <li>□ 等待 maintainer 合併 (依 CONTRIBUTING 的政策決定 squash / merge / rebase)</li>
-            <li>□ Issue 自動關閉 (因為 PR 描述有 <code>Closes #234</code>)</li>
-            <li>□ 把本地 fork 的 main 重新同步 upstream/main</li>
-            <li>□ 刪掉自己的 feature branch</li>
-            <li>□ 慶祝 — 把這個 PR 加進你的個人作品集 / LinkedIn</li>
+            <li>□ 等待 maintainer 合併（依 CONTRIBUTING 的政策決定採用 squash、merge 或 rebase）</li>
+            <li>□ Issue 自動關閉（因 PR 描述包含 <code>Closes #234</code>）</li>
+            <li>□ 將本地 fork 的 main 重新同步至 upstream/main</li>
+            <li>□ 刪除個人的 feature branch</li>
+            <li>□ 完成後可將該 PR 納入個人作品集或 LinkedIn 紀錄</li>
           </ul>
         </div>
       </details>
@@ -355,17 +355,17 @@
 
     <section id="pitfalls">
       <span class="section-eyebrow">07 — 常見陷阱</span>
-      <h2>新手最常踩的 8 個雷</h2>
+      <h2>新手最常見的 8 個錯誤</h2>
 
       <ol>
-        <li><strong>Force push 自己的 main</strong> — 嚴重災難，整個分支歷史毀掉。<strong>永遠在 feature branch 操作，不要碰 main</strong>。</li>
-        <li><strong>PR 太大</strong> — 1000+ 行的 PR 沒人想 review。一個 PR 一個目的，盡量 &lt; 400 行 diff。</li>
-        <li><strong>Commit history 太亂</strong> — <code>fix</code>、<code>asdf</code>、<code>finally working</code> 這種 commit 滿天飛。送 PR 前用 <code>rebase -i</code> 整理。</li>
-        <li><strong>沒回應 review comment</strong> — 改完就 push 不留言，reviewer 不知道你採納了哪些建議。每條至少回 Done。</li>
-        <li><strong>忘記 sync upstream</strong> — 兩週沒同步，PR 衝突爆炸。每次開新分支前先 fetch + rebase upstream。</li>
-        <li><strong>提交未跑測試的程式碼</strong> — push 之前在本地跑 <code>npm test</code> + <code>npm run lint</code>。CI 紅燈讓 reviewer 不會看你 PR。</li>
-        <li><strong>無視 CONTRIBUTING 的 commit 規範</strong> — 有些專案要求 conventional commits、有些要 DCO sign-off。違反會被退件重做。</li>
-        <li><strong>PR 描述寫 "fix"</strong> — Reviewer 不知道你在做什麼。Lesson 04 的標準範本一定要填。</li>
+        <li><strong>對個人 main 執行 force push</strong>——嚴重風險，整個分支的歷史將遭破壞。<strong>應始終於 feature branch 操作，不應動到 main</strong>。</li>
+        <li><strong>PR 規模過大</strong>——1000 行以上的 PR 將難以 review。每個 PR 應對應單一目的，盡量控制於 400 行 diff 以內。</li>
+        <li><strong>commit 歷史紊亂</strong>——<code>fix</code>、<code>asdf</code>、<code>finally working</code> 等粗略的 commit 散布其中。送出 PR 前應以 <code>rebase -i</code> 進行整理。</li>
+        <li><strong>未回應 review comment</strong>——修改後逕自 push 而未留言，reviewer 無從得知採納哪些建議。每條至少回覆 Done。</li>
+        <li><strong>遺忘同步 upstream</strong>——數週未同步將導致 PR 衝突堆積。每次切出新分支前皆應先執行 fetch 與 rebase upstream。</li>
+        <li><strong>提交未經測試的程式碼</strong>——push 前應於本地執行 <code>npm test</code> 與 <code>npm run lint</code>。CI 紅燈將使 reviewer 不願審閱該 PR。</li>
+        <li><strong>忽略 CONTRIBUTING 的 commit 規範</strong>——部分專案要求 conventional commits，部分要求 DCO sign-off。違反規範將被退件重做。</li>
+        <li><strong>PR 描述僅寫 "fix"</strong>——reviewer 無從得知 PR 的內容。Lesson 04 的標準範本應確實填寫。</li>
       </ol>
     </section>
 
@@ -376,17 +376,17 @@
       <h3>Issue 範例</h3>
       <div class="compare-grid">
         <div class="compare-card compare-bad">
-          <div class="compare-label"><span class="compare-icon">✗</span>糟糕的第一個 issue</div>
+          <div class="compare-label"><span class="compare-icon">✗</span>不佳的第一個 issue</div>
           <div class="compare-body">
             <code>不能用</code>
-            <p style="font-size:13px;margin-top:0.4rem;">無重現、無環境、無預期 vs 實際。Maintainer 只能回「請補資訊」。</p>
+            <p style="font-size:13px;margin-top:0.4rem;">缺少重現步驟、環境資訊與「預期 vs 實際」描述。Maintainer 僅能回覆「請補充資訊」。</p>
           </div>
         </div>
         <div class="compare-card compare-good">
-          <div class="compare-label"><span class="compare-icon">✓</span>好的第一個 issue</div>
+          <div class="compare-label"><span class="compare-icon">✓</span>良好的第一個 issue</div>
           <div class="compare-body">
-            <code>[Bug] DatePicker placeholder 在 Safari 17.4 顯示為亂碼</code>
-            <p style="font-size:13px;margin-top:0.4rem;">含完整重現步驟、環境資訊、截圖、可能的猜測。</p>
+            <code>[Bug] DatePicker placeholder 於 Safari 17.4 顯示為亂碼</code>
+            <p style="font-size:13px;margin-top:0.4rem;">包含完整重現步驟、環境資訊、截圖與可能成因的推測。</p>
           </div>
         </div>
       </div>
@@ -394,17 +394,17 @@
       <h3>PR 範例</h3>
       <div class="compare-grid">
         <div class="compare-card compare-bad">
-          <div class="compare-label"><span class="compare-icon">✗</span>糟糕的第一個 PR</div>
+          <div class="compare-label"><span class="compare-icon">✗</span>不佳的第一個 PR</div>
           <div class="compare-body">
-            <code>title: update<br>desc: (空白)<br>commits: fix · WIP · finally · oops</code>
-            <p style="font-size:13px;margin-top:0.4rem;">Reviewer 完全不知道在做什麼，直接退件。</p>
+            <code>title: update<br>desc:（空白）<br>commits: fix · WIP · finally · oops</code>
+            <p style="font-size:13px;margin-top:0.4rem;">Reviewer 無從得知 PR 內容，將被直接退件。</p>
           </div>
         </div>
         <div class="compare-card compare-good">
-          <div class="compare-label"><span class="compare-icon">✓</span>好的第一個 PR</div>
+          <div class="compare-label"><span class="compare-icon">✓</span>良好的第一個 PR</div>
           <div class="compare-body">
-            <code>title: fix(date-picker): handle Safari 17.4 placeholder render<br>desc: 完整 5 段描述<br>commits: 1 個乾淨的 conventional commit</code>
-            <p style="font-size:13px;margin-top:0.4rem;">Reviewer 5 秒進入狀況，可以直接看程式碼。</p>
+            <code>title: fix(date-picker): handle Safari 17.4 placeholder render<br>desc: 完整 5 段描述<br>commits: 1 個結構清晰的 conventional commit</code>
+            <p style="font-size:13px;margin-top:0.4rem;">Reviewer 可於數秒內掌握脈絡，直接進入程式碼審視。</p>
           </div>
         </div>
       </div>
@@ -415,90 +415,90 @@
       <h2>12 堂課重點反向問答</h2>
 
       <details class="collapse">
-        <summary>Lesson 01：Working Tree、Staging、Local Repo、Remote 分別是什麼？</summary>
-        <div class="collapse-body">編輯中的檔案 → <code>add</code> 進 Staging → <code>commit</code> 進 Local → <code>push</code> 上 Remote。</div>
+        <summary>Lesson 01：Working Tree、Staging、Local Repo 與 Remote 各為何？</summary>
+        <div class="collapse-body">編輯中的檔案 → <code>add</code> 進入 Staging → <code>commit</code> 進入 Local → <code>push</code> 至 Remote。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 02：rebase 的黃金守則是什麼？</summary>
-        <div class="collapse-body">不要對「已經 push 到別人會用的公開分支」做 rebase。</div>
+        <summary>Lesson 02：rebase 的黃金守則為何？</summary>
+        <div class="collapse-body">不應對「已 push 至他人會使用的公開分支」執行 rebase。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 03：你 8 人 SaaS 團隊應該用什麼分支策略？</summary>
-        <div class="collapse-body">GitHub Flow — main + 短命 feature branch + PR。</div>
+        <summary>Lesson 03：8 人 SaaS 團隊應採用何種分支策略？</summary>
+        <div class="collapse-body">GitHub Flow——main 加上短命 feature branch 與 PR。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 04：origin 跟 upstream 的差別？</summary>
-        <div class="collapse-body">origin = 你 fork 的版本；upstream = 原始專案。</div>
+        <summary>Lesson 04：origin 與 upstream 的差異為何？</summary>
+        <div class="collapse-body">origin 為個人 fork 的版本；upstream 為原始專案。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 05：Reviewer 看到只剩 nit 級問題該按 Approve 還是 Request changes？</summary>
-        <div class="collapse-body">Approve + 留下 nit comment。Request changes 留給真正 blocking 的問題。</div>
+        <summary>Lesson 05：Reviewer 僅剩 nit 級問題時應 Approve 或 Request changes？</summary>
+        <div class="collapse-body">Approve 並留下 nit comment。Request changes 應保留予實際 blocking 的問題。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 06：版本 1.4.5 加一個新功能，下一版是？</summary>
-        <div class="collapse-body">1.5.0 (MINOR +1，PATCH 重設為 0)。</div>
+        <summary>Lesson 06：版本 1.4.5 新增一項功能後的下一版為何？</summary>
+        <div class="collapse-body">1.5.0（MINOR +1，PATCH 重設為 0）。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 07：good first issue 標籤代表什麼？</summary>
-        <div class="collapse-body">Maintainer 評估過範圍適合新手、有清楚說明、不需熟悉 codebase 的 issue。</div>
+        <summary>Lesson 07：good first issue 標籤的意涵為何？</summary>
+        <div class="collapse-body">經 maintainer 評估，範圍適合新人、具備清楚說明、無須熟悉整體 codebase 的 issue。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 08：TDD 三步驟順序？</summary>
-        <div class="collapse-body">Red (寫失敗測試) → Green (最少實作通過) → Refactor (整理)。</div>
+        <summary>Lesson 08：TDD 三步驟的順序為何？</summary>
+        <div class="collapse-body">Red（撰寫失敗的測試）→ Green（以最小幅度的實作通過測試）→ Refactor（整理）。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 09：Continuous Delivery vs Continuous Deployment 差別？</summary>
-        <div class="collapse-body">Delivery = 自動到 staging 但 production 需手動按按鈕；Deployment = 合 main 直接上 production。</div>
+        <summary>Lesson 09：Continuous Delivery 與 Continuous Deployment 的差異為何？</summary>
+        <div class="collapse-body">Delivery 為自動部署至 staging，但 production 須人工觸發；Deployment 則為合併 main 後直接部署至 production。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 10：ADR 的決策被推翻後怎麼處理？</summary>
-        <div class="collapse-body">把 Status 改成 <code>Superseded by ADR-N</code> 並保留所有內容，永不刪除。</div>
+        <summary>Lesson 10：ADR 的決策被推翻後應如何處理？</summary>
+        <div class="collapse-body">將 Status 改為 <code>Superseded by ADR-N</code>，保留所有內容，永不刪除。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 11：xz utils 後門的最大教訓是？</summary>
-        <div class="collapse-body">開源專案的單一維護者是攻擊者下手點，需要多人維護 + SBOM + artifact signing。</div>
+        <summary>Lesson 11：xz utils 後門的最大教訓為何？</summary>
+        <div class="collapse-body">開源專案的單一維護者為攻擊者鎖定的目標，需採用多人維護、SBOM 與 artifact signing。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 12：開始動工前應該先讀哪 5 個檔案？</summary>
-        <div class="collapse-body">README.md / CONTRIBUTING.md / CODE_OF_CONDUCT.md / SECURITY.md / LICENSE。</div>
+        <summary>Lesson 12：開始動工前應先閱讀哪 5 個檔案？</summary>
+        <div class="collapse-body">README.md、CONTRIBUTING.md、CODE_OF_CONDUCT.md、SECURITY.md 與 LICENSE。</div>
       </details>
     </section>
 
     <section id="graduation">
       <span class="section-eyebrow">10 — 畢業任務</span>
-      <h2>三個畢業任務 (難度遞增)</h2>
+      <h2>三個畢業任務（難度遞增）</h2>
 
       <div class="section-card">
-        <h3 style="margin-top:0;color:var(--success);">Level 1 — 練習用 first-contributions</h3>
-        <p>到 <a class="inline-link" href="https://github.com/firstcontributions/first-contributions" target="_blank" rel="noopener">firstcontributions/first-contributions</a> 走完一次 fork → clone → 修改 → push → PR 流程。雖然只是加自己名字到 list，但能跑通整套流程。<strong>30 分鐘搞定。</strong></p>
+        <h3 style="margin-top:0;color:var(--success);">Level 1——使用 first-contributions 進行練習</h3>
+        <p>前往 <a class="inline-link" href="https://github.com/firstcontributions/first-contributions" target="_blank" rel="noopener">firstcontributions/first-contributions</a>，完整走過一次 fork → clone → 修改 → push → PR 流程。雖然僅是於 list 加上個人名稱，但可完整體驗整套流程。<strong>約 30 分鐘可完成。</strong></p>
       </div>
 
       <div class="section-card">
-        <h3 style="margin-top:0;color:var(--warn);">Level 2 — 改一個你常用工具的 docs typo</h3>
-        <p>挑一個你天天用的工具 (你的編輯器外掛、你公司用的 npm 套件、Vue / React / Vite...)。在 <code>docs/</code> 找錯字、過時範例、缺中文翻譯，送一個小 PR。<strong>關鍵是讓你「真的</strong>"擁有"<strong>一個被合併的開源 PR」</strong>。1-2 小時搞定。</p>
+        <h3 style="margin-top:0;color:var(--warn);">Level 2——修正常用工具 docs 中的 typo</h3>
+        <p>挑選一個日常使用的工具（個人編輯器外掛、公司使用的 npm 套件、Vue / React / Vite 等）。於 <code>docs/</code> 中查找錯字、過時範例或缺漏的中文翻譯，提交一個小型 PR。<strong>重點在於實際擁有「一個被合併的開源 PR」</strong>。約 1 至 2 小時可完成。</p>
       </div>
 
       <div class="section-card">
-        <h3 style="margin-top:0;color:var(--accent);">Level 3 — 修一個 good first issue 的小 bug</h3>
-        <p>到 <a class="inline-link" href="https://goodfirstissue.dev" target="_blank" rel="noopener">goodfirstissue.dev</a> 找一個你語言熟、看得懂的 small bug。完整走過 TDD / Conventional Commits / PR 流程，並回應 review。<strong>這是「真貢獻」的開始。</strong>視 bug 大小 1 天到 1 週。</p>
+        <h3 style="margin-top:0;color:var(--accent);">Level 3——修補一個 good first issue 中的小 bug</h3>
+        <p>於 <a class="inline-link" href="https://goodfirstissue.dev" target="_blank" rel="noopener">goodfirstissue.dev</a> 挑選一個語言熟悉且能理解的 small bug。完整走過 TDD、Conventional Commits 與 PR 流程，並回應 review。<strong>此為「實質貢獻」的起點。</strong>所需時間視 bug 規模而定，約 1 天至 1 週。</p>
       </div>
 
       <div class="callout callout-success">
         <div class="callout-icon">✓</div>
         <div class="callout-body">
-          <strong>三題都過了，恭喜畢業！</strong>
-          你現在已經具備加入任何大型開源專案、或進公司寫大型專案的協作能力。剩下的就是不斷實戰累積。<strong>繼續送 PR、繼續 review 別人 PR — 這是進步最快的方式。</strong>
+          <strong>三項任務皆完成即代表課程結業</strong>
+          至此已具備加入大型開源專案或於公司投入大型專案的協作能力。後續即為持續累積實戰經驗。<strong>持續送出 PR、持續 review 他人的 PR——此為進步最快的途徑。</strong>
         </div>
       </div>
     </section>

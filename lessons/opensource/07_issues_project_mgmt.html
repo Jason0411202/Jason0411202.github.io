@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 07 · 規範與品質篇</div>
     <h1 class="hero-title">Issue 撰寫<span> 與專案管理</span></h1>
-    <p class="hero-desc">Issue 不是抱怨區，是<strong>協作的最小單位</strong>。這堂教你寫出工程師願意處理的 issue，並看懂大型專案的標籤、Milestone、Triage 系統。</p>
+    <p class="hero-desc">Issue 並非抱怨區，而是<strong>協作的最小單位</strong>。本課將介紹如何撰寫工程師願意處理的 issue，並解析大型專案的標籤、Milestone 與 Triage 系統。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 7 / 12 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 11 分鐘</span>
@@ -48,26 +48,26 @@
 
     <section id="types">
       <span class="section-eyebrow">01 — Issue 三大類</span>
-      <h2>Issue 不只是「報 bug」</h2>
+      <h2>Issue 不僅止於「回報 bug」</h2>
 
-      <p>大型專案的 issue 通常分三大類，各有不同目的與寫法：</p>
+      <p>大型專案的 issue 通常分為三大類，各自具備不同目的與撰寫方式：</p>
 
       <table>
         <thead>
           <tr><th>類型</th><th>用途</th><th>標籤</th></tr>
         </thead>
         <tbody>
-          <tr><td><strong>Bug Report</strong></td><td>回報軟體錯誤行為</td><td><code>type: bug</code></td></tr>
-          <tr><td><strong>Feature Request</strong></td><td>提議新功能 / 改善</td><td><code>type: feature</code> / <code>enhancement</code></td></tr>
-          <tr><td><strong>Question / Discussion</strong></td><td>使用問題、設計討論</td><td><code>type: question</code> (許多專案會引導到 GitHub Discussions)</td></tr>
+          <tr><td><strong>Bug Report</strong></td><td>回報軟體的錯誤行為</td><td><code>type: bug</code></td></tr>
+          <tr><td><strong>Feature Request</strong></td><td>提議新功能或改善建議</td><td><code>type: feature</code> 或 <code>enhancement</code></td></tr>
+          <tr><td><strong>Question / Discussion</strong></td><td>使用方面的提問、設計層面的討論</td><td><code>type: question</code>（許多專案會將此類引導至 GitHub Discussions）</td></tr>
         </tbody>
       </table>
 
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>Question 該去 issue 還是 Discussions？</strong>
-          GitHub Discussions 是 2020 推出的論壇式功能，<strong>適合「使用方法」的提問</strong>。Issue 留給「需要 maintainer 採取行動」的事 — 改 code、改 docs、評估 feature。Stack Overflow 也是常見導向。看專案 CONTRIBUTING 怎麼說。
+          <strong>Question 應提交於 issue 或 Discussions？</strong>
+          GitHub Discussions 為 2020 年推出的論壇式功能，<strong>適合「使用方法」類型的提問</strong>。Issue 應保留予「需要 maintainer 採取行動」的事項——程式碼修改、文件修改、feature 評估等。Stack Overflow 亦為常見的引導去處。實際做法以專案的 CONTRIBUTING 為準。
         </div>
       </div>
     </section>
@@ -76,25 +76,25 @@
       <span class="section-eyebrow">02 — Bug Report</span>
       <h2>業界通用的 Bug Report 結構</h2>
 
-      <p>一個能被處理的 bug report，必須包含這幾個區塊：</p>
+      <p>一份能被有效處理的 bug report，須包含以下幾個區塊：</p>
 
       <div class="section-card">
 <pre style="background:var(--paper2);padding:0.9rem 1.1rem;border-radius:8px;font-size:13px;line-height:1.7;font-family:var(--mono);overflow-x:auto;"># 標題：[Bug] 一句話描述問題
 
 ## Describe the bug
-登出後 token 沒清乾淨，下次登入別的帳號會看到上一個使用者的資料。
+登出後 token 未完全清除，下次登入其他帳號時會短暫看到上一位使用者的資料。
 
 ## Steps to Reproduce
-1. 用 user A 登入
-2. 點右上角的「登出」
-3. 用 user B 登入
-4. 看到首頁顯示 user A 的 profile
+1. 以 user A 登入
+2. 點選右上角的「登出」
+3. 以 user B 登入
+4. 首頁顯示 user A 的 profile
 
 ## Expected behavior
-登出後應該完全清掉所有 user 資料，登入新帳號應顯示新使用者資料。
+登出後應完全清除所有 user 相關資料，登入新帳號時應顯示新使用者的資料。
 
 ## Actual behavior
-頁面短暫閃過 user A 的 avatar / name，再 refresh 才正常。
+頁面短暫閃現 user A 的 avatar 與 name，刷新後才恢復正常。
 
 ## Environment
 - OS: macOS 14.5
@@ -103,17 +103,17 @@
 - Node: 18.19.0
 
 ## Screenshots / Video
-(附錄影或截圖)
+（附上錄影或截圖）
 
 ## Additional context
-我猜可能是 React Query cache 沒清。第一次發現是 2026-04-25 上線後。</pre>
+推測可能是 React Query cache 未清除。首次發現於 2026-04-25 部署後。</pre>
       </div>
 
       <div class="callout callout-warn">
         <div class="callout-icon">!</div>
         <div class="callout-body">
-          <strong>沒有重現步驟 = 無解</strong>
-          Maintainer 不能重現的 bug 就無法 debug。「<em>有時候會壞</em>」是最差的 bug report。<strong>提供確切步驟、影片、log、版本資訊，才能進入 triage 流程。</strong>
+          <strong>缺少重現步驟即無從處理</strong>
+          無法重現的 bug 即無法 debug。「<em>有時候會壞</em>」屬於品質最低的 bug report。<strong>提供明確的重現步驟、影片、log 與版本資訊，才能進入 triage 流程。</strong>
         </div>
       </div>
     </section>
@@ -122,34 +122,34 @@
       <span class="section-eyebrow">03 — Feature Request</span>
       <h2>Feature Request 結構</h2>
 
-      <p>新功能要求要說<strong>痛點</strong>而不是<strong>解法</strong>。直接寫「請加 X 功能」很容易被拒，因為 maintainer 看不到使用情境。</p>
+      <p>新功能請求應描述<strong>痛點</strong>而非<strong>解法</strong>。直接寫「請新增 X 功能」常會被拒絕，因 maintainer 無從判斷實際的使用情境。</p>
 
       <div class="section-card">
 <pre style="background:var(--paper2);padding:0.9rem 1.1rem;border-radius:8px;font-size:13px;line-height:1.7;font-family:var(--mono);overflow-x:auto;"># 標題：[Feature] Allow custom date format in &lt;DatePicker&gt;
 
 ## Is your feature request related to a problem?
-我們的應用要顯示中文日期格式 (民國年)，目前 DatePicker 只支援
-ISO 格式，需要在 component 外面額外做轉換。
+應用需顯示中文日期格式（民國年），目前 DatePicker 僅支援
+ISO 格式，必須於 component 外額外進行轉換。
 
 ## Describe the solution you'd like
-新增一個 `format` prop 讓使用者傳入 day.js / date-fns 的格式字串：
+新增 `format` prop，使用者可傳入 day.js 或 date-fns 的格式字串：
 ```tsx
 &lt;DatePicker format="民國 YYY 年 M 月 D 日" /&gt;
 ```
 
 ## Describe alternatives you've considered
-- 用 wrapper component 自己做轉換 (現在的做法，但 onChange 處理麻煩)
-- 用 i18n library 整合 (太重)
+- 以 wrapper component 自行轉換（目前做法，但 onChange 處理較為繁瑣）
+- 整合 i18n library（過於厚重）
 
 ## Additional context
-看到隔壁的 react-aria/Calendar 有類似功能，可以參考。</pre>
+react-aria/Calendar 具備類似功能，可作為參考。</pre>
       </div>
 
       <div class="callout callout-tip">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>「我願意動手做」會大幅提升被接受機率</strong>
-          在 issue 結尾加一句「我願意送 PR」，maintainer 心中的成本馬上降一半。
+          <strong>「願意親自實作」可顯著提升被接受的機率</strong>
+          在 issue 末尾附上一句「願意送出 PR」，可大幅降低 maintainer 評估時的心理成本。
         </div>
       </div>
     </section>
@@ -160,17 +160,17 @@ ISO 格式，需要在 component 外面額外做轉換。
 
       <div class="compare-grid">
         <div class="compare-card compare-bad">
-          <div class="compare-label"><span class="compare-icon">✗</span>糟糕</div>
+          <div class="compare-label"><span class="compare-icon">✗</span>不佳</div>
           <div class="compare-body">
             <code>不能用</code><br><br>
-            <p style="font-size:13px;">無標題、無重現、無環境。Maintainer 只能回「請補充資訊」。</p>
+            <p style="font-size:13px;">無描述性標題、無重現步驟、無環境資訊。Maintainer 只能回覆「請補充資訊」。</p>
           </div>
         </div>
         <div class="compare-card compare-good">
-          <div class="compare-label"><span class="compare-icon">✓</span>好的</div>
+          <div class="compare-label"><span class="compare-icon">✓</span>良好</div>
           <div class="compare-body">
             <code>[Bug] Logout doesn't clear React Query cache (v1.4.2)</code><br><br>
-            <p style="font-size:13px;">標題告訴你「什麼壞了 + 哪個版本」，maintainer 不用點進去就能初步分類。</p>
+            <p style="font-size:13px;">標題即傳達「問題為何、發生於哪個版本」，maintainer 無須點開即可進行初步分類。</p>
           </div>
         </div>
       </div>
@@ -178,9 +178,9 @@ ISO 格式，需要在 component 外面額外做轉換。
 
     <section id="templates">
       <span class="section-eyebrow">05 — Issue Template</span>
-      <h2>Issue / PR 模板：把好習慣自動化</h2>
+      <h2>Issue 與 PR 模板：將良好習慣自動化</h2>
 
-      <p>專案根目錄放 <code>.github/ISSUE_TEMPLATE/</code> 後，使用者按「New Issue」會跳出選單，引導他們填好結構：</p>
+      <p>於專案根目錄置入 <code>.github/ISSUE_TEMPLATE/</code> 後，使用者按下「New Issue」時會出現選單，引導其依結構填寫內容：</p>
 
       <div class="code-block">
         <div class="code-block-header">
@@ -214,22 +214,22 @@ ISO 格式，需要在 component 外面額外做轉換。
     <span class="tk-kw">validations</span>: { <span class="tk-kw">required</span>: <span class="tk-st">true</span> }</code></pre>
       </div>
 
-      <p>PR 模板也類似 — 在 <code>.github/PULL_REQUEST_TEMPLATE.md</code> 寫好結構，使用者開 PR 時會自動帶入。</p>
+      <p>PR 模板的做法類似——於 <code>.github/PULL_REQUEST_TEMPLATE.md</code> 中寫好結構，使用者開 PR 時即會自動帶入。</p>
 
       <div class="callout callout-success">
         <div class="callout-icon">✓</div>
         <div class="callout-body">
-          <strong>模板省下 80% 的「請補資訊」往返</strong>
-          有了模板，必填欄位空著就不能送出。Maintainer 收到的 issue 質量會大幅提升。
+          <strong>模板可省下大量「請補充資訊」的往返溝通</strong>
+          採用模板後，必填欄位若未填寫即無法提交。Maintainer 收到的 issue 品質將顯著提升。
         </div>
       </div>
     </section>
 
     <section id="labels">
       <span class="section-eyebrow">06 — 標籤系統</span>
-      <h2>大型專案的標籤 (Label) 分類法</h2>
+      <h2>大型專案的標籤（Label）分類法</h2>
 
-      <p>看一下 Kubernetes 或 VS Code 的 issue 列表，會發現標籤被分成幾個維度，<strong>透過 prefix 區隔</strong>：</p>
+      <p>觀察 Kubernetes 或 VS Code 的 issue 列表，可發現標籤被劃分為幾個維度，<strong>並以 prefix 加以區隔</strong>：</p>
 
       <table>
         <thead>
@@ -248,23 +248,23 @@ ISO 格式，需要在 component 外面額外做轉換。
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong><code>good first issue</code> 與 <code>help wanted</code> 是 GitHub 官方推薦標籤</strong>
-          GitHub 會主動把帶有這兩個標籤的 issue 推到「explore」或「first contributions」入口。新人想找專案貢獻時，這是最好的入口。
+          <strong><code>good first issue</code> 與 <code>help wanted</code> 為 GitHub 官方推薦標籤</strong>
+          GitHub 會主動將帶有這兩個標籤的 issue 推送至「explore」或「first contributions」入口。對於初次想參與貢獻的開發者而言，這是最佳的進入點。
         </div>
       </div>
     </section>
 
     <section id="milestone">
       <span class="section-eyebrow">07 — Milestone</span>
-      <h2>Milestone：把 issue 綁定到 release</h2>
+      <h2>Milestone：將 issue 綁定至特定 release</h2>
 
-      <p>Milestone 是 GitHub 內建的「一組 issue/PR 屬於同一個 release」機制。例如建一個 <code>v1.5.0</code> milestone，把要進這版的 issue 全部 assign 過去，可以一目瞭然進度。</p>
+      <p>Milestone 為 GitHub 內建的「一組 issue / PR 屬於同一個 release」機制。例如建立 <code>v1.5.0</code> milestone，將該版預計納入的 issue 全數指派至此，即可清晰掌握整體進度。</p>
 
       <div class="diagram">
         <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" aria-label="Milestone 進度示意">
           <g font-family="JetBrains Mono, monospace" font-size="11">
             <text x="40" y="40" font-weight="700" fill="#0a0a0f" font-size="14">Milestone v1.5.0</text>
-            <text x="40" y="60" fill="#6b6b7e">截止日 2026-05-15 ｜ 進度 7/10 (70%)</text>
+            <text x="40" y="60" fill="#6b6b7e">截止日 2026-05-15 ｜ 進度 7/10（70%）</text>
 
             <!-- 進度條背景 -->
             <rect x="40" y="80" width="640" height="14" rx="7" fill="#eeede8" stroke="#d4d3cc"/>
@@ -281,8 +281,8 @@ ISO 格式，需要在 component 外面額外做轉換。
             <g transform="translate(40, 120)">
               <text fill="#15803d" font-size="11">✓ #421 新增 user profile 頁面</text>
               <text y="20" fill="#15803d" font-size="11">✓ #430 API 支援 GraphQL queries</text>
-              <text y="40" fill="#92400e" font-size="11">○ #441 修正手機 navbar overflow (進行中)</text>
-              <text y="60" fill="#6b6b7e" font-size="11">□ #445 升級 React 19 (尚未開始)</text>
+              <text y="40" fill="#92400e" font-size="11">○ #441 修正手機 navbar overflow（進行中）</text>
+              <text y="60" fill="#6b6b7e" font-size="11">□ #445 升級 React 19（尚未開始）</text>
             </g>
           </g>
         </svg>
@@ -292,32 +292,32 @@ ISO 格式，需要在 component 外面額外做轉換。
 
     <section id="projects">
       <span class="section-eyebrow">08 — GitHub Projects</span>
-      <h2>GitHub Projects (Projects v2)</h2>
+      <h2>GitHub Projects（Projects v2）</h2>
 
-      <p>2022 年推出的新版 Projects 已成為 GitHub 自家 issue 跨 repo 管理的主力工具。可以用三種視圖看同一份資料：</p>
+      <p>2022 年推出的新版 Projects 已成為 GitHub 跨 repo issue 管理的主力工具，可透過三種視圖檢視同一份資料：</p>
 
       <table>
         <thead>
           <tr><th>視圖</th><th>適用場景</th></tr>
         </thead>
         <tbody>
-          <tr><td><strong>Table</strong></td><td>看全貌、批次編輯欄位 (像 Notion / Airtable)</td></tr>
-          <tr><td><strong>Board (Kanban)</strong></td><td>看流程：Backlog → Todo → In Progress → Done</td></tr>
-          <tr><td><strong>Roadmap</strong></td><td>看時間軸：哪些工作壓在哪幾週</td></tr>
+          <tr><td><strong>Table</strong></td><td>檢視整體概況、批次編輯欄位（類似 Notion 或 Airtable）</td></tr>
+          <tr><td><strong>Board（Kanban）</strong></td><td>追蹤流程：Backlog → Todo → In Progress → Done</td></tr>
+          <tr><td><strong>Roadmap</strong></td><td>掌握時間軸：各項工作分配於哪些週次</td></tr>
         </tbody>
       </table>
 
-      <p>Projects 可以加自訂欄位 (Status / Priority / Sprint / Estimate / Assignee)，並且<strong>跨 repo</strong>聚合 issue。一個 Project 可以同時管 frontend repo + backend repo + docs repo 的 issue。</p>
+      <p>Projects 可新增自訂欄位（Status、Priority、Sprint、Estimate、Assignee），並支援<strong>跨 repo</strong>聚合 issue。單一 Project 可同時管理 frontend、backend 與 docs 等多個 repo 的 issue。</p>
 
       <details class="collapse">
-        <summary>Linear / Jira 跟 GitHub Projects 的取捨 <span class="collapse-tag">產品比較</span></summary>
+        <summary>Linear、Jira 與 GitHub Projects 的取捨 <span class="collapse-tag">產品比較</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:13px;">
-            <li><strong>GitHub Projects</strong>：完全整合 GitHub issue / PR；簡單、免費、不需切換工具；但 sprint planning / 報表能力較弱。</li>
-            <li><strong>Linear</strong>：UI / 速度業界標竿，cycle (sprint) 概念內建好，適合產品團隊。需付費。</li>
-            <li><strong>Jira</strong>：企業老牌，自訂能力極強但設定複雜，常被工程師討厭。多在大企業 / 受監管產業。</li>
+            <li><strong>GitHub Projects</strong>：完整整合 GitHub issue 與 PR；介面簡潔、免費、無須切換工具；但 sprint planning 與報表能力較為有限。</li>
+            <li><strong>Linear</strong>：UI 與速度為業界標竿，cycle（sprint）概念內建完整，適合產品團隊。須付費。</li>
+            <li><strong>Jira</strong>：老牌企業級工具，自訂能力極強但設定複雜，工程師接受度普遍較低。多用於大型企業或受監管產業。</li>
           </ul>
-          <p style="margin-top:0.6rem;font-size:13px;">小到中型團隊用 GitHub Projects 通常就夠了。</p>
+          <p style="margin-top:0.6rem;font-size:13px;">中小型團隊使用 GitHub Projects 通常已能滿足需求。</p>
         </div>
       </details>
     </section>
@@ -326,54 +326,54 @@ ISO 格式，需要在 component 外面額外做轉換。
       <span class="section-eyebrow">09 — Triage</span>
       <h2>Issue Triage 流程</h2>
 
-      <p>大型專案每天可能收到幾十個 issue，靠 maintainer 一個個處理會炸。<strong>Triage (分流)</strong> 是把進來的 issue 快速分類處理的流程：</p>
+      <p>大型專案每日可能湧入數十個 issue，maintainer 逐一處理將難以負荷。<strong>Triage（分流）</strong> 是將進來的 issue 快速分類處理的流程：</p>
 
       <div class="timeline">
         <div class="timeline-step">
           <div class="timeline-num">1</div>
           <div class="timeline-content">
-            <div class="timeline-title">標 <code>status: triage</code></div>
-            <div class="timeline-desc">所有新 issue 預設這個狀態，等人來看。</div>
+            <div class="timeline-title">標記 <code>status: triage</code></div>
+            <div class="timeline-desc">所有新 issue 預設為此狀態，等待人員處理。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">2</div>
           <div class="timeline-content">
             <div class="timeline-title">驗證重現性</div>
-            <div class="timeline-desc">能重現 → 標 <code>status: confirmed</code>；不能 → 留言請 reporter 補資訊，標 <code>needs-info</code>。</div>
+            <div class="timeline-desc">可重現者 → 標記 <code>status: confirmed</code>；無法重現者 → 留言請 reporter 補充資訊，並標記 <code>needs-info</code>。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">3</div>
           <div class="timeline-content">
-            <div class="timeline-title">指派優先級 / 區域 / Milestone</div>
-            <div class="timeline-desc"><code>priority: high</code> / <code>area: frontend</code> / 綁到 v1.5.0 milestone</div>
+            <div class="timeline-title">指派優先級、區域與 Milestone</div>
+            <div class="timeline-desc">例如 <code>priority: high</code>、<code>area: frontend</code>、綁定至 v1.5.0 milestone。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">4</div>
           <div class="timeline-content">
-            <div class="timeline-title">如果適合外部貢獻，標 good first issue</div>
-            <div class="timeline-desc">明確、範圍小、有重現步驟 → 邀請社群來修。</div>
+            <div class="timeline-title">適合外部貢獻者，標記 good first issue</div>
+            <div class="timeline-desc">範圍明確、規模適中、具備重現步驟者，可邀請社群協助修補。</div>
           </div>
         </div>
         <div class="timeline-step">
           <div class="timeline-num">5</div>
           <div class="timeline-content">
-            <div class="timeline-title">不打算做的 issue 直接 close + 解釋</div>
-            <div class="timeline-desc">超過範圍 / 重複 / 設計上不收 → 給明確理由然後 close。讓 backlog 不要爆炸。</div>
+            <div class="timeline-title">不予處理的 issue 應直接關閉並說明理由</div>
+            <div class="timeline-desc">超出範圍、重複、設計上不採納者 → 給予明確理由後關閉，避免 backlog 過度膨脹。</div>
           </div>
         </div>
       </div>
 
-      <h3>Stale bot：自動關閉沒人理的 issue</h3>
-      <p>很多大型專案 (如 React、TypeScript) 用 <a class="inline-link" href="https://github.com/actions/stale" target="_blank" rel="noopener">actions/stale</a>：超過 N 天沒回應的 issue 自動標 <code>stale</code>，再過 M 天自動 close。讓「永遠在那但沒人在乎」的 issue 不會堆積。</p>
+      <h3>Stale bot：自動關閉長期未處理的 issue</h3>
+      <p>許多大型專案（如 React、TypeScript）採用 <a class="inline-link" href="https://github.com/actions/stale" target="_blank" rel="noopener">actions/stale</a>：超過 N 天無回應的 issue 將自動標記為 <code>stale</code>，再經過 M 天即自動關閉，避免「長期存在但無人關注」的 issue 堆積。</p>
 
       <div class="callout callout-warn">
         <div class="callout-icon">!</div>
         <div class="callout-body">
-          <strong>Stale bot 也有副作用</strong>
-          有些 issue 是真的重要但 maintainer 沒空看，被自動 close 後社群會生氣。所以 stale bot 通常配合白名單 — 標了 <code>pinned</code> / <code>priority: high</code> 的 issue 不會被自動關。
+          <strong>Stale bot 亦有副作用</strong>
+          部分 issue 確實重要，僅因 maintainer 暫時無暇處理，被自動關閉後可能引發社群反彈。因此 stale bot 通常配合白名單機制——已標記 <code>pinned</code> 或 <code>priority: high</code> 的 issue 不會被自動關閉。
         </div>
       </div>
     </section>

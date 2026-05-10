@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 02 · Git 基礎篇</div>
     <h1 class="hero-title">Git <span>進階操作</span></h1>
-    <p class="hero-desc">這幾個指令你不會，PR 一被退件你就會卡很久 — rebase、cherry-pick、reflog、worktree、reset、revert，全部一次學會。</p>
+    <p class="hero-desc">PR 流程中經常會用到的進階指令：rebase、cherry-pick、reflog、worktree、reset、revert，本課將逐一說明其用途與適用場景。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 2 / 12 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 15 分鐘</span>
@@ -45,9 +45,9 @@
 
     <section id="rebase">
       <span class="section-eyebrow">01 — rebase</span>
-      <h2><code>rebase</code>：把分支「移植」到別人後面</h2>
+      <h2><code>rebase</code>：將分支「移植」至另一個基準點</h2>
 
-      <p><code>rebase</code> 字面意思是「換 base」 —— 把你的分支從原本接的點，搬到另一個點上。常見場景：你的 feature branch 是從兩週前的 main 開的，現在 main 已經往前跑了 30 個 commit，你想把自己的工作接到最新 main 後面。</p>
+      <p><code>rebase</code> 字面意思是「換 base」——把分支從原本接續的 commit，重新接到另一個 commit 之後。常見場景：feature 分支從兩週前的 main 切出，期間 main 已新增 30 個 commit，希望將自己的工作接續到最新 main 之後。</p>
 
       <div class="diagram">
         <svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" aria-label="rebase 前後對照">
@@ -107,8 +107,8 @@
             <text x="620" y="160" fill="#7c3aed" font-size="10">X'</text>
             <text x="680" y="160" fill="#7c3aed" font-size="10">Y'</text>
 
-            <text x="560" y="280" text-anchor="middle" fill="#6b6b7e" font-size="11">X、Y 重新建立成 X'、Y' (新 SHA)</text>
-            <text x="560" y="298" text-anchor="middle" fill="#ff3d1f" font-size="11" font-weight="700">SHA 改變 = 改寫歷史 = 別人在用的分支不要做</text>
+            <text x="560" y="280" text-anchor="middle" fill="#6b6b7e" font-size="11">X、Y 重新建立為 X'、Y'（新 SHA）</text>
+            <text x="560" y="298" text-anchor="middle" fill="#ff3d1f" font-size="11" font-weight="700">SHA 改變 = 改寫歷史 = 共用分支應避免</text>
           </g>
         </svg>
         <div class="diagram-caption">圖 2.1 — rebase 把 X、Y 重新接到最新 main 後面</div>
@@ -119,23 +119,23 @@
           <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 在 feature branch 上</span>
+<pre><code><span class="tk-cm"># 於 feature branch 上執行</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> fetch origin
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase origin/main
 
-<span class="tk-cm"># 如果有衝突，解決後</span>
+<span class="tk-cm"># 若發生衝突，解決後執行</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> add &lt;檔案&gt;
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase <span class="tk-op">--continue</span>
 
-<span class="tk-cm"># 不想繼續了 (回到 rebase 前狀態)</span>
+<span class="tk-cm"># 中止 rebase 並回到原始狀態</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase <span class="tk-op">--abort</span></code></pre>
       </div>
 
       <h3>互動式 rebase：整理自己的 commit 歷史</h3>
 
-      <p><strong>這是 rebase 的另一個用法，跟前面「移植分支」是完全不同的場景。</strong>前面的 <code>git rebase main</code> 是把分支接到別的 base；這裡的 <code>git rebase -i</code> 是針對<strong>同一條分支上自己的 commit</strong>做修改 —— 合併、改 message、刪掉、重排順序。共通點只是底層都會「重新建立 commit」這個動作。</p>
+      <p><strong>此為 rebase 的另一種用法，與前述「移植分支」屬於不同場景。</strong>前述的 <code>git rebase main</code> 是將分支接續到不同的 base；此處的 <code>git rebase -i</code> 則是針對<strong>同一條分支上的 commit</strong>進行調整——合併、修改 message、刪除、重新排序。兩者的共通點僅在於底層都會「重新建立 commit」。</p>
 
-      <p>送 PR 前最常用 — 把混亂的 commit 整理成乾淨的故事。<span style="color:#6b6b7e;">（如果只想改最新一個 commit，用 <code>git commit --amend</code> 更快；rebase -i 是處理更早或一次多個 commit 的版本。）</span></p>
+      <p>送出 PR 前最常使用此功能，將零散的 commit 整理為結構清晰的歷史。<span style="color:#6b6b7e;">（若僅需修改最新一筆 commit，使用 <code>git commit --amend</code> 更為直接；<code>rebase -i</code> 適用於處理更早或多筆 commit 的情況。）</span></p>
 
       <div class="code-block">
         <div class="code-block-header">
@@ -149,70 +149,70 @@
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> rebase <span class="tk-op">-i</span> origin/main</code></pre>
       </div>
 
-      <p>跳出來的編輯器會列出這些 commit，每行最前面寫一個動作：</p>
+      <p>執行後開啟的編輯器會列出這些 commit，每行最前方標示一個動作：</p>
 
       <table>
         <thead>
-          <tr><th>動作</th><th>意思</th><th>用在哪</th></tr>
+          <tr><th>動作</th><th>說明</th><th>適用情境</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>pick</code></td><td>保留</td><td>什麼都不改</td></tr>
-          <tr><td><code>reword</code> / <code>r</code></td><td>保留改動但重寫 message</td><td>commit message 寫得不夠好</td></tr>
-          <tr><td><code>squash</code> / <code>s</code></td><td>跟上一個合併，<strong>合併兩邊的 message</strong></td><td>把多個有意義的小步驟收成一個大功能 commit</td></tr>
-          <tr><td><code>fixup</code> / <code>f</code></td><td>跟上一個合併，<strong>丟掉這個的 message</strong></td><td>「修 typo / 修 lint / 修上一個 commit 的小錯」這種補丁</td></tr>
-          <tr><td><code>edit</code> / <code>e</code></td><td>停在這個 commit 讓你重新改檔案</td><td>想拆開或大改某個 commit</td></tr>
-          <tr><td><code>drop</code> / <code>d</code></td><td>整個 commit 丟掉</td><td>不該存在的實驗 commit</td></tr>
+          <tr><td><code>pick</code></td><td>保留</td><td>不需修改</td></tr>
+          <tr><td><code>reword</code> / <code>r</code></td><td>保留改動，重寫 message</td><td>commit message 描述不夠精確</td></tr>
+          <tr><td><code>squash</code> / <code>s</code></td><td>與上一筆合併，<strong>同時合併兩者的 message</strong></td><td>將多個有意義的小步驟整併為一筆功能性 commit</td></tr>
+          <tr><td><code>fixup</code> / <code>f</code></td><td>與上一筆合併，<strong>捨棄該筆的 message</strong></td><td>修 typo、修 lint、修補上一筆 commit 的小錯誤</td></tr>
+          <tr><td><code>edit</code> / <code>e</code></td><td>暫停於該 commit，可重新修改檔案</td><td>需要拆解或大幅修改某筆 commit</td></tr>
+          <tr><td><code>drop</code> / <code>d</code></td><td>整筆 commit 移除</td><td>不應保留的實驗性 commit</td></tr>
         </tbody>
       </table>
 
-      <p>實際在編輯器裡長這樣 — 假設 <code>git rebase -i HEAD~4</code>，要把後面 3 個小修補通通合進第一個有意義的 commit：</p>
+      <p>編輯器中的實際內容如下——假設執行 <code>git rebase -i HEAD~4</code>，將後續三筆小修補全數合併至第一筆功能性 commit：</p>
 
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">git-rebase-todo</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 編輯器打開後預設長這樣 (越上面越舊)</span>
+<pre><code><span class="tk-cm"># 編輯器開啟後的預設內容（由上而下，由舊到新）</span>
 pick a1b2c3d feat(profile): add avatar upload
 pick e4f5g6h fix typo
 pick i7j8k9l fix lint
 pick m0n1o2p tweak avatar size
 
-<span class="tk-cm"># 把後面三個改成 fixup (沒新訊息) 或 squash (要合併訊息)</span>
+<span class="tk-cm"># 將後續三筆改為 fixup（不保留 message）或 squash（合併 message）</span>
 pick   a1b2c3d feat(profile): add avatar upload
 fixup  e4f5g6h fix typo
 fixup  i7j8k9l fix lint
 squash m0n1o2p tweak avatar size
 
-<span class="tk-cm"># 存檔離開後，4 個 commit 會合成 1 個，</span>
-<span class="tk-cm"># 並再跳一次編輯器讓你確認最終的 commit message</span></code></pre>
+<span class="tk-cm"># 存檔離開後，四筆 commit 將合併為一筆，</span>
+<span class="tk-cm"># 並再次開啟編輯器供確認最終的 commit message</span></code></pre>
       </div>
 
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>怎麼操作這個編輯器</strong>
-          預設會開 Vim：<code>i</code> 進入編輯模式 → 把行首的 <code>pick</code> 改成 <code>squash</code> / <code>fixup</code> / <code>reword</code> 等動作（也可以整行上下拖移來改順序）→ 按 <code>Esc</code> 離開編輯模式 → 輸入 <code>:wq</code> 存檔離開。不熟 Vim 可以先 <code>git config --global core.editor "code --wait"</code> 換成 VS Code，存檔關掉分頁就會繼續。
+          <strong>編輯器操作方式</strong>
+          預設使用 Vim：按 <code>i</code> 進入編輯模式 → 將行首的 <code>pick</code> 改為 <code>squash</code> / <code>fixup</code> / <code>reword</code> 等動作（亦可整行上下移動以調整順序）→ 按 <code>Esc</code> 離開編輯模式 → 輸入 <code>:wq</code> 存檔離開。若不熟悉 Vim，可先以 <code>git config --global core.editor "code --wait"</code> 將編輯器切換為 VS Code，存檔關閉分頁後即會繼續執行。
         </div>
       </div>
 
-      <h3>把 rebase 過的 commit 推上去:<code>--force-with-lease</code></h3>
+      <h3>推送 rebase 後的 commit：<code>--force-with-lease</code></h3>
 
-      <p>rebase 完成後,本地的 commit SHA 已經跟遠端對不起來,普通 <code>git push</code> 會被 Git 擋下來(它認為你會弄丟遠端的歷史)。要把改寫過的歷史推上去就得 force push,但<strong>純 <code>--force</code> 有風險</strong> — 如果同事在你 rebase 期間剛好 push 了東西到同一支分支,你會直接覆蓋掉他的工作。</p>
+      <p>rebase 完成後，本地的 commit SHA 已與遠端對不上，一般的 <code>git push</code> 會被 Git 拒絕（避免覆蓋遠端的歷史）。要將改寫後的歷史推送出去必須 force push，但<strong>單純使用 <code>--force</code> 具有風險</strong>——若同事於 rebase 期間對同一分支 push 了內容，將會被直接覆寫。</p>
 
       <div class="compare-grid">
         <div class="compare-card compare-bad">
           <div class="compare-label"><span class="compare-icon">✗</span>危險</div>
           <div class="compare-body">
             <code>git push --force</code><br>
-            無條件覆蓋,同事剛 push 的 commit 會被你蓋掉,<strong>且不會警告。</strong>
+            無條件覆蓋；同事剛 push 的 commit 將被覆寫，<strong>且無任何警告。</strong>
           </div>
         </div>
         <div class="compare-card compare-good">
           <div class="compare-label"><span class="compare-icon">✓</span>推薦</div>
           <div class="compare-body">
             <code>git push --force-with-lease</code><br>
-            「除非遠端跟我上次 fetch 看到的一樣,否則拒絕推」 — 同事有新 push 時會擋下來提醒你。
+            僅當遠端的位置與上次 fetch 時一致才允許推送——若遠端有他人新 push，會直接拒絕並提示。
           </div>
         </div>
       </div>
@@ -220,8 +220,8 @@ squash m0n1o2p tweak avatar size
       <div class="callout callout-success">
         <div class="callout-icon">✓</div>
         <div class="callout-body">
-          <strong>建議設成預設 alias</strong>
-          <code>git config --global alias.fpush "push --force-with-lease"</code> — 之後習慣性打 <code>git fpush</code>,徹底避開 <code>--force</code>。同樣的安全考量也適用於 <code>commit --amend</code>、<code>cherry-pick</code>、<code>reset</code> 等任何會改寫 commit SHA 的操作 — 只要你接下來要 push,就用 <code>--force-with-lease</code>。
+          <strong>建議設定為預設 alias</strong>
+          <code>git config --global alias.fpush "push --force-with-lease"</code>——後續習慣性使用 <code>git fpush</code>，可徹底避開 <code>--force</code>。同樣的安全考量也適用於 <code>commit --amend</code>、<code>cherry-pick</code>、<code>reset</code> 等任何會改寫 commit SHA 的操作——只要後續需要 push，皆建議使用 <code>--force-with-lease</code>。
         </div>
       </div>
 
@@ -229,28 +229,28 @@ squash m0n1o2p tweak avatar size
 
     <section id="cherry-pick">
       <span class="section-eyebrow">02 — cherry-pick</span>
-      <h2><code>cherry-pick</code>：只挑一個 commit 搬到別處</h2>
+      <h2><code>cherry-pick</code>：將指定 commit 套用至其他分支</h2>
 
-      <p>典型場景：main 上有個 bugfix，你想把它 backport 到 v2 維護分支，但 v2 跟 main 已經差很多，沒辦法整支 merge。</p>
+      <p>典型場景：main 上有一筆 bugfix，需 backport 至 v2 維護分支，但 v2 與 main 之間已存在大量差異，無法整支分支 merge。</p>
 
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 切到目標分支</span>
+<pre><code><span class="tk-cm"># 切換至目標分支</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> checkout release/v2.x
 
-<span class="tk-cm"># 把 main 上某個 commit 拿過來</span>
+<span class="tk-cm"># 將 main 上某筆 commit 套用過來</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> cherry-pick a1b2c3d
 
-<span class="tk-cm"># 一次 cherry-pick 多個</span>
+<span class="tk-cm"># 一次套用多筆</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> cherry-pick a1b2c3d e4f5g6h
 
-<span class="tk-cm"># 一個範圍 (含 e4f5g6h，不含 a1b2c3d)</span>
+<span class="tk-cm"># 套用一個範圍（包含 e4f5g6h，不包含 a1b2c3d）</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> cherry-pick a1b2c3d..e4f5g6h
 
-<span class="tk-cm"># 衝突解掉之後</span>
+<span class="tk-cm"># 解決衝突後繼續</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> add &lt;files&gt;
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> cherry-pick <span class="tk-op">--continue</span></code></pre>
       </div>
@@ -258,24 +258,24 @@ squash m0n1o2p tweak avatar size
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>cherry-pick 到底搬了什麼？</strong>
-          只搬「那個 commit 自己的 diff」（它跟父 commit 的差異），<strong>不會</strong>把歷史、父 commit 或其他不同步的內容一起搬過來。套用到目前分支後會產生一個全新的 commit（hash 不同），如果這段 diff 在目標分支的對應位置已經長得不一樣，就會出現衝突要手動解。
+          <strong>cherry-pick 實際套用了哪些內容？</strong>
+          僅套用「該 commit 本身的 diff」（即與父 commit 的差異），<strong>不會</strong>連同歷史、父 commit 或其他相關內容一併帶入。套用至當前分支後會產生一筆全新的 commit（hash 不同）；若該 diff 在目標分支的對應位置已有不同內容，將會出現衝突需手動解決。
         </div>
       </div>
     </section>
 
     <section id="reflog">
       <span class="section-eyebrow">03 — reflog</span>
-      <h2><code>reflog</code>：救回任何「不見」的 commit</h2>
+      <h2><code>reflog</code>：救回看似「消失」的 commit</h2>
 
-      <p><code>reflog</code> 記錄<strong>你這台機器上</strong>所有 HEAD 與分支指針的移動 — commit、reset、rebase、checkout、fetch / pull 都會留下一筆（純本地紀錄，別人 push 到遠端的事不會出現）。<strong>就算 commit 從分支上消失、被 rebase 改寫、被 reset --hard 蓋掉，只要還沒 GC (預設 90 天)，它都還在 reflog 裡。</strong></p>
+      <p><code>reflog</code> 記錄<strong>本機上</strong>所有 HEAD 與分支指針的移動——commit、reset、rebase、checkout、fetch / pull 皆會留下紀錄（純本地紀錄，他人 push 至遠端的動作不會出現）。<strong>即使 commit 從分支上消失、被 rebase 改寫、或被 reset --hard 覆蓋，只要尚未被 GC（預設 90 天）回收，皆可從 reflog 中找回。</strong></p>
 
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 看 HEAD 最近 30 個移動</span>
+<pre><code><span class="tk-cm"># 檢視 HEAD 最近 30 次移動紀錄</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> reflog
 
 a1b2c3d HEAD@{0}: reset: moving to HEAD~3
@@ -283,129 +283,129 @@ e4f5g6h HEAD@{1}: commit: feat(profile): add avatar upload
 i7j8k9l HEAD@{2}: commit: fix(profile): handle empty name
 ...
 
-<span class="tk-cm"># 我想救回 e4f5g6h 那個 commit</span>
+<span class="tk-cm"># 救回 e4f5g6h 該筆 commit</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> checkout <span class="tk-op">-b</span> rescue HEAD@{1}
-<span class="tk-cm"># 或直接</span>
+<span class="tk-cm"># 或直接重設當前分支</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> reset <span class="tk-op">--hard</span> HEAD@{1}</code></pre>
       </div>
 
-      <h3>「救回」具體在救什麼？</h3>
+      <h3>「救回」的對象究竟為何？</h3>
 
-      <p>要理解 reflog 怎麼救人，先把 git 拆成三個東西看：</p>
+      <p>要理解 reflog 的救援機制，需先將 git 拆解為三個層次：</p>
 
       <table>
         <thead>
-          <tr><th>角色</th><th>放什麼</th><th><code>reset --hard</code> 後</th></tr>
+          <tr><th>角色</th><th>內容</th><th><code>reset --hard</code> 後的狀態</th></tr>
         </thead>
         <tbody>
           <tr>
             <td><code>.git/objects/</code></td>
-            <td>commit 物件本體 — 檔案快照、message、作者、parent SHA 都在這</td>
-            <td>完全沒動，commit 還活著</td>
+            <td>commit 物件本體——檔案快照、message、作者、parent SHA 皆儲存於此</td>
+            <td>完全未動，commit 仍存在</td>
           </tr>
           <tr>
-            <td>分支指針 (<code>main</code>、<code>feature</code>...)</td>
-            <td>「這個分支現在指向哪個 SHA」</td>
-            <td>已搬走，所以 <code>git log</code> 看不到那些 commit</td>
+            <td>分支指針（<code>main</code>、<code>feature</code> 等）</td>
+            <td>記錄「該分支當前指向哪個 SHA」</td>
+            <td>已移動，因此 <code>git log</code> 無法顯示那些 commit</td>
           </tr>
           <tr>
             <td><code>reflog</code></td>
-            <td><strong>只記「HEAD 曾經指過哪些 SHA」的時間軸 — 不存任何 commit 內容</strong></td>
-            <td>還在，會看到「reset: moving to ...」這一筆</td>
+            <td><strong>僅記錄「HEAD 曾指向過哪些 SHA」的時間軸——不儲存任何 commit 內容</strong></td>
+            <td>仍存在，會顯示「reset: moving to ...」一筆</td>
           </tr>
         </tbody>
       </table>
 
-      <p style="margin-top:0.8rem;"><strong>救回流程：</strong>從 reflog 拿到 SHA（reflog 只給你「鑰匙」） → 用這把鑰匙找到 <code>.git/objects/</code> 裡那個還活著的 commit → 用 <code>reset</code> 或 <code>checkout</code> 把分支指針重新接回去。</p>
+      <p style="margin-top:0.8rem;"><strong>救援流程：</strong>從 reflog 取得 SHA（reflog 僅提供「索引」）→ 透過該 SHA 於 <code>.git/objects/</code> 中找到仍存在的 commit → 以 <code>reset</code> 或 <code>checkout</code> 將分支指針重新指向該 commit。</p>
 
-      <p>兩種救法影響範圍不同：</p>
+      <p>兩種救援方式的影響範圍如下：</p>
 
       <table>
         <thead>
-          <tr><th>指令</th><th>會發生什麼</th><th>執行完的下一步</th></tr>
+          <tr><th>指令</th><th>影響範圍</th><th>後續動作</th></tr>
         </thead>
         <tbody>
           <tr>
-            <td><code>git checkout -b rescue &lt;SHA&gt;</code><br><span style="color:#6b6b7e;font-size:13px;">推薦先用這個</span></td>
-            <td>開一條新分支 <code>rescue</code> 指向那個 commit；<strong>原分支完全不動</strong>，git 歷史沒被改寫</td>
-            <td>在 rescue 確認內容沒問題，再 cherry-pick 或 merge 回原本的分支</td>
+            <td><code>git checkout -b rescue &lt;SHA&gt;</code><br><span style="color:#6b6b7e;font-size:13px;">建議優先採用</span></td>
+            <td>建立新分支 <code>rescue</code> 指向該 commit；<strong>原分支完全不受影響</strong>，git 歷史未被改寫</td>
+            <td>於 rescue 確認內容無誤後，再透過 cherry-pick 或 merge 整合回原分支</td>
           </tr>
           <tr>
-            <td><code>git reset --hard &lt;SHA&gt;</code><br><span style="color:#ff3d1f;font-size:13px;">已 push 過要小心</span></td>
-            <td>當前分支指針 + HEAD + index + 工作目錄全部覆蓋成那個 commit 的狀態，<strong>本地分支歷史會被改寫</strong></td>
-            <td>本地已是救回後的狀態；要同步到遠端需要 <code>git push --force-with-lease</code> (會影響其他協作者)</td>
+            <td><code>git reset --hard &lt;SHA&gt;</code><br><span style="color:#ff3d1f;font-size:13px;">已 push 者需審慎評估</span></td>
+            <td>當前分支指針、HEAD、index 與工作目錄一併覆蓋為該 commit 的狀態，<strong>本地分支歷史會被改寫</strong></td>
+            <td>本地已恢復為救援後的狀態；同步至遠端需執行 <code>git push --force-with-lease</code>（將影響其他協作者）</td>
           </tr>
         </tbody>
       </table>
 
-      <p style="margin-top:0.8rem;font-size:13px;color:#6b6b7e;">注意：untracked 或只 modify 沒 commit 的檔案不在 commit 物件裡，reflog 救不回。</p>
+      <p style="margin-top:0.8rem;font-size:13px;color:#6b6b7e;">注意：untracked 或僅修改未 commit 的檔案並未存於 commit 物件中，reflog 無法救回。</p>
     </section>
 
     <section id="worktree">
       <span class="section-eyebrow">04 — worktree</span>
-      <h2><code>worktree</code>：同一個 repo 開多個工作目錄</h2>
+      <h2><code>worktree</code>：同一倉庫開設多個工作目錄</h2>
 
-      <p>你正在 feature 分支寫到一半，主管要你立刻 review 一個 PR。傳統做法是 <code>git stash</code> + <code>git switch pr/123</code>，但 stash 容易忘記、切回來還要解 IDE 重新索引。<code>worktree</code> 直接幫你開出第二個目錄，兩個分支同時存在不互相干擾。</p>
+      <p>當前在 feature 分支進行中，臨時需要切換至另一條分支進行 review。傳統做法是先 <code>git stash</code> 再 <code>git switch pr/123</code>，但 stash 容易遺忘、切回後 IDE 還需重新索引。<code>worktree</code> 可直接開出第二個目錄，使兩個分支同時並存且互不干擾。</p>
 
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 在隔壁目錄開一個新工作區，checkout 別的分支</span>
+<pre><code><span class="tk-cm"># 於相鄰目錄開設新工作區，並 checkout 指定分支</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> worktree add ../myrepo-review pr/123
 
-<span class="tk-cm"># 開 IDE 進去 ../myrepo-review 看 PR，原本目錄完全不動</span>
+<span class="tk-cm"># 以 IDE 開啟 ../myrepo-review 進行 review，原目錄不受影響</span>
 
-<span class="tk-cm"># 看完了，刪掉這個 worktree</span>
+<span class="tk-cm"># review 完成後，移除該 worktree</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> worktree remove ../myrepo-review
 
-<span class="tk-cm"># 列出全部 worktree</span>
+<span class="tk-cm"># 列出所有 worktree</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> worktree list</code></pre>
       </div>
 
       <div class="callout callout-tip">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>用 worktree 取代多 clone</strong>
-          以前需要看別的分支時，常常會 clone 兩份同樣的 repo。<code>worktree</code> 讓你共用 <code>.git</code>，磁碟空間省一半，fetch / pull 也只要做一次。
+          <strong>以 worktree 取代多重 clone</strong>
+          過去需同時檢視不同分支時，常會 clone 兩份相同的 repo。<code>worktree</code> 共用同一個 <code>.git</code> 目錄，可顯著節省磁碟空間，fetch / pull 也僅需執行一次。
         </div>
       </div>
     </section>
 
     <section id="reset">
       <span class="section-eyebrow">05 — reset</span>
-      <h2><code>reset</code>：把分支指針往回搬</h2>
+      <h2><code>reset</code>：將分支指針回退至指定位置</h2>
 
-      <p><code>reset</code> 的本質是「移動指針」 — 把 HEAD 跟當前分支搬到指定的 commit，被略過的 commit 就從這條分支上消失了 (還在 reflog，90 天內可救)。典型場景：剛 commit 完發現 message 寫錯、想把幾個小 commit 重新揉一揉、或本地實驗失敗想整個工作目錄還原到乾淨狀態。它<strong>會改寫歷史</strong>，所以原則只有一條：<strong>對還沒 push 的本地 commit 用，已 push 的公開分支改用下一節的 <code>revert</code>。</strong></p>
+      <p><code>reset</code> 的本質是「移動指針」——將 HEAD 與當前分支移至指定的 commit，被跳過的 commit 隨之從該分支上消失（仍存於 reflog，90 天內可救回）。典型場景：commit 後發現 message 撰寫錯誤、需重新整併數筆小 commit，或本地實驗失敗需將工作目錄還原為乾淨狀態。此操作<strong>會改寫歷史</strong>，原則僅有一條：<strong>僅用於尚未 push 的本地 commit；已 push 至公開分支者請改用下一節介紹的 <code>revert</code>。</strong></p>
 
-      <p>三種模式差別在動到哪幾層：</p>
+      <p>三種模式的差異在於影響的層級：</p>
 
       <table>
         <thead>
-          <tr><th>模式</th><th>HEAD 動?</th><th>Staging 動?</th><th>Working Tree 動?</th><th>用在哪</th></tr>
+          <tr><th>模式</th><th>HEAD</th><th>Staging</th><th>Working Tree</th><th>適用情境</th></tr>
         </thead>
         <tbody>
           <tr>
             <td><code>--soft</code></td>
-            <td>✓ 動</td>
-            <td>✗ 不動</td>
-            <td>✗ 不動</td>
-            <td>把幾個 commit 退回成「即將要 commit」的狀態 (改動已 staged)</td>
+            <td>✓ 移動</td>
+            <td>✗ 保留</td>
+            <td>✗ 保留</td>
+            <td>將數筆 commit 退回為「待 commit」狀態（改動仍處於 staged）</td>
           </tr>
           <tr>
-            <td><code>--mixed</code> (預設)</td>
-            <td>✓ 動</td>
-            <td>✓ 動 (清空)</td>
-            <td>✗ 不動</td>
-            <td>退回 commit、把 staging 清空，但檔案改動還留在工作目錄</td>
+            <td><code>--mixed</code>（預設）</td>
+            <td>✓ 移動</td>
+            <td>✓ 清空</td>
+            <td>✗ 保留</td>
+            <td>退回 commit 並清空 staging，但檔案改動仍保留於工作目錄</td>
           </tr>
           <tr>
             <td><code>--hard</code></td>
-            <td>✓ 動</td>
-            <td>✓ 動</td>
-            <td>✓ 動 (覆寫)</td>
-            <td><strong>連檔案都還原</strong> — 會吃掉沒 commit 的改動，務必確認</td>
+            <td>✓ 移動</td>
+            <td>✓ 清空</td>
+            <td>✓ 覆寫</td>
+            <td><strong>連同檔案內容一併還原</strong>——將清除尚未 commit 的改動，務必確認</td>
           </tr>
         </tbody>
       </table>
@@ -415,19 +415,19 @@ i7j8k9l HEAD@{2}: commit: fix(profile): handle empty name
           <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 把最近 3 個 commit 撤掉但保留改動 (預設 mixed)</span>
+<pre><code><span class="tk-cm"># 撤回最近 3 筆 commit 但保留改動（預設 mixed）</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> reset HEAD~3
 
-<span class="tk-cm"># 退回成「已 staged」的狀態 (常配 commit --amend 重做最後一個 commit)</span>
+<span class="tk-cm"># 退回為「已 staged」狀態（常搭配 commit --amend 重做最後一筆 commit）</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> reset <span class="tk-op">--soft</span> HEAD~1
 
-<span class="tk-cm"># 連檔案內容也還原 (危險：沒 commit 的改動會消失)</span>
+<span class="tk-cm"># 連同檔案內容一併還原（高風險：未 commit 的改動將遺失）</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> reset <span class="tk-op">--hard</span> HEAD~3
 
-<span class="tk-cm"># 把整個 staging 清空 (不加參數等同 reset --mixed HEAD)</span>
+<span class="tk-cm"># 清空整個 staging（不加參數等同於 reset --mixed HEAD）</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> reset
 
-<span class="tk-cm"># 不小心 reset --hard 錯了？用 reflog 救回來</span>
+<span class="tk-cm"># 誤用 reset --hard 後的救援：透過 reflog 找回</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> reflog
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> reset <span class="tk-op">--hard</span> HEAD@{1}</code></pre>
       </div>
@@ -435,26 +435,26 @@ i7j8k9l HEAD@{2}: commit: fix(profile): handle empty name
 
     <section id="revert">
       <span class="section-eyebrow">06 — revert</span>
-      <h2><code>revert</code>：用一個反向 commit 取消歷史</h2>
+      <h2><code>revert</code>：以反向 commit 取消既有歷史</h2>
 
-      <p><code>revert</code> 不會把舊 commit 拔掉，而是<strong>產生一個新 commit，內容是「把那個 commit 的 diff 反過來做」</strong>。原本的歷史完全保留 — 別人 pull 下來不會發現有 commit 不見，只會看到分支多了一個「revert xxx」的新 commit。典型場景：已經 push 到 <code>main</code> 或團隊共用分支的 commit 要撤掉、production 上線後發現 bug 要立刻回退但保留紀錄、或想撤掉一次已經 merge 進主線的整支 feature。它是<strong>公開分支唯一安全的回退方式</strong>；本地還沒 push 的 commit 用上一節的 <code>reset</code> 比較乾淨，不會在歷史中多一個 revert commit。</p>
+      <p><code>revert</code> 不會移除舊有 commit，而是<strong>產生一筆新 commit，內容為「將該 commit 的 diff 反向套用」</strong>。原始歷史完整保留——他人 pull 下來不會發現有 commit 消失，僅會看到分支上多了一筆「revert xxx」的新 commit。典型場景：已 push 至 <code>main</code> 或團隊共用分支的 commit 需撤回、production 上線後發現 bug 須立即回退但保留紀錄、或需撤回一條已 merge 進主線的 feature 分支。此為<strong>公開分支上唯一安全的回退方式</strong>；本地尚未 push 的 commit 改用上一節的 <code>reset</code> 較為乾淨，不會在歷史中留下 revert commit。</p>
 
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 撤掉某個 commit (產生一個反向 commit)</span>
+<pre><code><span class="tk-cm"># 撤回某筆 commit（產生一筆反向 commit）</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> revert a1b2c3d
 
-<span class="tk-cm"># 連續撤掉多個 commit (會逐一產生反向 commit)</span>
+<span class="tk-cm"># 連續撤回多筆 commit（將逐一產生反向 commit）</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> revert a1b2c3d e4f5g6h
 
-<span class="tk-cm"># 撤掉但先不立刻 commit，最後合併成一個反向 commit</span>
+<span class="tk-cm"># 撤回但暫不 commit，最後合併為單一反向 commit</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> revert <span class="tk-op">--no-commit</span> a1b2c3d e4f5g6h
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> commit <span class="tk-op">-m</span> <span class="tk-st">"revert: rollback feature X"</span>
 
-<span class="tk-cm"># 撤掉一個 merge commit (要用 -m 1 指定保留主分支那一邊)</span>
+<span class="tk-cm"># 撤回一筆 merge commit（須以 -m 1 指定保留主分支端）</span>
 <span class="tk-pn">$</span> <span class="tk-fn">git</span> revert <span class="tk-op">-m</span> 1 &lt;merge-commit&gt;
 
 <span class="tk-cm"># revert 進行中發生衝突</span>
@@ -465,8 +465,8 @@ i7j8k9l HEAD@{2}: commit: fix(profile): handle empty name
       <div class="callout callout-tip">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>reset 還是 revert？一句話判斷</strong>
-          還沒 push → <code>reset</code> 隨你改。已 push 到別人會看到的分支 → 一律 <code>revert</code>，不要在公開歷史上動 reset。
+          <strong>reset 或 revert 的判斷準則</strong>
+          尚未 push → 使用 <code>reset</code> 自由調整。已 push 至他人可見的分支 → 一律使用 <code>revert</code>，不應於公開歷史上執行 reset。
         </div>
       </div>
     </section>

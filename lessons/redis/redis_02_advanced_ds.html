@@ -16,8 +16,8 @@
   <div class="hero-inner">
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Redis 02 · 進階資料結構</div>
-    <h1 class="hero-title">把 Redis 真正<span>用起來</span>的 8 個工具</h1>
-    <p class="hero-desc">Streams（取代 Pub/Sub 做可靠佇列）、Bitmap、HyperLogLog、Geo、Pipelining、Transactions、Lua scripting — 每個工具一個小故事 + 一段 redis-cli 範例。</p>
+    <h1 class="hero-title">深入運用 Redis 的<span>8 項工具</span></h1>
+    <p class="hero-desc">Streams（取代 Pub/Sub 作為可靠佇列）、Bitmap、HyperLogLog、Geo、Pipelining、Transactions、Lua scripting——逐一介紹每項工具的應用情境，並搭配 redis-cli 範例。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 2 / 6 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 15 分鐘</span>
@@ -81,7 +81,7 @@ OK
       <ul>
         <li><strong>多 consumer 協作</strong>：consumer group 確保一筆訊息只被組內一個 worker 收到。</li>
         <li><strong>已讀追蹤</strong>：未 ACK 的訊息會留在 <em>pending entries list</em>，worker 重啟後可重拿。</li>
-        <li><strong>Cap by length</strong>：用 <code>XADD ... MAXLEN ~ 10000</code> 限制長度，避免 memory 爆炸。</li>
+        <li><strong>Cap by length</strong>：以 <code>XADD ... MAXLEN ~ 10000</code> 限制長度，避免記憶體無限增長。</li>
       </ul>
 
       <div class="callout callout-info">
@@ -205,7 +205,7 @@ Reading messages...
 
     <section id="pipeline">
       <span class="section-eyebrow">06 — Pipelining</span>
-      <h2>Pipelining：把 100 條指令的 RTT 砍掉</h2>
+      <h2>Pipelining：消除 100 條指令的 RTT 開銷</h2>
       <p>每次 redis-cli 發指令到 server 都有一次網路 round-trip（RTT）。如果你要連送 1000 條指令，1ms RTT × 1000 = 1 秒。Pipelining 讓 client 把多條指令<strong>一次塞進 TCP buffer 一起送</strong>，server 也一次回 1000 條 reply。</p>
 
       <div class="diagram">

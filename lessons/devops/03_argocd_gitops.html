@@ -192,7 +192,7 @@
 <span class="tk-cm"># 3. 瀏覽器打開 https://localhost:8080，使用者 admin、密碼貼上</span></code></pre>
       </div>
 
-      <h3>三個你會反覆回來的頁面</h3>
+      <h3>三個常用核心頁面</h3>
       <table>
         <thead>
           <tr><th>頁面</th><th>看到什麼</th><th>常用操作</th></tr>
@@ -236,7 +236,7 @@
     <section id="sync-dialog">
       <span class="section-eyebrow">03 — Sync 選項</span>
       <h2>Sync 對話框每個 checkbox 的真實後果</h2>
-      <p>UI 上點 Sync 會跳出一堆 checkbox，每個都對應 cluster 的真實行為。<strong>不要無腦全勾</strong>，下面這張表是線上事故來源 Top 5。</p>
+      <p>UI 上點選 Sync 後會出現多個 checkbox，每項皆對應 cluster 的實際行為。<strong>不應未經評估即全部勾選</strong>，下表彙整線上事故的前 5 大成因。</p>
 
       <table>
         <thead>
@@ -250,7 +250,7 @@
           </tr>
           <tr>
             <td><code>Force</code></td>
-            <td>用 <code>kubectl replace</code> 取代 <code>apply</code>。會強制覆蓋整個物件，破壞 immutable 欄位也直接砍重建</td>
+            <td>以 <code>kubectl replace</code> 取代 <code>apply</code>，將強制覆蓋整個物件；違反 immutable 欄位限制時會直接刪除並重建</td>
             <td>幾乎不該勾。只有 spec.selector 之類 immutable 欄位真的要改才用</td>
           </tr>
           <tr>
@@ -392,7 +392,7 @@
     <section id="sync-waves-hooks">
       <span class="section-eyebrow">05 — Sync waves 與 Hooks</span>
       <h2>控制 sync 順序：sync waves & resource hooks</h2>
-      <p>有些資源必須跑在前面、有些必須跑在後面。例如 DB schema migration 一定要在新版 Pod 滾出來前跑完，否則新 code 連到舊 schema 會炸。Argo CD 用兩種機制解這件事：<strong>sync waves</strong> 控制順序，<strong>hooks</strong> 控制時機。</p>
+      <p>部分資源必須先執行，部分則須後執行。例如 DB schema migration 必須在新版 Pod 部署前完成，否則新版程式碼存取舊 schema 將發生錯誤。Argo CD 透過兩種機制處理：<strong>sync waves</strong> 控制執行順序，<strong>hooks</strong> 控制執行時機。</p>
 
       <h3>Sync waves — annotation 排序</h3>
       <p>每個 resource 可以掛一個 <code>argocd.argoproj.io/sync-wave</code> annotation，<strong>數字小的先 apply、數字大的後 apply</strong>。沒掛的預設 wave 是 <code>0</code>。</p>
@@ -525,7 +525,7 @@
           <div class="timeline-num">4</div>
           <div class="timeline-content">
             <div class="timeline-title">HPA 看到負載還是高，又把 replicas 改回 8</div>
-            <div class="timeline-desc">兩個 controller 開始 ping-pong，<strong>使用者體驗瞬間爆炸</strong></div>
+            <div class="timeline-desc">兩個 controller 反覆相互覆寫，<strong>使用者體驗將急遽惡化</strong></div>
           </div>
         </div>
       </div>
@@ -738,7 +738,7 @@ ID  DATE                  REVISION
 
       <h3>真正正確的 rollback 流程</h3>
       <ol>
-        <li>線上有問題 → UI 先按 rollback 把 cluster 拉回上一版（<strong>救火</strong>）</li>
+        <li>線上發生問題 → 先於 UI 點選 rollback 將 cluster 還原至前一版（<strong>緊急止血</strong>）</li>
         <li>同時在 manifest repo <code>git revert &lt;bad-commit&gt;</code> 並 push（<strong>讓 Git 也回到正確狀態</strong>）</li>
         <li>之後 Argo CD reconcile 看 Git 跟 cluster 已經一致，OutOfSync 消失</li>
         <li>事後再去查 root cause、決定要不要 forward-fix</li>
@@ -771,7 +771,7 @@ ID  DATE                  REVISION
 <span class="tk-pn">$</span> <span class="tk-fn">argocd</span> login argocd.example.com <span class="tk-op">--sso</span> <span class="tk-op">--grpc-web</span></code></pre>
       </div>
 
-      <h3>七個你會天天用的指令</h3>
+      <h3>七個日常常用指令</h3>
       <table>
         <thead>
           <tr><th>指令</th><th>用途</th></tr>

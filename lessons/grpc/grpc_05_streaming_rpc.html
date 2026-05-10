@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 05 · Streaming 三模式</div>
     <h1 class="hero-title">三種 <span>Streaming RPC</span></h1>
-    <p class="hero-desc">Server streaming、Client streaming、Bidirectional streaming 一次學會,理解 <code>io.EOF</code> 在 stream 收尾的角色。<strong>學完能寫即時推送、檔案上傳、雙向協商的功能。</strong></p>
+    <p class="hero-desc">完整介紹 Server streaming、Client streaming 與 Bidirectional streaming，並理解 <code>io.EOF</code> 於 stream 收尾的角色。<strong>完成此堂後，即具備實作即時推送、檔案上傳與雙向協商功能的能力。</strong></p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 5 / 10 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 17 分鐘</span>
@@ -362,7 +362,7 @@ stream.CloseSend()
       <details class="collapse">
         <summary>1. <code>stream.Send</code> 沒檢查 error <span class="collapse-tag">高頻</span></summary>
         <div class="collapse-body">
-          <p><code>Send</code> 在「對方已斷線」「buffer 滿」「context 已 cancel」時會回 error。如果忽略繼續 send,你會丟訊息也不會察覺。<strong>每個 Send 都要檢 err</strong>,出錯就 break 並收尾。</p>
+          <p><code>Send</code> 在「對方已斷線」、「buffer 已滿」、「context 已 cancel」等情況下會回傳 error。若忽略此 error 並繼續 send，將導致訊息遺失而無法察覺。<strong>每次 Send 後皆應檢查 err</strong>，發生錯誤即 break 並進行收尾。</p>
         </div>
       </details>
 

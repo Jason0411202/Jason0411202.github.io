@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 05 · DevOps 實務篇</div>
     <h1 class="hero-title">ELK <span>日誌蒐集與分析</span></h1>
-    <p class="hero-desc">監控告訴你「服務出狀況」，<strong>log 才告訴你「為什麼出狀況」</strong>。這堂課我們把 Fluent Bit + Elasticsearch + Kibana 串成一條穩定的 pipeline，並學會用 KQL、Lens、Dashboard、Alerting 把 log 變成可以被搜尋、聚合、告警的結構化資料。</p>
+    <p class="hero-desc">監控告知「服務出現問題」，<strong>log 才能說明「問題的成因」</strong>。本課將 Fluent Bit、Elasticsearch 與 Kibana 串接為一條穩定的 pipeline，並透過 KQL、Lens、Dashboard 與 Alerting 將 log 轉化為可搜尋、可聚合、可告警的結構化資料。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 5 / 5 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 65 分鐘</span>
@@ -155,7 +155,7 @@
       </div>
 
       <h3>為什麼 namespace 過濾這麼重要</h3>
-      <p>在一個動輒幾十個 namespace 的 cluster 裡，<code>kube-system</code>、<code>ingress-nginx</code>、<code>cert-manager</code> 這些系統 namespace 噴出來的 log 通常是業務 log 的數倍。在 Fluent Bit 設定中加上 <strong>namespace allowlist 或 denylist</strong>，能讓 ES index 大小直接降 5 - 10 倍：</p>
+      <p>於動輒數十個 namespace 的 cluster 中，<code>kube-system</code>、<code>ingress-nginx</code>、<code>cert-manager</code> 等系統 namespace 產生的 log 通常為業務 log 的數倍。在 Fluent Bit 設定中加入 <strong>namespace allowlist 或 denylist</strong>，可使 ES index 大小降低 5 至 10 倍：</p>
 
       <div class="code-block">
         <div class="code-block-header">
@@ -362,7 +362,7 @@
       </ul>
 
       <h3>用「加 column」把表格變得有意義</h3>
-      <p>預設只看到 <code>@timestamp</code> 跟 <code>_source</code>（一坨 JSON），完全沒法快速掃。從左 sidebar 把這幾個欄位加成 column，畫面馬上有可讀性：</p>
+      <p>預設僅顯示 <code>@timestamp</code> 與 <code>_source</code>（完整的 JSON），不利於快速瀏覽。從左側 sidebar 將下列欄位加為 column 後，畫面即具備可讀性：</p>
 
       <div class="code-block">
         <div class="code-block-header">
@@ -844,7 +844,7 @@ PUT &lt;app&gt;-2026.04.27/_settings
         <div class="callout-body">
           <strong>5 堂課跑下來，你手上已經有完整的閉環</strong>
           Lesson 01 寫了 CI/CD pipeline 把 code 變成 build；Lesson 02 用容器化把 build 變成 image；Lesson 03 用 IaC / GitOps 把 image 變成 cluster 上的 service；Lesson 04 用 Prometheus + Grafana 知道 service 健康狀態；今天 Lesson 05 用 ELK 把每一條 log 串起來，補上「為什麼出狀況」的最後一塊。<br><br>
-          <strong>下一步建議</strong>：把這 5 堂的工具放進你自己的 side project，從一個小服務開始實作 <em>commit → CI → image → 部署 → metric → log</em> 的全流程。出 incident 時你會第一次體會到「監控告訴你『現在不對勁』，log 告訴你『發生什麼事』」這兩件事如何協作。<br><br>
+          <strong>後續建議</strong>：將本系列 5 堂的工具導入個人的 side project，從一個小型服務開始實作 <em>commit → CI → image → 部署 → metric → log</em> 的完整流程。實際遇到事故時，便能體會「監控指出『系統異常』，log 說明『異常成因』」兩者如何相互配合。<br><br>
           DevOps 不是工具堆疊，是 feedback loop。<strong>願你之後每次 push code，都有信心。</strong>
         </div>
       </div>

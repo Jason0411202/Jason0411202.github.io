@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 04 · Unary RPC 實戰</div>
     <h1 class="hero-title">第一支 gRPC 服務:<span>Unary RPC</span></h1>
-    <p class="hero-desc">從 proto 寫到 server、client 全部 hand on。<strong>本課使用 grpc-go v1.80.0 的新 API:<code>grpc.NewClient()</code> 取代已 deprecated 的 <code>grpc.Dial()</code>。</strong></p>
+    <p class="hero-desc">由 proto 撰寫至 server 與 client 完整實作。<strong>本課採用 grpc-go v1.80.0 的新 API：<code>grpc.NewClient()</code> 取代已 deprecated 的 <code>grpc.Dial()</code>。</strong></p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 4 / 10 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 15 分鐘</span>
@@ -231,7 +231,7 @@
         <div class="callout-body">
           <strong>務必 embed <code>pb.UnimplementedGreeterServer</code></strong>
           這是 protoc-gen-go-grpc <strong>強制</strong>的(你可以用 <code>require_unimplemented_servers=false</code> 關掉但<strong>不建議</strong>)。
-          它做兩件事:(1) 為將來新增 method 提供「<code>Unimplemented</code> 預設回傳」,讓你的 server 升級 proto 時不會編不過;(2) 強迫你寫 forward-compatible 的 service 實作。
+          其作用有二：(1) 為日後新增 method 提供「<code>Unimplemented</code> 預設回傳」，使 server 升級 proto 時不致編譯失敗；(2) 強制使 service 實作具備 forward-compatible 的特性。
         </div>
       </div>
     </section>
@@ -370,7 +370,7 @@
         </div>
       </div>
 
-      <h3>三件你需要知道的差別</h3>
+      <h3>三項應知的差異</h3>
       <ol>
         <li><strong><code>NewClient</code> 是 lazy</strong> — 呼叫時不會真的 dial,第一次 RPC 才會建連線。所以這幾個 DialOption <strong>會被 NewClient 忽略</strong>:<code>WithBlock()</code>、<code>WithTimeout()</code>、<code>WithReturnConnectionError()</code>、<code>FailOnNonTempDialError()</code>。</li>
         <li><strong>預設 name resolver 從 <code>passthrough</code> 改為 <code>dns</code></strong> — 寫 <code>"foo.com:80"</code> 時 NewClient 會做 DNS 解析、支援多個 backend address。</li>

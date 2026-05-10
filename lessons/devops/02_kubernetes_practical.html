@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 02 · DevOps 實務篇</div>
     <h1 class="hero-title">Kubernetes <span>日常操作實務</span></h1>
-    <p class="hero-desc">從 kubectl 心智模型出發，把每天 SRE / 後端工程師會用到的 K8s 操作一次學會。<strong>不是教你 control plane 內部原理，是讓你在線上事故發生時 30 秒內找到問題。</strong></p>
+    <p class="hero-desc">由 kubectl 心智模型出發，掌握 SRE 與後端工程師每日會用到的 K8s 操作。<strong>本課不深入 control plane 的內部原理，重點放在線上事故發生時的快速定位能力。</strong></p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 2 / 5 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 75 分鐘</span>
@@ -48,7 +48,7 @@
     <section id="kubectl-mental-model">
       <span class="section-eyebrow">01 — kubectl 心智模型</span>
       <h2>三層概念：context、namespace、kubeconfig</h2>
-      <p>很多 K8s 災難都是<strong>在錯的 cluster 上下了正確的指令</strong>。在按下 Enter 之前，你必須知道：「我這個指令會打到哪一座 cluster、用什麼身份、預設操作哪一個 namespace？」這三個問題的答案就在 kubeconfig 裡。</p>
+      <p>多數 K8s 事故源於<strong>於錯誤的 cluster 上執行了正確的指令</strong>。在按下 Enter 前，必須清楚掌握：「此指令將送至哪一座 cluster？以何身份？預設操作哪個 namespace？」這三個問題的答案皆在 kubeconfig 中。</p>
 
       <div class="diagram">
         <svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" aria-label="kubeconfig 結構圖">
@@ -102,7 +102,7 @@
             <line x1="240" y1="220" x2="280" y2="220" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#arrK)" stroke-dasharray="3 3"/>
             <line x1="460" y1="220" x2="500" y2="220" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#arrK)" stroke-dasharray="3 3"/>
 
-            <text x="380" y="370" text-anchor="middle" fill="#6b6b7e" font-size="11">current-context: prod-admin  ← 由它決定指令打到哪</text>
+            <text x="380" y="370" text-anchor="middle" fill="#6b6b7e" font-size="11">current-context: prod-admin  ← 由此決定指令送往何處</text>
           </g>
         </svg>
         <div class="diagram-caption">圖 24.1 — kubeconfig 三大區與 current-context 的關係</div>
@@ -169,7 +169,7 @@ prod-admin
     <section id="five-verbs">
       <span class="section-eyebrow">02 — 每天會用的五個動詞</span>
       <h2>get / describe / logs / exec / port-forward</h2>
-      <p>kubectl 有幾百個 subcommand，但 90% 的工作日只會用到下面五個。把它們玩熟，你就能應付絕大多數的線上排查。</p>
+      <p>kubectl 雖具備數百個 subcommand，但日常 90% 的工作僅會用到以下五個。熟練掌握這五個指令，即可應對絕大多數的線上排查情境。</p>
 
       <h3>kubectl get — 看資源狀態</h3>
       <p><code>get</code> 是儀表板。常用旗標一次看完：</p>
@@ -280,7 +280,7 @@ prod-admin
 <span class="tk-pn">$</span> <span class="tk-fn">kubectl</span> port-forward <span class="tk-op">-n</span> <span class="tk-st">&lt;your-ns&gt;</span> svc/postgres <span class="tk-num">5432</span>:<span class="tk-num">5432</span></code></pre>
       </div>
 
-      <h3>順手好用：kubectl cp</h3>
+      <h3>實用工具：kubectl cp</h3>
       <p>從 pod 把檔案抓出來，或塞檔案進去：</p>
 
       <div class="code-block">
@@ -338,7 +338,7 @@ prod-admin
           <div class="timeline-num">2</div>
           <div class="timeline-content">
             <div class="timeline-title">ImagePullBackOff — 抓不到 image</div>
-            <div class="timeline-desc">image tag 拼錯、private registry 沒設 <code>imagePullSecrets</code>、registry 暫時掛掉都會中。<code>describe</code> 的 Events 會直接寫 "manifest unknown" 或 "401 Unauthorized"。</div>
+            <div class="timeline-desc">image tag 拼寫錯誤、private registry 未設定 <code>imagePullSecrets</code>、registry 暫時失效皆會觸發此狀態。<code>describe</code> 的 Events 會明確顯示 "manifest unknown" 或 "401 Unauthorized"。</div>
           </div>
         </div>
         <div class="timeline-step">
@@ -405,7 +405,7 @@ prod-admin
         <div class="compare-card compare-bad">
           <div class="compare-label"><span class="compare-icon">!</span>直接 ephemeral container</div>
           <div class="compare-body">
-            <strong>共享 target pod 的 namespace</strong>，能直接看到 target process、它打開的 socket。但因為注入到 live pod，無法改 target 的 entrypoint / env，也不能在 production 上隨便試。
+            <strong>共享 target pod 的 namespace</strong>，可直接觀察 target process 及其開啟的 socket。但因注入至 live pod，無法修改 target 的 entrypoint 或 env，亦不應於 production 上任意試驗。
           </div>
         </div>
         <div class="compare-card compare-good">
@@ -419,8 +419,8 @@ prod-admin
       <div class="callout callout-warn">
         <div class="callout-icon">!</div>
         <div class="callout-body">
-          <strong>ephemeral container 不能刪</strong>
-          <code>kubectl debug</code> 注入後，那個 ephemeral container 會留在 pod spec 裡直到 pod 被刪掉重建。在 production 對<strong>很多 pod 都用 debug 注入</strong>會把資源吃光，記得做完事 pod 砍掉重來。
+          <strong>ephemeral container 無法移除</strong>
+          <code>kubectl debug</code> 注入後，ephemeral container 將留存於 pod spec 中，直至 pod 被刪除並重建為止。於 production 對<strong>大量 pod 同時注入 debug</strong> 會耗盡資源，操作完成後應將 pod 刪除重建。
         </div>
       </div>
     </section>
@@ -844,7 +844,7 @@ example-app    Deployment/example-app    cpu: 65%/70%    2         10        5</
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong><code>helm template</code> 是除錯神器</strong>
-          當 <code>helm upgrade</code> 失敗只給你一行神祕錯誤，先在本機 <code>helm template</code> 渲染出最終 YAML，肉眼掃一遍就知道哪裡縮排錯、哪個 value 沒帶到。<strong>它完全不接觸集群，可以隨便試。</strong>
+          當 <code>helm upgrade</code> 失敗僅回傳一行訊息不明的錯誤時，可於本機執行 <code>helm template</code> 將最終 YAML 渲染出來，肉眼檢視即可定位縮排錯誤或未帶入的 value。<strong>此操作完全不接觸 cluster，可安全反覆嘗試。</strong>
         </div>
       </div>
 
@@ -1061,9 +1061,9 @@ sum(rate(
   <span class="tk-kw">requests</span>:                <span class="tk-cm"># 排程器以這個算 Node 容量</span>
     <span class="tk-kw">cpu</span>: <span class="tk-st">"100m"</span>           <span class="tk-cm"># 100 millicores = 0.1 vCPU</span>
     <span class="tk-kw">memory</span>: <span class="tk-st">"256Mi"</span>
-  <span class="tk-kw">limits</span>:                  <span class="tk-cm"># 超過這條 kernel 出手</span>
-    <span class="tk-kw">cpu</span>: <span class="tk-st">"500m"</span>           <span class="tk-cm"># CPU 超過 → throttle (變慢但不死)</span>
-    <span class="tk-kw">memory</span>: <span class="tk-st">"512Mi"</span>       <span class="tk-cm"># Memory 超過 → OOMKilled (直接砍掉)</span></code></pre>
+  <span class="tk-kw">limits</span>:                  <span class="tk-cm"># 超過此限制將由 kernel 介入</span>
+    <span class="tk-kw">cpu</span>: <span class="tk-st">"500m"</span>           <span class="tk-cm"># CPU 超過 → throttle（執行變慢但不會被終止）</span>
+    <span class="tk-kw">memory</span>: <span class="tk-st">"512Mi"</span>       <span class="tk-cm"># Memory 超過 → OOMKilled（直接終止）</span></code></pre>
       </div>
 
       <h3>QoS class：三個等級</h3>

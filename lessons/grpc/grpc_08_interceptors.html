@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 08 · 中介層</div>
     <h1 class="hero-title"><span>Interceptors</span> 中介層</h1>
-    <p class="hero-desc">gRPC 的 middleware 機制 — 把橫切性邏輯(log、auth、recovery)從 handler 抽出來,變成可組裝的 interceptor。<strong>學完能寫一個生產級 server 的標準四件組。</strong></p>
+    <p class="hero-desc">gRPC 的 middleware 機制——將橫切性邏輯（log、auth、recovery）自 handler 抽離，組裝為可重用的 interceptor。<strong>完成此堂後，即可實作生產級 server 的標準四件組。</strong></p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 8 / 10 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 16 分鐘</span>
@@ -47,7 +47,7 @@
     <section id="what">
       <span class="section-eyebrow">01 — interceptor 是什麼</span>
       <h2>把橫切邏輯從 handler 抽出來</h2>
-      <p>每支 handler 都要做的事(log 一行 access log、catch panic、檢查 token、量處理時間)如果寫進 handler,會把業務邏輯淹沒。Interceptor 就是 gRPC 的 middleware,讓你把這些事抽到外層。</p>
+      <p>每支 handler 皆需執行的工作（記錄 access log、捕獲 panic、檢查 token、計時）若寫入 handler 內，將淹沒業務邏輯。Interceptor 即為 gRPC 的 middleware，可將此類橫切邏輯抽離至外層。</p>
 
       <div class="diagram">
         <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" aria-label="interceptor chain">
@@ -234,7 +234,7 @@
         <div class="callout-icon">✓</div>
         <div class="callout-body">
           <strong>用社群現成套件</strong>
-          <code>github.com/grpc-ecosystem/go-grpc-middleware</code>(v2)提供 production-grade 的 logging、recovery、auth、retry、ratelimit 等 interceptor,實務上幾乎都直接用,不用自己手寫。本課手寫是為了讓你看懂內部結構。
+          <code>github.com/grpc-ecosystem/go-grpc-middleware</code>（v2）提供 production-grade 的 logging、recovery、auth、retry、ratelimit 等 interceptor，實務上多直接採用，無須自行實作。本課手寫實作的目的為呈現其內部結構。
         </div>
       </div>
     </section>

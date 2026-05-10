@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 09 · 自動化與測試篇</div>
     <h1 class="hero-title">CI/CD、<span>Hooks、Lint</span></h1>
-    <p class="hero-desc">人類會忘記跑 lint、忘記跑測試、忘記檢查格式。<strong>把這些責任交給機器</strong> — 從本地 git hook 到雲端 CI/CD 的完整自動化鏈。</p>
+    <p class="hero-desc">人為操作難免遺漏 lint、測試或格式檢查。<strong>將這類例行任務交由機器執行</strong>——從本地 git hook 到雲端 CI/CD 的完整自動化鏈。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 9 / 12 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
@@ -48,27 +48,27 @@
       <span class="section-eyebrow">01 — CI/CD 區別</span>
       <h2>Continuous Integration / Delivery / Deployment</h2>
 
-      <p>三個都叫 CI/CD，但意義不同 — 是<strong>連續</strong>的三個階段：</p>
+      <p>三者皆稱為 CI/CD，但意涵不同——屬於<strong>連續性</strong>的三個階段：</p>
 
       <table>
         <thead>
-          <tr><th>名稱</th><th>意義</th><th>具體做了什麼</th></tr>
+          <tr><th>名稱</th><th>意義</th><th>具體執行內容</th></tr>
         </thead>
         <tbody>
           <tr>
             <td><strong>Continuous Integration</strong></td>
             <td>持續整合</td>
-            <td>每個 push / PR 自動跑測試 + lint，<strong>確保 main 永遠是綠的</strong></td>
+            <td>每次 push 或 PR 自動執行測試與 lint，<strong>確保 main 永遠處於綠燈狀態</strong></td>
           </tr>
           <tr>
             <td><strong>Continuous Delivery</strong></td>
             <td>持續交付</td>
-            <td>CI 之後自動把通過的 build <strong>送到 staging / artifact 倉庫</strong>，但 production 部署是<strong>手動按按鈕</strong></td>
+            <td>CI 通過後自動將 build 產物<strong>推送至 staging 或 artifact 倉庫</strong>，但 production 部署仍須<strong>人工觸發</strong></td>
           </tr>
           <tr>
             <td><strong>Continuous Deployment</strong></td>
             <td>持續部署</td>
-            <td>連 production 部署也自動 — <strong>合進 main 就直接上線</strong></td>
+            <td>連同 production 部署亦自動化——<strong>合併進 main 後即直接上線</strong></td>
           </tr>
         </tbody>
       </table>
@@ -76,8 +76,8 @@
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>三者關係</strong>
-          CI 是 CD 的前提。CD 又分 Delivery (人按 button 才上線) 跟 Deployment (合 main 就上線)。Deployment 風險最高、需要最強 CI 守護。<strong>大多數團隊先做到 CI，再進到 Continuous Delivery，最後才 Continuous Deployment。</strong>
+          <strong>三者的關係</strong>
+          CI 為 CD 的前提。CD 又分為 Delivery（須人工觸發部署）與 Deployment（合併 main 即自動上線）。Deployment 風險最高，需要最強的 CI 防護。<strong>多數團隊會先建立 CI，再推進至 Continuous Delivery，最後才導入 Continuous Deployment。</strong>
         </div>
       </div>
     </section>
@@ -86,7 +86,7 @@
       <span class="section-eyebrow">02 — GitHub Actions</span>
       <h2>GitHub Actions 結構</h2>
 
-      <p>GitHub 內建的 CI/CD 平台，<strong>免費額度對開源專案幾乎無限</strong>。設定檔放在 <code>.github/workflows/*.yml</code>。</p>
+      <p>GitHub 內建的 CI/CD 平台，<strong>對開源專案提供近乎無限的免費額度</strong>。設定檔置於 <code>.github/workflows/*.yml</code>。</p>
 
       <div class="diagram">
         <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" aria-label="GitHub Actions 結構">
@@ -119,7 +119,7 @@
 
             <text x="170" y="200" text-anchor="middle" fill="#0a0a0f" font-size="10">並行</text>
             <text x="370" y="200" text-anchor="middle" fill="#0a0a0f" font-size="10">並行</text>
-            <text x="570" y="200" text-anchor="middle" fill="#0a0a0f" font-size="10">兩個都通過後才跑</text>
+            <text x="570" y="200" text-anchor="middle" fill="#0a0a0f" font-size="10">前兩者皆通過後才執行</text>
           </g>
         </svg>
         <div class="diagram-caption">圖 9.1 — Workflow / Job / Step 三層結構</div>
@@ -127,10 +127,10 @@
 
       <h3>四個關鍵概念</h3>
       <ul>
-        <li><strong>Workflow</strong> — 一個 YAML 檔代表一個 workflow，定義什麼事件觸發 (<code>on: push</code>)</li>
-        <li><strong>Job</strong> — 一個 workflow 內的執行單位，預設並行；可用 <code>needs:</code> 設依賴順序</li>
-        <li><strong>Step</strong> — Job 內依序執行的步驟，可以是 shell 指令或 action</li>
-        <li><strong>Action</strong> — 可重用的 step (例如 <code>actions/checkout@v4</code>)，可從 Marketplace 找</li>
+        <li><strong>Workflow</strong>——一份 YAML 檔代表一個 workflow，定義由什麼事件觸發（<code>on: push</code>）</li>
+        <li><strong>Job</strong>——workflow 內的執行單位，預設並行執行；可透過 <code>needs:</code> 設定依賴順序</li>
+        <li><strong>Step</strong>——Job 內依序執行的步驟，可為 shell 指令或 action</li>
+        <li><strong>Action</strong>——可重複使用的 step（例如 <code>actions/checkout@v4</code>），可於 Marketplace 取得</li>
       </ul>
     </section>
 
@@ -198,8 +198,8 @@
       <div class="callout callout-success">
         <div class="callout-icon">✓</div>
         <div class="callout-body">
-          <strong>幾個業界慣例</strong>
-          ① <code>install --frozen-lockfile</code> 確保 CI 用的依賴版本跟 lock 檔完全一致 ② 用 <code>cache: 'pnpm'</code> 加速 ③ matrix 跑多 Node 版本確保跨版本相容 ④ action 永遠 pin 主版號 (<code>@v4</code>)，不要 <code>@latest</code> 否則 breaking 會自動套上你 CI。
+          <strong>數項業界慣例</strong>
+          ① <code>install --frozen-lockfile</code> 確保 CI 使用的依賴版本與 lock 檔完全一致；② 透過 <code>cache: 'pnpm'</code> 加速依賴安裝；③ 以 matrix 執行多個 Node 版本，確保跨版本相容；④ action 永遠固定主版號（<code>@v4</code>），避免使用 <code>@latest</code>，否則上游的 breaking change 將自動套用至 CI。
         </div>
       </div>
     </section>
@@ -208,41 +208,41 @@
       <span class="section-eyebrow">04 — Branch Protection</span>
       <h2>Branch Protection Rules</h2>
 
-      <p>有 CI 但沒設保護規則 = 大家還是可以強推 main / 跳過 review。在 Settings → Branches 加保護規則：</p>
+      <p>具備 CI 但未設定保護規則時，成員仍可強制推送 main 或略過 review。應於 Settings → Branches 設定保護規則：</p>
 
       <table>
         <thead>
           <tr><th>規則</th><th>效果</th></tr>
         </thead>
         <tbody>
-          <tr><td><strong>Require pull request before merging</strong></td><td>禁止直接 push main，一定要走 PR</td></tr>
-          <tr><td><strong>Require approvals</strong> (1+)</td><td>至少 N 人 approve 才能 merge</td></tr>
-          <tr><td><strong>Dismiss stale approvals on new push</strong></td><td>有新 commit 後 approve 失效，要重 review</td></tr>
-          <tr><td><strong>Require review from Code Owners</strong></td><td>動到 CODEOWNERS 指定的目錄要該 owner approve</td></tr>
-          <tr><td><strong>Require status checks to pass</strong></td><td>CI 必須綠燈才能 merge — 然後勾選哪些 check</td></tr>
-          <tr><td><strong>Require branches to be up to date</strong></td><td>PR 必須 rebase 到最新 main 才能合 (避免 fast-forward 後爆炸)</td></tr>
-          <tr><td><strong>Require linear history</strong></td><td>禁止 merge commit，強制 squash 或 rebase merge</td></tr>
-          <tr><td><strong>Require signed commits</strong></td><td>強制 GPG / SSH 簽名 (高安全環境)</td></tr>
-          <tr><td><strong>Do not allow bypassing</strong></td><td>連 admin 也不能跳過 — 真的卡住時才暫時關</td></tr>
+          <tr><td><strong>Require pull request before merging</strong></td><td>禁止直接 push main，所有變更須透過 PR</td></tr>
+          <tr><td><strong>Require approvals</strong>（1+）</td><td>須至少 N 人 approve 後才能 merge</td></tr>
+          <tr><td><strong>Dismiss stale approvals on new push</strong></td><td>有新 commit 進入後，先前的 approve 失效，須重新 review</td></tr>
+          <tr><td><strong>Require review from Code Owners</strong></td><td>動到 CODEOWNERS 指定的目錄時須由該 owner approve</td></tr>
+          <tr><td><strong>Require status checks to pass</strong></td><td>CI 必須通過才能 merge——可指定須通過的 check 項目</td></tr>
+          <tr><td><strong>Require branches to be up to date</strong></td><td>PR 必須 rebase 至最新 main 後才能合併（避免 fast-forward 後產生問題）</td></tr>
+          <tr><td><strong>Require linear history</strong></td><td>禁止 merge commit，強制使用 squash 或 rebase merge</td></tr>
+          <tr><td><strong>Require signed commits</strong></td><td>強制 GPG 或 SSH 簽名（高安全等級環境）</td></tr>
+          <tr><td><strong>Do not allow bypassing</strong></td><td>連 admin 亦不得跳過——僅於確實受阻時暫時關閉</td></tr>
         </tbody>
       </table>
 
       <div class="callout callout-warn">
         <div class="callout-icon">!</div>
         <div class="callout-body">
-          <strong>沒設 branch protection 等於沒做 CI</strong>
-          如果開發者可以強推、可以跳過 CI 失敗、可以略過 review — 那 CI / review 流程就只是「禮貌建議」。Branch protection 把「該做的事」變成「必做的事」。
+          <strong>未設定 branch protection 等同於未建立 CI</strong>
+          若開發者可強制推送、可略過 CI 失敗、可繞過 review，CI 與 review 流程僅淪為「禮貌建議」。Branch protection 將「應做的事」轉化為「必做的事」。
         </div>
       </div>
     </section>
 
     <section id="linter">
       <span class="section-eyebrow">05 — Linter / Formatter</span>
-      <h2>Linter 與 Formatter 的差別</h2>
+      <h2>Linter 與 Formatter 的差異</h2>
 
       <ul>
-        <li><strong>Linter</strong> — 檢查程式碼<strong>邏輯 / 風格問題</strong>，例如未使用變數、不安全的型別、複雜度過高</li>
-        <li><strong>Formatter</strong> — 只管<strong>排版</strong>，引號 / 縮排 / 換行 / 行寬</li>
+        <li><strong>Linter</strong>——檢查程式碼的<strong>邏輯與風格問題</strong>，例如未使用的變數、不安全的型別、複雜度過高等</li>
+        <li><strong>Formatter</strong>——僅處理<strong>排版</strong>，例如引號、縮排、換行、行寬等</li>
       </ul>
 
       <h3>各語言對應工具</h3>
@@ -252,9 +252,9 @@
           <tr><th>語言</th><th>Linter</th><th>Formatter</th></tr>
         </thead>
         <tbody>
-          <tr><td>JavaScript / TypeScript</td><td>ESLint</td><td>Prettier (或 Biome 整合兩者)</td></tr>
-          <tr><td>Python</td><td><strong>Ruff</strong> (新) / Pylint / Flake8</td><td>Ruff format / Black</td></tr>
-          <tr><td>Go</td><td>golangci-lint</td><td>gofmt / goimports (內建)</td></tr>
+          <tr><td>JavaScript / TypeScript</td><td>ESLint</td><td>Prettier（或以 Biome 整合兩者）</td></tr>
+          <tr><td>Python</td><td><strong>Ruff</strong>（新）/ Pylint / Flake8</td><td>Ruff format / Black</td></tr>
+          <tr><td>Go</td><td>golangci-lint</td><td>gofmt / goimports（內建）</td></tr>
           <tr><td>Rust</td><td>Clippy</td><td>rustfmt</td></tr>
           <tr><td>Java</td><td>Checkstyle / SpotBugs</td><td>google-java-format / Spotless</td></tr>
         </tbody>
@@ -263,15 +263,15 @@
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>Ruff 是 Python 生態的新霸主</strong>
-          用 Rust 寫的，比 Pylint 快 10-100 倍。一個工具替代 Flake8 + isort + pyupgrade + Black。2024 後新 Python 專案幾乎都選它。
+          <strong>Ruff 為 Python 生態的新主流</strong>
+          以 Rust 撰寫，速度較 Pylint 快 10 至 100 倍。單一工具即可取代 Flake8、isort、pyupgrade 與 Black 的功能。2024 年後新建立的 Python 專案多採用此工具。
         </div>
       </div>
 
       <details class="collapse">
-        <summary>EditorConfig — 跨編輯器一致基礎排版 <span class="collapse-tag">小工具</span></summary>
+        <summary>EditorConfig——跨編輯器的基礎排版一致性 <span class="collapse-tag">輔助工具</span></summary>
         <div class="collapse-body">
-          <p>放一個 <code>.editorconfig</code> 在 repo 根目錄，所有支援的 IDE / 編輯器都會自動套用：</p>
+          <p>於 repo 根目錄置入 <code>.editorconfig</code>，所有支援的 IDE 與編輯器將自動套用：</p>
           <div class="code-block">
             <div class="code-block-header">
               <span class="code-block-lang">editorconfig</span>
@@ -290,16 +290,16 @@ insert_final_newline = true
 [*.md]
 trim_trailing_whitespace = false</code></pre>
           </div>
-          <p style="margin-top:0.6rem;font-size:13px;">不取代 Prettier / rustfmt，但讓「沒裝 formatter 的同事」至少縮排不會亂。</p>
+          <p style="margin-top:0.6rem;font-size:13px;">不取代 Prettier 或 rustfmt，但可確保「未安裝 formatter 的成員」至少能維持基本縮排一致。</p>
         </div>
       </details>
     </section>
 
     <section id="hooks">
       <span class="section-eyebrow">06 — Git Hooks</span>
-      <h2>Git Hooks：在本地 commit 前先擋下垃圾</h2>
+      <h2>Git Hooks：在本地 commit 前先攔截不合格內容</h2>
 
-      <p>Git 內建 hooks (<code>.git/hooks/</code>) 在特定事件時執行 script。但 <code>.git</code> 不會被版本控制 = 同事 clone 時不會帶到 hook。所以實務上用<strong>第三方工具管理 hook</strong>：</p>
+      <p>Git 內建 hooks（<code>.git/hooks/</code>）可於特定事件時執行 script。然而 <code>.git</code> 不納入版本控制——成員 clone 時不會帶入 hook。實務上採用<strong>第三方工具管理 hook</strong>：</p>
 
       <h3>三大方案比較</h3>
 
@@ -311,17 +311,17 @@ trim_trailing_whitespace = false</code></pre>
           <tr>
             <td><strong>Husky + lint-staged</strong></td>
             <td>Node.js</td>
-            <td>JS 生態事實標準；只 lint 改動的檔案 (lint-staged)</td>
+            <td>JS 生態的事實標準；可僅針對改動的檔案執行 lint（lint-staged）</td>
           </tr>
           <tr>
             <td><strong>pre-commit</strong></td>
-            <td>Python (但跨語言)</td>
-            <td>支援所有語言；hook 設定一份 YAML 就能跨 repo 共用</td>
+            <td>Python（跨語言適用）</td>
+            <td>支援所有語言；hook 以單份 YAML 定義即可跨 repo 共用</td>
           </tr>
           <tr>
             <td><strong>Lefthook</strong></td>
-            <td>Go (但跨語言)</td>
-            <td>新世代，支援並行執行多個 hook，速度快</td>
+            <td>Go（跨語言適用）</td>
+            <td>新世代工具，支援並行執行多個 hook，速度更快</td>
           </tr>
         </tbody>
       </table>
@@ -337,11 +337,11 @@ trim_trailing_whitespace = false</code></pre>
 <span class="tk-pn">$</span> pnpm add <span class="tk-op">-D</span> husky lint-staged
 <span class="tk-pn">$</span> pnpm exec husky init
 
-<span class="tk-cm"># 2. 把 .husky/pre-commit 改成這樣</span>
+<span class="tk-cm"># 2. 將 .husky/pre-commit 內容調整如下</span>
 <span class="tk-pn">$</span> <span class="tk-fn">cat</span> .husky/pre-commit
 pnpm exec lint-staged
 
-<span class="tk-cm"># 3. 在 package.json 加 lint-staged 設定</span></code></pre>
+<span class="tk-cm"># 3. 於 package.json 新增 lint-staged 設定</span></code></pre>
       </div>
 
       <div class="code-block">
@@ -366,30 +366,30 @@ pnpm exec lint-staged
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>為什麼要 lint-staged 不直接 lint 全部</strong>
-          老 codebase 有 1000 個檔案，每次 commit 全 lint 一遍要 30 秒，沒人受得了。<strong>lint-staged 只 lint 你這次改動的檔案</strong>，1 秒內結束。同時逐步累積到 main 都乾淨。
+          <strong>為何採用 lint-staged 而非全量 lint</strong>
+          舊有 codebase 動輒上千個檔案，每次 commit 全量 lint 需耗時數十秒，影響開發流暢度。<strong>lint-staged 僅針對本次改動的檔案執行 lint</strong>，可於 1 秒內完成，並能逐步使 main 維持整潔。
         </div>
       </div>
 
       <details class="collapse">
-        <summary>為什麼不直接用 Git 原生 .git/hooks/？ <span class="collapse-tag">原因</span></summary>
+        <summary>為何不直接使用 Git 原生 .git/hooks/？ <span class="collapse-tag">原因</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:13px;">
-            <li><strong>不會跟 repo 一起 clone</strong> — 別人拿到專案就沒 hook</li>
-            <li><strong>沒有跨平台處理</strong> — Windows 跟 Unix shell 不同</li>
-            <li><strong>沒有 hook 管理</strong> — 多個 hook 不能同時用一個事件</li>
-            <li><strong>沒有版本控制</strong> — hook 改了沒人知道</li>
+            <li><strong>不會隨 repo 一同 clone</strong>——其他成員 clone 後即缺少 hook</li>
+            <li><strong>缺乏跨平台處理</strong>——Windows 與 Unix shell 行為不同</li>
+            <li><strong>缺乏 hook 管理機制</strong>——同一事件無法同時掛載多個 hook</li>
+            <li><strong>缺乏版本控制</strong>——hook 變更後其他成員無從得知</li>
           </ul>
-          <p style="margin-top:0.6rem;font-size:13px;">所以 Husky / pre-commit / Lefthook 這些工具都是把 hook 寫在 repo 內、自動安裝到 .git/hooks/ — 解決上面所有問題。</p>
+          <p style="margin-top:0.6rem;font-size:13px;">因此 Husky、pre-commit、Lefthook 等工具皆採用「將 hook 寫於 repo 內，並自動安裝至 .git/hooks/」的方式，解決上述所有問題。</p>
         </div>
       </details>
     </section>
 
     <section id="commitlint">
       <span class="section-eyebrow">07 — commitlint</span>
-      <h2>commitlint：擋下不符規範的 commit message</h2>
+      <h2>commitlint：攔截不符規範的 commit message</h2>
 
-      <p>Lesson 06 學的 Conventional Commits 規範要怎麼真正落實？讓 commitlint 在 <code>commit-msg</code> hook 自動驗證：</p>
+      <p>Lesson 06 介紹的 Conventional Commits 規範如何於團隊中切實落實？可透過 commitlint 於 <code>commit-msg</code> hook 自動驗證：</p>
 
       <div class="code-block">
         <div class="code-block-header">
@@ -398,14 +398,14 @@ pnpm exec lint-staged
         </div>
 <pre><code><span class="tk-pn">$</span> pnpm add <span class="tk-op">-D</span> @commitlint/cli @commitlint/config-conventional
 
-<span class="tk-cm"># 建 commitlint.config.js</span>
+<span class="tk-cm"># 建立 commitlint.config.js</span>
 <span class="tk-pn">$</span> <span class="tk-fn">echo</span> <span class="tk-st">"export default { extends: ['@commitlint/config-conventional'] };"</span> &gt; commitlint.config.js
 
-<span class="tk-cm"># 加 husky commit-msg hook</span>
+<span class="tk-cm"># 新增 husky commit-msg hook</span>
 <span class="tk-pn">$</span> <span class="tk-fn">echo</span> <span class="tk-st">'pnpm exec commitlint --edit "$1"'</span> &gt; .husky/commit-msg</code></pre>
       </div>
 
-      <p>之後若有人嘗試 commit <code>fix bug</code>：</p>
+      <p>後續若有成員嘗試以 <code>fix bug</code> commit：</p>
 
       <div class="code-block">
         <div class="code-block-header">
@@ -427,8 +427,8 @@ husky - commit-msg script failed (code 1)</code></pre>
       <div class="callout callout-success">
         <div class="callout-icon">✓</div>
         <div class="callout-body">
-          <strong>本地 + CI 雙重把關</strong>
-          本地 hook 在 commit 當下擋；CI 上再用 <code>wagoid/commitlint-github-action</code> 在 PR 也檢查。本地擋下大多數，CI 處理「跳過 hook 推上來」的情況。
+          <strong>本地與 CI 雙重把關</strong>
+          本地 hook 於 commit 當下攔截；CI 端再以 <code>wagoid/commitlint-github-action</code> 於 PR 階段檢查。本地阻擋多數情況，CI 則處理「跳過 hook 強行推送」的例外。
         </div>
       </div>
     </section>
