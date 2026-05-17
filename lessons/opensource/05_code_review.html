@@ -35,8 +35,6 @@
       <li><a class="toc-link" href="#author">Author 禮儀</a></li>
       <li><a class="toc-link" href="#conventional">留言規範</a></li>
       <li><a class="toc-link" href="#actions">三種 review 結論</a></li>
-      <li><a class="toc-link" href="#suggested">Suggested changes</a></li>
-      <li><a class="toc-link" href="#codeowners">CODEOWNERS</a></li>
     </ul>
   </div>
 </nav>
@@ -57,7 +55,7 @@
           <div class="timeline-num">1</div>
           <div class="timeline-content">
             <div class="timeline-title">PR 開啟（Lesson 04 終點）</div>
-            <div class="timeline-desc">Author 將 feature 分支 push 至個人 fork 並於 GitHub 開啟 PR；GitHub 依設定或 <code>CODEOWNERS</code> 自動指派 reviewer。</div>
+            <div class="timeline-desc">Author 將 feature 分支 push 至個人 fork 並於 GitHub 開啟 PR，並於右側欄位指派或請求對應領域的 reviewer。</div>
           </div>
         </div>
         <div class="timeline-step">
@@ -202,24 +200,7 @@
       <span class="section-eyebrow">04 — 留言規範</span>
       <h2>Conventional Comments——以 prefix 表達意圖</h2>
 
-      <p>同樣是 review 留言，以下兩種寫法傳達的訊息截然不同：</p>
-
-      <div class="compare-grid">
-        <div class="compare-card compare-bad">
-          <div class="compare-label"><span class="compare-icon">✗</span>模糊</div>
-          <div class="compare-body">
-            <code>這個命名不太好</code>
-            <p style="font-size:13px;margin-top:0.4rem;">Author 無從判斷這是必須修正還是僅為建議？應改為什麼？是否為合併的必要條件？</p>
-          </div>
-        </div>
-        <div class="compare-card compare-good">
-          <div class="compare-label"><span class="compare-icon">✓</span>明確</div>
-          <div class="compare-body">
-            <code>nit: <code>handle</code> → <code>handleSubmit</code> 會更明確，非必要</code>
-            <p style="font-size:13px;margin-top:0.4rem;"><code>nit:</code> 表示細節建議、可選；author 即可判斷不修改亦能合併。</p>
-          </div>
-        </div>
-      </div>
+      <p>Review 留言若僅寫「這個命名不太好」，author 無從判斷此為必須修正或僅為建議、是否為合併的必要條件。<strong>Conventional Comments</strong> 規範以一個 prefix 標示留言的意圖與嚴重度，使 author 能立即辨識處理優先級。</p>
 
       <h3>業界共通的 prefix</h3>
 
@@ -260,6 +241,53 @@
           </tr>
         </tbody>
       </table>
+
+      <h3>實戰範例：同一段程式碼上的多條留言</h3>
+
+      <p>以下示意一段登入處理函式可能收到的 review 留言。每則留言以 prefix 開頭，並輔以<strong>具體、可執行的描述</strong>——author 看完即可直接著手處理，無須再回頭釐清意圖：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">typescript — src/auth/login.ts</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">const</span> handle = <span class="tk-kw">async</span> (e) =&gt; {
+  e.preventDefault();
+  <span class="tk-kw">if</span> (formData.password.length &lt; <span class="tk-st">6</span>) <span class="tk-kw">return</span>;
+  <span class="tk-kw">await</span> <span class="tk-fn">fetch</span>(<span class="tk-st">'/api/login'</span>, {
+    method: <span class="tk-st">'POST'</span>,
+    body: <span class="tk-fn">JSON</span>.stringify(formData),
+  });
+};</code></pre>
+      </div>
+
+      <div class="section-card">
+        <p style="margin:0 0 1rem;font-size:13px;color:var(--muted);">Reviewer 在此段程式碼上可能留下的留言：</p>
+
+        <div style="border-left:3px solid var(--ecc);padding:0.5rem 0 0.5rem 0.95rem;margin:0.7rem 0;">
+          <code>blocking:</code> <code>fetch</code> 未處理失敗情況，網路錯誤時 UI 將卡在 loading state，使用者無從得知登入結果。建議以 <code>try/catch</code> 包覆，並透過 toast 或表單下方訊息顯示錯誤。
+        </div>
+
+        <div style="border-left:3px solid var(--ecc);padding:0.5rem 0 0.5rem 0.95rem;margin:0.7rem 0;">
+          <code>suggestion:</code> password 長度檢查可抽至 schema validation（例如 zod），與其他欄位的驗證集中於同一處，日後新增規則（特殊字元、英數混合等）較容易擴充。
+        </div>
+
+        <div style="border-left:3px solid var(--ecc);padding:0.5rem 0 0.5rem 0.95rem;margin:0.7rem 0;">
+          <code>nit:</code> <code>handle</code> → <code>handleSubmit</code> 命名更明確，可直接從變數名得知用途；非必要，僅為可讀性建議。
+        </div>
+
+        <div style="border-left:3px solid var(--ecc);padding:0.5rem 0 0.5rem 0.95rem;margin:0.7rem 0;">
+          <code>question:</code> 此處最小長度設為 6 的依據為何？是否符合內部密碼政策？若有對應的常數或設定值，建議引用以便日後集中管理。
+        </div>
+
+        <div style="border-left:3px solid var(--ecc);padding:0.5rem 0 0.5rem 0.95rem;margin:0.7rem 0;">
+          <code>praise:</code> 早期 return 的寫法相當乾淨，避免了多層 if 巢狀，使後續錯誤處理的邏輯更易閱讀。
+        </div>
+      </div>
+
+      <p>觀察上述每則留言的共通結構：<strong>prefix（傳達優先級）→ 指出位置或現象 → 說明原因或影響 → 提出具體建議</strong>。Prefix 本身即標示處理優先級，author 無須額外詢問即可判斷該則留言屬於必修、建議或僅供討論。</p>
+
+      <p><strong>一則留言對應一個議題</strong>——每則 comment 在 GitHub 上是一個獨立的對話 thread，author 需逐一回覆並標示為已解決。若將多個議題塞入同一則留言，author 難以分別追蹤處理狀態，prefix 也無法準確涵蓋。</p>
 
       <div class="callout callout-success">
         <div class="callout-icon">✓</div>
@@ -306,87 +334,6 @@
           部分團隊文化將 request changes 視為「強烈反對」。若僅為 nit 級別的問題，建議使用 <strong>Approve</strong> 並附上 <strong>nit comment</strong>——傳達「以下為建議，可採納或不採納，但不阻擋合併」之意。Request changes 應保留予確實會造成破壞性影響的問題。
         </div>
       </div>
-    </section>
-
-    <section id="suggested">
-      <span class="section-eyebrow">06 — Suggested changes</span>
-      <h2>GitHub Suggested Changes——一鍵接受改動</h2>
-
-      <p>於 GitHub 留言時使用特殊的 code block 撰寫建議修改內容，author 即可於網頁上直接 commit：</p>
-
-      <div class="code-block">
-        <div class="code-block-header">
-          <span class="code-block-lang">markdown</span>
-          <button class="code-copy-btn" type="button">複製</button>
-        </div>
-<pre><code><span class="tk-cm">```suggestion</span>
-const handleSubmit = async (event) =&gt; {
-  event.preventDefault();
-  await onSubmit(formData);
-};
-<span class="tk-cm">```</span></code></pre>
-      </div>
-
-      <p>Author 將看到「Add suggestion to batch」或「Commit suggestion」按鈕，點擊後即可直接 push 一筆 commit，無須本地操作。</p>
-
-      <div class="callout callout-info">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>suggestion 的適用時機</strong>
-          適合用於 typo、命名建議、簡單重構等場景，較文字描述精確。複雜邏輯不建議使用 suggestion，因為 author 應在理解後自行撰寫，而非無條件採納。
-        </div>
-      </div>
-    </section>
-
-    <section id="codeowners">
-      <span class="section-eyebrow">07 — CODEOWNERS</span>
-      <h2><code>CODEOWNERS</code>：自動指派 reviewer</h2>
-
-      <p>大型專案會在 repo 根目錄或 <code>.github/</code> 下放置一個 <code>CODEOWNERS</code> 檔，用於定義「特定目錄變動時自動指派由誰 review」：</p>
-
-      <div class="code-block">
-        <div class="code-block-header">
-          <span class="code-block-lang">codeowners</span>
-          <button class="code-copy-btn" type="button">複製</button>
-        </div>
-<pre><code><span class="tk-cm"># 預設所有改動皆由此團隊 review</span>
-*       @your-org/core-team
-
-<span class="tk-cm"># 前端目錄指派前端團隊</span>
-/web/   @your-org/frontend
-/mobile/ @your-org/mobile
-
-<span class="tk-cm"># 安全相關必須由安全團隊 review</span>
-/auth/  @your-org/security
-*.pem   @your-org/security
-
-<span class="tk-cm"># 文件由 docs 團隊任一成員 review 即可</span>
-/docs/  @your-org/docs</code></pre>
-      </div>
-
-      <p>當 PR 改動對應目錄時，GitHub 將自動將相關人員或團隊加為 reviewer。搭配 branch protection 的 <strong>Require review from Code Owners</strong>，可強制要求由相關領域專家 review 後方能合併。</p>
-
-      <details class="collapse">
-        <summary>進階：CODEOWNERS 的語法注意事項 <span class="collapse-tag">深入</span></summary>
-        <div class="collapse-body">
-          <ul style="margin-left:1rem;font-size:13px;">
-            <li><strong>後寫者優先</strong>——與 .gitignore 相同，下方規則會覆蓋上方規則</li>
-            <li><strong>路徑開頭的 <code>/</code> 代表 repo 根目錄</strong>——<code>/auth/</code> 僅匹配根目錄下的 auth/，不會匹配 <code>src/auth/</code></li>
-            <li><strong>未加開頭 <code>/</code> 代表任意位置</strong>——<code>auth/</code> 將同時匹配 <code>src/auth/</code> 與 <code>tests/auth/</code></li>
-            <li><strong>個人 owner 須具備寫入權限</strong>——無寫入權限者不得成為 code owner</li>
-          </ul>
-        </div>
-      </details>
-
-      <details class="collapse">
-        <summary>Async 與 Sync review、Pair review 與 Review fatigue <span class="collapse-tag">深入</span></summary>
-        <div class="collapse-body">
-          <p style="margin-bottom:0.5rem;"><strong>Async review（最常採用）</strong>：reviewer 於可用時段自行檢視並留下 comment，author 修改後再請 reviewer 複查。適合分散式團隊。</p>
-          <p style="margin-bottom:0.5rem;"><strong>Sync review</strong>：雙方共處（或視訊）逐行討論。適合複雜或高風險的改動，可一次釐清所有疑問。</p>
-          <p style="margin-bottom:0.5rem;"><strong>Pair review</strong>：兩人共同撰寫並進行 review，適用於新人 onboarding。</p>
-          <p><strong>Review fatigue 的緩解措施</strong>：① 單次 review 控制在 60 分鐘或 400 行以內；② 將大 PR 拆解為較小的 PR；③ 進行 reviewer rotation，避免長期集中於少數成員；④ 透過自動化工具（linter、CI）處理機械性檢查，讓人工 review 聚焦於真正重要的部分。</p>
-        </div>
-      </details>
     </section>
 
     <nav class="lesson-nav" aria-label="上一課/下一課">
