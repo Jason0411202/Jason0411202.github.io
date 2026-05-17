@@ -19,7 +19,7 @@
     <h1 class="hero-title">Fork、Upstream、<span>PR 完整流程</span></h1>
     <p class="hero-desc">從按下 Fork 按鈕開始，到 PR 被 maintainer merge——逐步說明業界的標準做法。</p>
     <div class="hero-badges">
-      <span class="hero-badge"><span class="dot"></span>第 4 / 12 堂</span>
+      <span class="hero-badge"><span class="dot"></span>第 4 / 11 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
       <span class="hero-badge"><span class="dot"></span>中階</span>
     </div>
@@ -229,7 +229,7 @@ upstream  https://github.com/原始作者/repo.git (push)</code></pre>
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong>commit message 格式</strong>
-          建議採用 Conventional Commits（Lesson 06 將詳述）。Reviewer 從訊息標題即可辨識改動類型（feat / fix / refactor 等）與影響範圍，亦便於日後生成 changelog。
+          建議採用 Conventional Commits（Lesson 01「Commit Message 規範」已詳述）。Reviewer 從訊息標題即可辨識改動類型（feat / fix / refactor 等）與影響範圍，亦便於日後生成 changelog。
         </div>
       </div>
     </section>
@@ -281,7 +281,7 @@ upstream  https://github.com/原始作者/repo.git (push)</code></pre>
         &lt;type&gt;(&lt;scope&gt;): &lt;subject&gt;
       </p>
       <ul>
-        <li><strong>type</strong>——標示該 PR 的改動類型。Conventional Commits 規格僅強制 <code>feat</code> 與 <code>fix</code>,其他 type 來自 Angular Commit Convention 的延伸(完整一覽見 Lesson 06「常用的 type」),Breaking change 於 type 後加 <code>!</code> 標示。</li>
+        <li><strong>type</strong>——標示該 PR 的改動類型。Conventional Commits 規格僅強制 <code>feat</code> 與 <code>fix</code>,其他 type 來自 Angular Commit Convention 的延伸(完整一覽見 Lesson 01「常用的 type」)。</li>
         <li><strong>scope</strong>——影響範圍,常見為模組名稱、套件名稱或功能區塊(例如 <code>auth</code>、<code>button</code>、<code>api</code>)。範圍單純或跨多個模組時可省略。</li>
         <li><strong>subject</strong>——簡潔描述,小寫開頭、不加句點、祈使句語氣,建議控制於 50 字內。</li>
       </ul>
@@ -537,20 +537,19 @@ Closes #234
 
   <aside class="lesson-aside">
     <div class="aside-card">
-      <div class="aside-title">12 堂課程系列 <span class="progress-pill">4 / 12</span></div>
+      <div class="aside-title">11 堂課程系列 <span class="progress-pill">4 / 11</span></div>
       <ul class="course-nav">
         <li><a class="course-nav-item" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
         <li><a class="course-nav-item" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
         <li><a class="course-nav-item" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇</span></a></li>
         <li><a class="course-nav-item current" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
         <li><a class="course-nav-item" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
-        <li><a class="course-nav-item" href="06_commits_versioning.html"><span class="course-nav-num">06</span><span>Commit、SemVer、Changelog</span></a></li>
-        <li><a class="course-nav-item" href="07_issues_project_mgmt.html"><span class="course-nav-num">07</span><span>Issue 與專案管理</span></a></li>
-        <li><a class="course-nav-item" href="08_testing_tdd.html"><span class="course-nav-num">08</span><span>測試金字塔與 TDD</span></a></li>
-        <li><a class="course-nav-item" href="09_ci_cd_hooks.html"><span class="course-nav-num">09</span><span>CI/CD、Hooks、Lint</span></a></li>
-        <li><a class="course-nav-item" href="10_rfc_adr_release.html"><span class="course-nav-num">10</span><span>RFC、ADR、Release</span></a></li>
-        <li><a class="course-nav-item" href="11_dependencies_supply_chain.html"><span class="course-nav-num">11</span><span>依賴管理與供應鏈安全</span></a></li>
-        <li><a class="course-nav-item" href="12_first_contribution.html"><span class="course-nav-num">12</span><span>第一次貢獻實戰</span></a></li>
+        <li><a class="course-nav-item" href="06_issues_project_mgmt.html"><span class="course-nav-num">06</span><span>Issue 與專案管理</span></a></li>
+        <li><a class="course-nav-item" href="07_testing_tdd.html"><span class="course-nav-num">07</span><span>測試金字塔與 TDD</span></a></li>
+        <li><a class="course-nav-item" href="08_ci_cd_hooks.html"><span class="course-nav-num">08</span><span>CI/CD、Hooks、Lint</span></a></li>
+        <li><a class="course-nav-item" href="09_rfc_adr_release.html"><span class="course-nav-num">09</span><span>RFC、ADR、Release</span></a></li>
+        <li><a class="course-nav-item" href="10_dependencies_supply_chain.html"><span class="course-nav-num">10</span><span>依賴管理與供應鏈安全</span></a></li>
+        <li><a class="course-nav-item" href="11_first_contribution.html"><span class="course-nav-num">11</span><span>第一次貢獻實戰</span></a></li>
       </ul>
     </div>
   </aside>

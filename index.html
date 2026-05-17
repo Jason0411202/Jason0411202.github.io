@@ -496,11 +496,11 @@ a { color: inherit; text-decoration: none; }
 
       <div class="side-card">
         <div class="side-title">課程系列：開源協作</div>
-        <div class="side-text">12 堂實務導向課程，從 Git 進階、PR/Code Review、測試 CI、到第一次貢獻全流程，目標是上工立刻能用。</div>
+        <div class="side-text">11 堂實務導向課程，從 Git 進階、PR/Code Review、測試 CI、到第一次貢獻全流程，目標是上工立刻能用。</div>
         <div class="side-list">
           <div>· Git 日常 + 進階 (rebase/bisect 等)</div>
           <div>· 分支策略 / Fork / PR / Code Review</div>
-          <div>· Conventional Commits + SemVer</div>
+          <div>· Issue 撰寫 + 專案管理</div>
           <div>· 測試金字塔 + TDD</div>
           <div>· CI/CD + Hooks + Lint</div>
           <div>· RFC / ADR / 供應鏈安全</div>
@@ -593,13 +593,12 @@ const gitLessons = [
   { n: '03', file: 'lessons/opensource/03_branching_strategies.html',     title: '分支策略選擇',                desc: 'Git Flow / GitHub Flow / GitLab Flow / Trunk-Based — 怎麼選最適合自己的團隊。',                  minutes: 10, tags: ['協作', '分支'] },
   { n: '04', file: 'lessons/opensource/04_fork_pr_workflow.html',         title: 'Fork、Upstream、PR 完整流程',  desc: '從 fork 開始一直到 PR 被合併的全流程，包含 sync upstream、衝突解決、PR 描述。',                 minutes: 14, tags: ['協作', 'PR'] },
   { n: '05', file: 'lessons/opensource/05_code_review.html',              title: 'Code Review 文化與技巧',       desc: 'Google eng-practices、Conventional Comments、CODEOWNERS — Reviewer 與 Author 雙視角。',          minutes: 12, tags: ['協作', 'Review'] },
-  { n: '06', file: 'lessons/opensource/06_commits_versioning.html',       title: 'Commit Message、SemVer、Changelog', desc: 'Conventional Commits 1.0、Semantic Versioning 2.0、Keep a Changelog 1.1 — 業界規範一次學完。',  minutes: 13, tags: ['規範', '版本'] },
-  { n: '07', file: 'lessons/opensource/07_issues_project_mgmt.html',      title: 'Issue 撰寫與專案管理',         desc: 'Bug report / Feature request 模板、標籤系統、Milestone、GitHub Projects、Issue triage。',         minutes: 11, tags: ['規範', 'Issue'] },
-  { n: '08', file: 'lessons/opensource/08_testing_tdd.html',              title: '測試金字塔與 TDD',             desc: '測試金字塔/獎盃/蜂巢、TDD 三步驟、F.I.R.S.T、AAA、Coverage 何時 80% 才合理。',                 minutes: 13, tags: ['測試', 'TDD'] },
-  { n: '09', file: 'lessons/opensource/09_ci_cd_hooks.html',              title: 'CI/CD、Git Hooks、Lint/Format', desc: 'GitHub Actions、Branch Protection、husky/lint-staged/pre-commit、commitlint。',                  minutes: 14, tags: ['CI', '自動化'] },
-  { n: '10', file: 'lessons/opensource/10_rfc_adr_release.html',          title: 'RFC、ADR、Release Management', desc: 'Rust RFCs / Python PEP 模式、Michael Nygard ADR 範本、feature freeze → RC → GA 流程。',          minutes: 13, tags: ['大型專案', '文件'] },
-  { n: '11', file: 'lessons/opensource/11_dependencies_supply_chain.html', title: '依賴管理與供應鏈安全',         desc: 'Dependabot vs Renovate、CVE/GHSA、SECURITY.md、SBOM、xz utils 等真實案例。',                     minutes: 12, tags: ['安全', '依賴'] },
-  { n: '12', file: 'lessons/opensource/12_first_contribution.html',       title: '第一次貢獻實戰 Checklist',      desc: '從找專案、判斷適合度、認領 issue 到 PR 被合併全流程 — 把前 11 堂收尾成一份可執行清單。',           minutes: 14, tags: ['實戰', 'Checklist'] }
+  { n: '06', file: 'lessons/opensource/06_issues_project_mgmt.html',      title: 'Issue 撰寫與專案管理',         desc: 'Bug report / Feature request 模板、標籤系統、Milestone、GitHub Projects、Issue triage。',         minutes: 11, tags: ['規範', 'Issue'] },
+  { n: '07', file: 'lessons/opensource/07_testing_tdd.html',              title: '測試金字塔與 TDD',             desc: '測試金字塔/獎盃/蜂巢、TDD 三步驟、F.I.R.S.T、AAA、Coverage 何時 80% 才合理。',                 minutes: 13, tags: ['測試', 'TDD'] },
+  { n: '08', file: 'lessons/opensource/08_ci_cd_hooks.html',              title: 'CI/CD、Git Hooks、Lint/Format', desc: 'GitHub Actions、Branch Protection、husky/lint-staged/pre-commit、commitlint。',                  minutes: 14, tags: ['CI', '自動化'] },
+  { n: '09', file: 'lessons/opensource/09_rfc_adr_release.html',          title: 'RFC、ADR、Release Management', desc: 'Rust RFCs / Python PEP 模式、Michael Nygard ADR 範本、feature freeze → RC → GA 流程。',          minutes: 13, tags: ['大型專案', '文件'] },
+  { n: '10', file: 'lessons/opensource/10_dependencies_supply_chain.html', title: '依賴管理與供應鏈安全',         desc: 'Dependabot vs Renovate、CVE/GHSA、SECURITY.md、SBOM、xz utils 等真實案例。',                     minutes: 12, tags: ['安全', '依賴'] },
+  { n: '11', file: 'lessons/opensource/11_first_contribution.html',       title: '第一次貢獻實戰 Checklist',      desc: '從找專案、判斷適合度、認領 issue 到 PR 被合併全流程 — 把前 10 堂收尾成一份可執行清單。',           minutes: 14, tags: ['實戰', 'Checklist'] }
 ];
 
 const grpcLessons = [
@@ -660,7 +659,7 @@ const posts = [
     minutes: l.minutes,
     tags: l.tags,
     category: '開源協作',
-    series: `第 ${l.n} / 12 堂`
+    series: `第 ${l.n} / 11 堂`
   })),
   ...grpcLessons.map((l) => ({
     title: l.title,

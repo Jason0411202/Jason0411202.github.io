@@ -19,7 +19,7 @@
     <h1 class="hero-title">Git 日常<span>實務速成</span></h1>
     <p class="hero-desc">從四區心智模型出發，掌握每天會用到的 Git 指令。<strong>本課不深入 Git 內部物件原理，重點放在能立即應用於團隊協作的實務操作。</strong></p>
     <div class="hero-badges">
-      <span class="hero-badge"><span class="dot"></span>第 1 / 12 堂</span>
+      <span class="hero-badge"><span class="dot"></span>第 1 / 11 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 12 分鐘</span>
       <span class="hero-badge"><span class="dot"></span>初階</span>
     </div>
@@ -32,6 +32,7 @@
     <ul class="toc-list">
       <li><a class="toc-link" href="#mental-model">總覽</a></li>
       <li><a class="toc-link" href="#daily-flow">基本操作</a></li>
+      <li><a class="toc-link" href="#commit-message">Commit Message 規範</a></li>
       <li><a class="toc-link" href="#log">git blame</a></li>
       <li><a class="toc-link" href="#diff">git diff</a></li>
       <li><a class="toc-link" href="#amend">git --amend 參數</a></li>
@@ -139,7 +140,7 @@
           <div class="timeline-num">4</div>
           <div class="timeline-content">
             <div class="timeline-title">提交</div>
-            <div class="timeline-desc"><code>git commit -m "..."</code>。commit message 的撰寫規範將於 Lesson 06 專章說明。</div>
+            <div class="timeline-desc"><code>git commit -m "..."</code>。commit message 應遵循下一節介紹的 Conventional Commits 格式。</div>
           </div>
         </div>
         <div class="timeline-step">
@@ -220,8 +221,80 @@
       <p>實務上最常使用的是 <code>y</code>、<code>n</code>、<code>s</code> 三個鍵。例如同一檔案中同時包含「正式功能」與「順帶修正的 typo」，可透過 <code>git add -p</code> 先 stage 功能部分並 commit，剩下的 typo 再單獨 commit，得到兩個職責清楚的 commit。</p>
     </section>
 
+    <section id="commit-message">
+      <span class="section-eyebrow">03 — Commit Message 規範</span>
+      <h2>Conventional Commits：業界事實標準</h2>
+
+      <p>commit message 不僅是給自己看的紀錄，更是團隊協作、code review、產生 changelog 的重要依據。<a class="inline-link" href="https://www.conventionalcommits.org/zh-hant/v1.0.0/" target="_blank" rel="noopener">Conventional Commits 1.0</a> 為當前的事實標準，幾乎所有自動化工具皆採用此格式。基本格式如下：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">commit</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-fn">&lt;type&gt;</span>(<span class="tk-op">&lt;scope&gt;</span>): <span class="tk-st">&lt;subject&gt;</span>
+
+<span class="tk-st">&lt;body 詳細說明，可省略&gt;</span>
+
+<span class="tk-cm">&lt;footer 例如 Closes #123&gt;</span></code></pre>
+      </div>
+
+      <p>解構一個範例：</p>
+
+      <div class="section-card">
+<pre style="background:var(--paper2);padding:0.9rem;border-radius:8px;font-family:var(--mono);font-size:13px;line-height:1.7;">feat(auth): switch session storage to httpOnly cookies
+
+之前用 localStorage 存 token 容易被 XSS 偷走，
+改用 httpOnly cookie + CSRF token 機制。
+
+Closes #421</pre>
+
+        <ul style="margin-top:0.8rem;font-size:13px;">
+          <li><strong>type</strong>：<code>feat</code> 表示新功能</li>
+          <li><strong>scope</strong>：<code>(auth)</code> 表示影響範圍（可選）</li>
+          <li><strong>subject</strong>：<code>switch session storage to httpOnly cookies</code>——50 字以內、祈使句、首字小寫、結尾不加句點</li>
+          <li><strong>body</strong>：詳細說明 why（而非 what）</li>
+          <li><strong>footer</strong>：相關 issue 連結或其他 metadata</li>
+        </ul>
+      </div>
+
+      <h3>常用的 type</h3>
+
+      <p>Conventional Commits 規格僅強制 <code>feat</code> 與 <code>fix</code>，其他 type 來自 Angular Commit Convention 的延伸，業界普遍採用：</p>
+
+      <table>
+        <thead>
+          <tr><th>type</th><th>用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>feat</code></td><td>新功能</td></tr>
+          <tr><td><code>fix</code></td><td>bug 修補</td></tr>
+          <tr><td><code>docs</code></td><td>純文件改動</td></tr>
+          <tr><td><code>style</code></td><td>格式、縮排、分號等不影響邏輯的調整</td></tr>
+          <tr><td><code>refactor</code></td><td>重構（不新增功能、不修補 bug）</td></tr>
+          <tr><td><code>perf</code></td><td>效能優化</td></tr>
+          <tr><td><code>test</code></td><td>新增或修改測試</td></tr>
+          <tr><td><code>build</code></td><td>建置系統或依賴變動</td></tr>
+          <tr><td><code>ci</code></td><td>CI 設定變動</td></tr>
+          <tr><td><code>chore</code></td><td>其他維運事項（升級 dep、調整 config）</td></tr>
+          <tr><td><code>revert</code></td><td>還原某筆 commit</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>subject 撰寫要點</strong>
+          ① 採用<strong>祈使句</strong>（<code>add</code> 而非 <code>added</code>）——如同對 git 下達指令<br>
+          ② <strong>首字小寫</strong>，<strong>結尾不加句點</strong><br>
+          ③ 控制於 <strong>50 字以內</strong>，較長內容置於 body<br>
+          ④ 自我檢視：當此訊息出現在 changelog 中供使用者閱讀時，是否易於理解？
+        </div>
+      </div>
+    </section>
+
     <section id="log">
-      <span class="section-eyebrow">03 — git blame</span>
+      <span class="section-eyebrow">04 — git blame</span>
       <h2>看 commit 歷史的兩個工具</h2>
 
       <h3>Git Graph (VSCode 擴充套件) — 視覺化分支與 commit</h3>
@@ -263,7 +336,7 @@ e4f5a6b7 (Bob    2025-02-03 09:11:45 +0800  44)     throw new Error(<span class=
     </section>
 
     <section id="diff">
-      <span class="section-eyebrow">04 — git diff</span>
+      <span class="section-eyebrow">05 — git diff</span>
       <h2>比較分支差異</h2>
       <p>單檔或工作區的差異，於 VSCode 的 Source Control 面板點選檔案即可檢視，日常較少使用 <code>git diff</code>。在 terminal 中真正會用到的情境，是<strong>比較兩個分支的整體差異</strong>——例如送出 PR 前確認自己的分支與 <code>main</code> 之間的具體變動。</p>
 
@@ -314,7 +387,7 @@ index 1a2b3c4..5d6e7f8 100644
     </section>
 
     <section id="amend">
-      <span class="section-eyebrow">05 — git --amend 參數</span>
+      <span class="section-eyebrow">06 — git --amend 參數</span>
       <h2>剛 commit 後發現遺漏的修改</h2>
       <p>不必另開一筆 <code>fix typo</code> 的 commit，使用 <code>--amend</code> 將遺漏的改動併入上一筆：</p>
 
@@ -351,7 +424,7 @@ index 1a2b3c4..5d6e7f8 100644
     </section>
 
     <section id="stash">
-      <span class="section-eyebrow">06 — git stash</span>
+      <span class="section-eyebrow">07 — git stash</span>
       <h2><code>stash</code>：暫存未完成的工作，先處理其他事項</h2>
 
       <p>當前分支上有尚未 commit 的進度，但臨時被指派去處理另一條分支上的工作（例如線上 bug），這種情況就適合使用 stash。</p>
@@ -458,7 +531,7 @@ stash@{1}: On feat/user-profile: WIP with new files
     </section>
 
     <section id="restore">
-      <span class="section-eyebrow">07 — git restore</span>
+      <span class="section-eyebrow">08 — git restore</span>
       <h2>使用 <code>restore</code> 從特定 commit 還原檔案</h2>
 
       <p>日常的取消改動，直接於 VSCode 的 Source Control 面板操作即可。諸如「丟棄 working tree 的改動」、「取消已 stage 的檔案」、「整個資料夾還原」等操作，Source Control 面板皆有對應按鈕（改動旁的 <code>↶ Discard Changes</code>、<code>−</code> Unstage 等），無須記憶指令。terminal 真正會用到的情境，是<strong>從某個歷史 commit 將單一檔案還原回來</strong>——此操作 GUI 較不直接。</p>
@@ -518,20 +591,19 @@ stash@{1}: On feat/user-profile: WIP with new files
 
   <aside class="lesson-aside">
     <div class="aside-card">
-      <div class="aside-title">12 堂課程系列 <span class="progress-pill">1 / 12</span></div>
+      <div class="aside-title">11 堂課程系列 <span class="progress-pill">1 / 11</span></div>
       <ul class="course-nav">
         <li><a class="course-nav-item current" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
         <li><a class="course-nav-item" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
         <li><a class="course-nav-item" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇</span></a></li>
         <li><a class="course-nav-item" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
         <li><a class="course-nav-item" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
-        <li><a class="course-nav-item" href="06_commits_versioning.html"><span class="course-nav-num">06</span><span>Commit、SemVer、Changelog</span></a></li>
-        <li><a class="course-nav-item" href="07_issues_project_mgmt.html"><span class="course-nav-num">07</span><span>Issue 與專案管理</span></a></li>
-        <li><a class="course-nav-item" href="08_testing_tdd.html"><span class="course-nav-num">08</span><span>測試金字塔與 TDD</span></a></li>
-        <li><a class="course-nav-item" href="09_ci_cd_hooks.html"><span class="course-nav-num">09</span><span>CI/CD、Hooks、Lint</span></a></li>
-        <li><a class="course-nav-item" href="10_rfc_adr_release.html"><span class="course-nav-num">10</span><span>RFC、ADR、Release</span></a></li>
-        <li><a class="course-nav-item" href="11_dependencies_supply_chain.html"><span class="course-nav-num">11</span><span>依賴管理與供應鏈安全</span></a></li>
-        <li><a class="course-nav-item" href="12_first_contribution.html"><span class="course-nav-num">12</span><span>第一次貢獻實戰</span></a></li>
+        <li><a class="course-nav-item" href="06_issues_project_mgmt.html"><span class="course-nav-num">06</span><span>Issue 與專案管理</span></a></li>
+        <li><a class="course-nav-item" href="07_testing_tdd.html"><span class="course-nav-num">07</span><span>測試金字塔與 TDD</span></a></li>
+        <li><a class="course-nav-item" href="08_ci_cd_hooks.html"><span class="course-nav-num">08</span><span>CI/CD、Hooks、Lint</span></a></li>
+        <li><a class="course-nav-item" href="09_rfc_adr_release.html"><span class="course-nav-num">09</span><span>RFC、ADR、Release</span></a></li>
+        <li><a class="course-nav-item" href="10_dependencies_supply_chain.html"><span class="course-nav-num">10</span><span>依賴管理與供應鏈安全</span></a></li>
+        <li><a class="course-nav-item" href="11_first_contribution.html"><span class="course-nav-num">11</span><span>第一次貢獻實戰</span></a></li>
       </ul>
     </div>
   </aside>

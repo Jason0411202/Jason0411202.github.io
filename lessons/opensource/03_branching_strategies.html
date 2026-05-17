@@ -19,7 +19,7 @@
     <h1 class="hero-title">分支策略<span>選擇</span></h1>
     <p class="hero-desc">四種主流分支策略——Git Flow、GitHub Flow、GitLab Flow、Trunk-Based。<strong>並無絕對最佳的選擇，僅有最適合團隊現況的方案。</strong></p>
     <div class="hero-badges">
-      <span class="hero-badge"><span class="dot"></span>第 3 / 12 堂</span>
+      <span class="hero-badge"><span class="dot"></span>第 3 / 11 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 10 分鐘</span>
       <span class="hero-badge"><span class="dot"></span>中階</span>
     </div>
@@ -242,7 +242,7 @@
         &lt;type&gt;/&lt;issue-id&gt;-&lt;short-description&gt;
       </p>
       <ul>
-        <li><strong>type</strong>——標示該分支「所屬的工作類型」，使人能從分支名稱判讀意圖、優先級與 review 必要性。常用詞彙列於下表，通常與 commit message 共用同一組詞彙（Lesson 06 Conventional Commits 將進一步說明 commit 端的細節）。</li>
+        <li><strong>type</strong>——標示該分支「所屬的工作類型」，使人能從分支名稱判讀意圖、優先級與 review 必要性。常用詞彙列於下表，通常與 commit message 共用同一組詞彙（Lesson 01「Commit Message 規範」已介紹 Conventional Commits 的 commit 端細節）。</li>
         <li><strong>issue-id</strong>——對應的 issue 或 ticket 編號，例如 <code>#34</code>、<code>JIRA-456</code>。將分支與工單綁定，便於搜尋、追蹤與自動關閉 PR。</li>
         <li><strong>short-description</strong>——採用 <strong>kebab-case</strong>（小寫加連字號），以 3 至 5 個英文單字描述工作內容，避免冗長。</li>
       </ul>
@@ -309,7 +309,7 @@
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong>為何不包含 <code>style</code>、<code>build</code>、<code>ci</code>、<code>revert</code>？</strong>
-          這幾項於 commit message 有獨立 type（見 Lesson 06「常用的 type」），但鮮少獨立開長期分支：<code>style</code>（純格式化）、<code>build</code>（調整建置設定）、<code>ci</code>（調整 workflow）在分支層通常併入 <code>chore/*</code>；<code>revert</code>（還原單一 commit）則通常直接於 main 上 revert，不另闢分支。
+          這幾項於 commit message 有獨立 type（見 Lesson 01「常用的 type」），但鮮少獨立開長期分支：<code>style</code>（純格式化）、<code>build</code>（調整建置設定）、<code>ci</code>（調整 workflow）在分支層通常併入 <code>chore/*</code>；<code>revert</code>（還原單一 commit）則通常直接於 main 上 revert，不另闢分支。
         </div>
       </div>
     </section>
@@ -329,20 +329,19 @@
 
   <aside class="lesson-aside">
     <div class="aside-card">
-      <div class="aside-title">12 堂課程系列 <span class="progress-pill">3 / 12</span></div>
+      <div class="aside-title">11 堂課程系列 <span class="progress-pill">3 / 11</span></div>
       <ul class="course-nav">
         <li><a class="course-nav-item" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
         <li><a class="course-nav-item" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
         <li><a class="course-nav-item current" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇</span></a></li>
         <li><a class="course-nav-item" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
         <li><a class="course-nav-item" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
-        <li><a class="course-nav-item" href="06_commits_versioning.html"><span class="course-nav-num">06</span><span>Commit、SemVer、Changelog</span></a></li>
-        <li><a class="course-nav-item" href="07_issues_project_mgmt.html"><span class="course-nav-num">07</span><span>Issue 與專案管理</span></a></li>
-        <li><a class="course-nav-item" href="08_testing_tdd.html"><span class="course-nav-num">08</span><span>測試金字塔與 TDD</span></a></li>
-        <li><a class="course-nav-item" href="09_ci_cd_hooks.html"><span class="course-nav-num">09</span><span>CI/CD、Hooks、Lint</span></a></li>
-        <li><a class="course-nav-item" href="10_rfc_adr_release.html"><span class="course-nav-num">10</span><span>RFC、ADR、Release</span></a></li>
-        <li><a class="course-nav-item" href="11_dependencies_supply_chain.html"><span class="course-nav-num">11</span><span>依賴管理與供應鏈安全</span></a></li>
-        <li><a class="course-nav-item" href="12_first_contribution.html"><span class="course-nav-num">12</span><span>第一次貢獻實戰</span></a></li>
+        <li><a class="course-nav-item" href="06_issues_project_mgmt.html"><span class="course-nav-num">06</span><span>Issue 與專案管理</span></a></li>
+        <li><a class="course-nav-item" href="07_testing_tdd.html"><span class="course-nav-num">07</span><span>測試金字塔與 TDD</span></a></li>
+        <li><a class="course-nav-item" href="08_ci_cd_hooks.html"><span class="course-nav-num">08</span><span>CI/CD、Hooks、Lint</span></a></li>
+        <li><a class="course-nav-item" href="09_rfc_adr_release.html"><span class="course-nav-num">09</span><span>RFC、ADR、Release</span></a></li>
+        <li><a class="course-nav-item" href="10_dependencies_supply_chain.html"><span class="course-nav-num">10</span><span>依賴管理與供應鏈安全</span></a></li>
+        <li><a class="course-nav-item" href="11_first_contribution.html"><span class="course-nav-num">11</span><span>第一次貢獻實戰</span></a></li>
       </ul>
     </div>
   </aside>

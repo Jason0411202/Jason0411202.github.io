@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lesson 12｜第一次貢獻實戰 Checklist — 開源貢獻課程</title>
+<title>Lesson 11｜第一次貢獻實戰 Checklist — 開源貢獻課程</title>
 <meta name="description" content="從找專案、判斷適合度、認領 issue 到 PR 被合併的完整流程 — 把前 11 堂收尾成一份可執行的 step-by-step checklist。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -15,11 +15,11 @@
 <header class="lesson-hero">
   <div class="hero-inner">
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
-    <div class="hero-eyebrow">Lesson 12 · 大型專案實務篇</div>
+    <div class="hero-eyebrow">Lesson 11 · 大型專案實務篇</div>
     <h1 class="hero-title">第一次<span> 貢獻實戰</span></h1>
     <p class="hero-desc">作為前 11 堂的總結。<strong>從零開始送出第一個被合併的 PR</strong>——包含完整 checklist、選擇專案、評估適合度、常見陷阱與畢業任務。</p>
     <div class="hero-badges">
-      <span class="hero-badge"><span class="dot"></span>第 12 / 12 堂</span>
+      <span class="hero-badge"><span class="dot"></span>第 11 / 11 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
       <span class="hero-badge"><span class="dot"></span>實戰</span>
     </div>
@@ -189,7 +189,7 @@
           </tr>
           <tr>
             <td><strong>SECURITY.md</strong></td>
-            <td>發現漏洞時的通報方式（Lesson 11）</td>
+            <td>發現漏洞時的通報方式（Lesson 10）</td>
           </tr>
           <tr>
             <td><strong>LICENSE</strong></td>
@@ -272,7 +272,7 @@
       </details>
 
       <details class="collapse">
-        <summary>④ 動工——TDD 流程（Lesson 08） <span class="collapse-tag">主要時間</span></summary>
+        <summary>④ 動工——TDD 流程（Lesson 07） <span class="collapse-tag">主要時間</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:14px;">
             <li>□ 先撰寫一個失敗的測試（RED）</li>
@@ -285,14 +285,13 @@
       </details>
 
       <details class="collapse">
-        <summary>⑤ 撰寫 commit（Lesson 06） <span class="collapse-tag">5 分鐘</span></summary>
+        <summary>⑤ 撰寫 commit（Lesson 01） <span class="collapse-tag">5 分鐘</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:14px;">
             <li>□ <code>git status</code> 確認異動的檔案</li>
             <li>□ <code>git add &lt;file&gt;</code> 逐檔加入（避免 debug 殘留）</li>
             <li>□ <code>git diff --staged</code> 進行最終檢查</li>
             <li>□ 採用 Conventional Commits 格式：<code>fix(scope): subject</code></li>
-            <li>□ 如為 breaking change，加上 <code>!</code> 或於 footer 寫入 BREAKING CHANGE</li>
             <li>□ Body 清楚說明 why（而非 what）</li>
             <li>□ Footer 加上 <code>Closes #234</code></li>
           </ul>
@@ -412,7 +411,7 @@
 
     <section id="review-quiz">
       <span class="section-eyebrow">09 — 總回顧</span>
-      <h2>12 堂課重點反向問答</h2>
+      <h2>11 堂課重點反向問答</h2>
 
       <details class="collapse">
         <summary>Lesson 01：Working Tree、Staging、Local Repo 與 Remote 各為何？</summary>
@@ -440,37 +439,32 @@
       </details>
 
       <details class="collapse">
-        <summary>Lesson 06：版本 1.4.5 新增一項功能後的下一版為何？</summary>
-        <div class="collapse-body">1.5.0（MINOR +1，PATCH 重設為 0）。</div>
-      </details>
-
-      <details class="collapse">
-        <summary>Lesson 07：good first issue 標籤的意涵為何？</summary>
+        <summary>Lesson 06：good first issue 標籤的意涵為何？</summary>
         <div class="collapse-body">經 maintainer 評估，範圍適合新人、具備清楚說明、無須熟悉整體 codebase 的 issue。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 08：TDD 三步驟的順序為何？</summary>
+        <summary>Lesson 07：TDD 三步驟的順序為何？</summary>
         <div class="collapse-body">Red（撰寫失敗的測試）→ Green（以最小幅度的實作通過測試）→ Refactor（整理）。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 09：Continuous Delivery 與 Continuous Deployment 的差異為何？</summary>
+        <summary>Lesson 08：Continuous Delivery 與 Continuous Deployment 的差異為何？</summary>
         <div class="collapse-body">Delivery 為自動部署至 staging，但 production 須人工觸發；Deployment 則為合併 main 後直接部署至 production。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 10：ADR 的決策被推翻後應如何處理？</summary>
+        <summary>Lesson 09：ADR 的決策被推翻後應如何處理？</summary>
         <div class="collapse-body">將 Status 改為 <code>Superseded by ADR-N</code>，保留所有內容，永不刪除。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 11：xz utils 後門的最大教訓為何？</summary>
+        <summary>Lesson 10：xz utils 後門的最大教訓為何？</summary>
         <div class="collapse-body">開源專案的單一維護者為攻擊者鎖定的目標，需採用多人維護、SBOM 與 artifact signing。</div>
       </details>
 
       <details class="collapse">
-        <summary>Lesson 12：開始動工前應先閱讀哪 5 個檔案？</summary>
+        <summary>Lesson 11：開始動工前應先閱讀哪 5 個檔案？</summary>
         <div class="collapse-body">README.md、CONTRIBUTING.md、CODE_OF_CONDUCT.md、SECURITY.md 與 LICENSE。</div>
       </details>
     </section>
@@ -504,9 +498,9 @@
     </section>
 
     <nav class="lesson-nav" aria-label="上一課/下一課">
-      <a class="lesson-nav-card lesson-nav-prev" href="11_dependencies_supply_chain.html">
+      <a class="lesson-nav-card lesson-nav-prev" href="10_dependencies_supply_chain.html">
         <div class="lesson-nav-eyebrow">← 上一課</div>
-        <div class="lesson-nav-title">Lesson 11 · 依賴管理與供應鏈安全</div>
+        <div class="lesson-nav-title">Lesson 10 · 依賴管理與供應鏈安全</div>
       </a>
       <a class="lesson-nav-card lesson-nav-next" href="../../index.html">
         <div class="lesson-nav-eyebrow">完課 →</div>
@@ -518,20 +512,19 @@
 
   <aside class="lesson-aside">
     <div class="aside-card">
-      <div class="aside-title">12 堂課程系列 <span class="progress-pill">12 / 12</span></div>
+      <div class="aside-title">11 堂課程系列 <span class="progress-pill">11 / 11</span></div>
       <ul class="course-nav">
         <li><a class="course-nav-item" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
         <li><a class="course-nav-item" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
         <li><a class="course-nav-item" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇</span></a></li>
         <li><a class="course-nav-item" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
         <li><a class="course-nav-item" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
-        <li><a class="course-nav-item" href="06_commits_versioning.html"><span class="course-nav-num">06</span><span>Commit、SemVer、Changelog</span></a></li>
-        <li><a class="course-nav-item" href="07_issues_project_mgmt.html"><span class="course-nav-num">07</span><span>Issue 與專案管理</span></a></li>
-        <li><a class="course-nav-item" href="08_testing_tdd.html"><span class="course-nav-num">08</span><span>測試金字塔與 TDD</span></a></li>
-        <li><a class="course-nav-item" href="09_ci_cd_hooks.html"><span class="course-nav-num">09</span><span>CI/CD、Hooks、Lint</span></a></li>
-        <li><a class="course-nav-item" href="10_rfc_adr_release.html"><span class="course-nav-num">10</span><span>RFC、ADR、Release</span></a></li>
-        <li><a class="course-nav-item" href="11_dependencies_supply_chain.html"><span class="course-nav-num">11</span><span>依賴管理與供應鏈安全</span></a></li>
-        <li><a class="course-nav-item current" href="12_first_contribution.html"><span class="course-nav-num">12</span><span>第一次貢獻實戰</span></a></li>
+        <li><a class="course-nav-item" href="06_issues_project_mgmt.html"><span class="course-nav-num">06</span><span>Issue 與專案管理</span></a></li>
+        <li><a class="course-nav-item" href="07_testing_tdd.html"><span class="course-nav-num">07</span><span>測試金字塔與 TDD</span></a></li>
+        <li><a class="course-nav-item" href="08_ci_cd_hooks.html"><span class="course-nav-num">08</span><span>CI/CD、Hooks、Lint</span></a></li>
+        <li><a class="course-nav-item" href="09_rfc_adr_release.html"><span class="course-nav-num">09</span><span>RFC、ADR、Release</span></a></li>
+        <li><a class="course-nav-item" href="10_dependencies_supply_chain.html"><span class="course-nav-num">10</span><span>依賴管理與供應鏈安全</span></a></li>
+        <li><a class="course-nav-item current" href="11_first_contribution.html"><span class="course-nav-num">11</span><span>第一次貢獻實戰</span></a></li>
       </ul>
     </div>
   </aside>
