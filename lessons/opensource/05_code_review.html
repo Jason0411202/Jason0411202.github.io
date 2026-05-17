@@ -30,7 +30,7 @@
   <div class="sticky-nav-inner">
     <span class="toc-label">章節</span>
     <ul class="toc-list">
-      <li><a class="toc-link" href="#why">為什麼要 review</a></li>
+      <li><a class="toc-link" href="#why">時機與目的</a></li>
       <li><a class="toc-link" href="#reviewer">Reviewer 心法</a></li>
       <li><a class="toc-link" href="#author">Author 禮儀</a></li>
       <li><a class="toc-link" href="#conventional">留言規範</a></li>
@@ -45,8 +45,52 @@
   <article class="lesson-article">
 
     <section id="why">
-      <span class="section-eyebrow">01 — 為什麼要 review</span>
-      <h2>Code review 的核心目的</h2>
+      <span class="section-eyebrow">01 — 時機與目的</span>
+      <h2>Review 發生於 PR 開啟與 merge 之間</h2>
+
+      <p>承續 Lesson 04 的流程——當 feature 分支 push 完成、PR 在 GitHub 開啟後，貢獻並未結束。在 maintainer 按下 Merge 之前，PR 將進入 <strong>code review</strong> 階段。此為整段工作流中耗時最長、對最終程式碼品質影響最大的環節。</p>
+
+      <h3>從 PR 開啟到 merge 的 review 時序</h3>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">PR 開啟（Lesson 04 終點）</div>
+            <div class="timeline-desc">Author 將 feature 分支 push 至個人 fork 並於 GitHub 開啟 PR；GitHub 依設定或 <code>CODEOWNERS</code> 自動指派 reviewer。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Reviewer 留下 comment</div>
+            <div class="timeline-desc">針對特定行數提出問題、建議或要求修正，並以 prefix 標示嚴重度（<code>blocking:</code>、<code>nit:</code> 等，後續章節詳述）。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Author 回應 comment 並補上 commit</div>
+            <div class="timeline-desc">逐條回覆 comment 並 push 新 commit，新 commit 自動納入該 PR。視 comment 數量與性質可能需反覆若干輪。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Reviewer approve</div>
+            <div class="timeline-desc">所有 blocking 問題皆已處理完畢後，reviewer 按下 <strong>Approve</strong> 給予通過票。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">5</div>
+          <div class="timeline-content">
+            <div class="timeline-title">Maintainer merge</div>
+            <div class="timeline-desc">取得足夠的 approve 並通過 CI 後，由 maintainer 按下 Merge 完成合併（合併政策參見 Lesson 04）。</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>為什麼值得花這段時間——review 的核心目的</h3>
 
       <p>許多人誤以為 review 的主要任務是「找 bug」。實際上找 bug 只是<strong>副產物</strong>。Google Engineering Practices 對 review 目的的官方定義如下：</p>
 

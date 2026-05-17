@@ -304,6 +304,14 @@
           </tr>
         </tbody>
       </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>為何不包含 <code>style</code>、<code>build</code>、<code>ci</code>、<code>revert</code>？</strong>
+          這幾項於 commit message 有獨立 type（見 Lesson 06「常用的 type」），但鮮少獨立開長期分支：<code>style</code>（純格式化）、<code>build</code>（調整建置設定）、<code>ci</code>（調整 workflow）在分支層通常併入 <code>chore/*</code>；<code>revert</code>（還原單一 commit）則通常直接於 main 上 revert，不另闢分支。
+        </div>
+      </div>
     </section>
 
     <nav class="lesson-nav" aria-label="上一課/下一課">

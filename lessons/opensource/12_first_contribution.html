@@ -251,7 +251,7 @@
         <summary>② 同步上游（Lesson 04） <span class="collapse-tag">2 分鐘</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:14px;">
-            <li>□ <code>git switch main</code></li>
+            <li>□ <code>git checkout main</code></li>
             <li>□ <code>git fetch upstream</code></li>
             <li>□ <code>git rebase upstream/main</code></li>
             <li>□ <code>git push origin main</code>（使 GitHub 上的個人 fork 同步至最新）</li>
@@ -263,7 +263,7 @@
         <summary>③ 切分支並設定本地環境（Lesson 01、09） <span class="collapse-tag">約 30 分鐘</span></summary>
         <div class="collapse-body">
           <ul style="margin-left:1rem;font-size:14px;">
-            <li>□ 自最新 main 切出 feature 分支 <code>git switch -c fix/issue-234</code></li>
+            <li>□ 自最新 main 切出 feature 分支 <code>git checkout -b fix/issue-234</code></li>
             <li>□ 依 README 安裝依賴（<code>npm ci</code>、<code>poetry install</code> 等）</li>
             <li>□ 執行現有測試以確認環境正常（<code>npm test</code>）</li>
             <li>□ 確認是否需手動安裝 Husky 或 pre-commit——若無自動安裝，須執行 <code>pnpm prepare</code> 或 <code>pre-commit install</code></li>
