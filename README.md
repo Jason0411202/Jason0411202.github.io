@@ -115,24 +115,21 @@ Automation utilities + ChatGPT bot
 
 🌐 **[jason0411202.github.io](https://jason0411202.github.io)** — 技術筆記入口
 
-🎓 **開源協作課程系列** — 12 堂實務導向 HTML 互動式課程  
-   從 Git 進階、PR/Code Review、測試 CI、到第一次貢獻全流程。  
-   業界與開源社群實際使用的標準做法。
+🎓 **開源協作課程系列** — 10 堂實務導向 HTML 互動式課程  
+   前 6 堂為通用觀念，後 4 堂落地到 Azure DevOps 平台實務。
 
 | # | 課程主題 |
 |---|---|
 | 01 | Git 日常實務速成 |
 | 02 | Git 進階操作 (rebase / cherry-pick / bisect) |
-| 03 | 分支策略選擇 (Git Flow / GitHub Flow / Trunk-Based) |
+| 03 | 分支策略選擇 / Issue (Git Flow / GitHub Flow / Trunk-Based) |
 | 04 | Fork、Upstream、PR 完整流程 |
 | 05 | Code Review 文化與技巧 |
-| 06 | Commit Message、SemVer、Changelog |
-| 07 | Issue 撰寫與專案管理 |
-| 08 | 測試金字塔與 TDD |
-| 09 | CI/CD、Git Hooks、Lint/Format |
-| 10 | RFC、ADR、Release Management |
-| 11 | 依賴管理與供應鏈安全 |
-| 12 | 第一次貢獻實戰 Checklist |
+| 06 | 軟體測試 |
+| 07 | Azure Boards (Work Item / Backlog / Kanban / WIQL) |
+| 08 | Azure Repos (Branch Policies / PR / Required Reviewers) |
+| 09 | Azure Pipelines (YAML / Variables + Key Vault / Environments / Templates) |
+| 10 | Azure Artifacts (Feed / Upstream Sources / Views / Retention) |
 
 ---
 

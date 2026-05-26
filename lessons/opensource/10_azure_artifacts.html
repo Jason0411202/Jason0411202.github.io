@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 10｜Azure Artifacts — 開源貢獻課程</title>
+<meta name="description" content="Azure Artifacts:Feed 設計、五大套件類型(npm/NuGet/Maven/Python/Cargo/Universal)、Upstream Sources、Views (@Local/@Prerelease/@Release)、Retention Policy。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 10 · Azure DevOps 實戰篇</div>
+    <h1 class="hero-title">Azure Artifacts<span> 套件治理</span></h1>
+    <p class="hero-desc">Azure Artifacts 為 Azure DevOps 的套件管理 hub。本課介紹 Feed 設計、六種支援的套件格式（npm / NuGet / Maven / Python / Cargo / Universal）、Upstream Sources 自動快取機制、Views 三段式 promotion 流程，以及 Retention Policy。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 10 / 10 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 11 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>Azure DevOps</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#why">為什麼需要內部 feed</a></li>
+      <li><a class="toc-link" href="#feed">Feed 概念</a></li>
+      <li><a class="toc-link" href="#types">支援的套件格式</a></li>
+      <li><a class="toc-link" href="#upstream">Upstream Sources</a></li>
+      <li><a class="toc-link" href="#views">Views 與 Promotion</a></li>
+      <li><a class="toc-link" href="#publish">於 Pipeline 中發佈</a></li>
+      <li><a class="toc-link" href="#retention">Retention Policy</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="why">
+      <span class="section-eyebrow">01 — 為什麼需要</span>
+      <h2>為什麼企業需要內部套件 feed</h2>
+
+      <p>直接從 npmjs.com、PyPI、Maven Central 拉套件雖然方便，卻有以下風險：</p>
+
+      <ul>
+        <li><strong>供應鏈風險</strong>——惡意套件、typosquatting、被入侵的維護者帳號（如 xz utils 事件）</li>
+        <li><strong>授權合規</strong>——某些 license（GPL 等 copyleft）禁止用於商業產品；需在引入前審核</li>
+        <li><strong>build reproducibility</strong>——公共 registry 上的套件可能被 unpublish（npm 著名的 left-pad 事件）</li>
+        <li><strong>網路延遲與成本</strong>——大型 monorepo 每天數百次 build，全走外網拉取效率不佳</li>
+        <li><strong>地端 / VNet 內 build</strong>——若 build agent 位於封閉網路，無法直接連到公網</li>
+      </ul>
+
+      <p>內部 feed 解決上述問題——build agent 一律從內部 feed 取套件，feed 統一管理「哪些版本可用、哪些被禁用」。</p>
+    </section>
+
+    <section id="feed">
+      <span class="section-eyebrow">02 — Feed 概念</span>
+      <h2>Feed:組織內的套件儲存庫</h2>
+
+      <p><strong>Feed</strong> 是 Azure Artifacts 的最基本單位——可視為一個獨立的 package registry，內部可同時存放多種套件格式。Feed 的 scope 有兩種：</p>
+
+      <table>
+        <thead>
+          <tr><th>Scope</th><th>說明</th><th>適用</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Project-scoped</strong></td><td>Feed 隸屬於某個 Project；URL 含 project 名稱</td><td>單一 Project 自用</td></tr>
+          <tr><td><strong>Organization-scoped</strong></td><td>Feed 跨整個 Organization 共用</td><td>共用 SDK、共用工具型套件，多 Project 引用</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Feed 內的權限</h3>
+      <ul>
+        <li><strong>Reader</strong>——可下載套件</li>
+        <li><strong>Collaborator</strong>——可從 upstream 拉取套件至 feed</li>
+        <li><strong>Contributor</strong>——可直接 publish 套件</li>
+        <li><strong>Owner</strong>——管理權限與設定</li>
+      </ul>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>常見的 Feed 切分策略</strong>
+          ① 每個 Project 一個 feed（隔離）；② 共用「core libraries」org-scoped feed + 各 Project 各自 feed（混合）；③ 全公司一個 org-scoped feed（集中管理但權限細粒度需細心）。多數企業採策略 ②。
+        </div>
+      </div>
+    </section>
+
+    <section id="types">
+      <span class="section-eyebrow">03 — 套件格式</span>
+      <h2>支援的六種套件格式</h2>
+
+      <p>單一 feed 即可同時容納以下六種：</p>
+
+      <table>
+        <thead>
+          <tr><th>格式</th><th>用戶端工具</th><th>典型用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>npm</strong></td><td>npm / pnpm / yarn</td><td>JavaScript / TypeScript 套件</td></tr>
+          <tr><td><strong>NuGet</strong></td><td>nuget / dotnet</td><td>.NET 套件</td></tr>
+          <tr><td><strong>Maven</strong></td><td>mvn / gradle</td><td>Java / Kotlin / Scala 套件</td></tr>
+          <tr><td><strong>Python</strong></td><td>pip / twine</td><td>Python wheel / sdist</td></tr>
+          <tr><td><strong>Cargo</strong></td><td>cargo</td><td>Rust crate</td></tr>
+          <tr><td><strong>Universal Packages</strong></td><td>az artifacts universal</td><td>任意大型二進位檔（ML model、container layer cache、build artifact）</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>Universal Packages 的定位</strong>
+          並非主流 ecosystem 已有的標準格式（如 OCI image）；而是「無對應 package manager 的二進位想要進入 feed」的萬用容器，例如機器學習模型 weights、編譯後的 binary tarball。容量上限大、可分塊傳輸，但用戶端僅有 az CLI。
+        </div>
+      </div>
+
+      <h3>引用內部 feed:以 npm 為例</h3>
+      <p>於專案根目錄置入 <code>.npmrc</code>：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">ini</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm">; @my-org scope 走內部 feed,其餘走公共 registry</span>
+@my-org:registry=https://pkgs.dev.azure.com/&lt;org&gt;/&lt;project&gt;/_packaging/my-feed/npm/registry/
+always-auth=true</code></pre>
+      </div>
+
+      <p>本機開發者執行 <code>npm install</code> 時，Azure Artifacts CLI 會引導完成 token 寫入；CI 環境則由 <code>npmAuthenticate@0</code> task 自動處理。</p>
+    </section>
+
+    <section id="upstream">
+      <span class="section-eyebrow">04 — Upstream Sources</span>
+      <h2>Upstream Sources:自動快取公共套件</h2>
+
+      <p>Feed 可掛載多個 <strong>upstream source</strong>——當 client 索取的套件不存在於 feed 中時，Azure Artifacts 會：</p>
+
+      <ol>
+        <li>依 feed 設定的順序，逐一向 upstream（npmjs.com、PyPI、Maven Central 或其他 feed）查詢</li>
+        <li>找到後自動下載至 feed 並回傳給 client</li>
+        <li>後續對相同版本的請求一律從 feed 取出，無須再外連</li>
+      </ol>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" aria-label="Upstream sources 流程">
+          <g font-family="JetBrains Mono, monospace" font-size="12">
+            <!-- Client -->
+            <rect x="20" y="90" width="120" height="60" rx="8" fill="#fafaf8" stroke="#d4d3cc"/>
+            <text x="80" y="120" text-anchor="middle" fill="#0a0a0f" font-weight="700" font-size="12">Build Agent</text>
+            <text x="80" y="138" text-anchor="middle" fill="#6b6b7e" font-size="10">npm install</text>
+
+            <!-- Feed -->
+            <rect x="200" y="90" width="180" height="60" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="290" y="120" text-anchor="middle" fill="#4c1d95" font-weight="700" font-size="12">Internal Feed</text>
+            <text x="290" y="138" text-anchor="middle" fill="#6b6b7e" font-size="10">my-feed</text>
+
+            <!-- Upstream(s) -->
+            <rect x="440" y="30" width="240" height="50" rx="8" fill="#fafaf8" stroke="#d4d3cc"/>
+            <text x="560" y="60" text-anchor="middle" fill="#0a0a0f" font-weight="700" font-size="12">npmjs.com</text>
+            <rect x="440" y="100" width="240" height="50" rx="8" fill="#fafaf8" stroke="#d4d3cc"/>
+            <text x="560" y="130" text-anchor="middle" fill="#0a0a0f" font-weight="700" font-size="12">org/shared-feed</text>
+            <rect x="440" y="170" width="240" height="50" rx="8" fill="#fafaf8" stroke="#d4d3cc"/>
+            <text x="560" y="200" text-anchor="middle" fill="#0a0a0f" font-weight="700" font-size="12">Other org feeds</text>
+
+            <line x1="140" y1="120" x2="200" y2="120" stroke="#7c3aed" stroke-width="1.8"/>
+            <line x1="380" y1="120" x2="440" y2="125" stroke="#7c3aed" stroke-width="1.2" stroke-dasharray="3,3"/>
+            <line x1="380" y1="120" x2="440" y2="55" stroke="#7c3aed" stroke-width="1.2" stroke-dasharray="3,3"/>
+            <line x1="380" y1="120" x2="440" y2="195" stroke="#7c3aed" stroke-width="1.2" stroke-dasharray="3,3"/>
+
+            <text x="170" y="105" fill="#7c3aed" font-size="11">①</text>
+            <text x="410" y="115" fill="#7c3aed" font-size="11">②未命中時</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 12.1 — Upstream sources 自動快取流程</div>
+      </div>
+
+      <h3>查詢順序</h3>
+      <ol>
+        <li>直接 publish 至 feed 的套件</li>
+        <li>過去已從 upstream 快取的套件</li>
+        <li>依 upstream 設定順序，逐一查詢</li>
+      </ol>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>掛上 upstream 後 build 行為對開發者透明</strong>
+          開發者照常 <code>npm install lodash</code>，看不見「來自 npmjs 或來自 feed cache」的差異。但對組織而言：① 套件被永久保留，npmjs 即使該版本被 unpublish 也仍可下載；② 可基於 audit log 追溯哪些公共套件被使用；③ 後續整網路斷網仍可繼續 build。
+        </div>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>Maven snapshot 不支援 upstream</strong>
+          Maven snapshot 版本（如 <code>1.0.0-SNAPSHOT</code>）的語意是「同一版本號可被重複覆蓋」，與 Azure Artifacts 套件 immutable 的設計衝突。<strong>upstream 僅支援已發佈的正式版本</strong>，snapshot 須直接連 Maven Central 或自行 publish 至 feed。
+        </div>
+      </div>
+    </section>
+
+    <section id="views">
+      <span class="section-eyebrow">05 — Views 與 Promotion</span>
+      <h2>Views:套件三段式 promotion 流程</h2>
+
+      <p>每個 feed 預設提供三個 view，作為套件「成熟度」的階段：</p>
+
+      <table>
+        <thead>
+          <tr><th>View</th><th>用途</th><th>進入方式</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>@Local</strong></td><td>所有 publish 與 upstream 快取的套件，預設皆進此 view</td><td>publish 或 upstream 拉取後自動進入</td></tr>
+          <tr><td><strong>@Prerelease</strong></td><td>標記為「測試中」的版本</td><td>由 maintainer 從 @Local promote 至此</td></tr>
+          <tr><td><strong>@Release</strong></td><td>已驗證、可生產使用的穩定版本</td><td>由 maintainer 從 @Prerelease 或 @Local promote 至此</td></tr>
+        </tbody>
+      </table>
+
+      <p>引用 view 的 URL 後綴差異：</p>
+      <div class="section-card">
+<pre style="background:var(--paper2);padding:0.9rem 1.1rem;border-radius:8px;font-size:13px;line-height:1.7;font-family:var(--mono);overflow-x:auto;">@Local      → .../_packaging/my-feed/npm/registry/
+@Prerelease → .../_packaging/my-feed@Prerelease/npm/registry/
+@Release    → .../_packaging/my-feed@Release/npm/registry/</pre>
+      </div>
+
+      <p>典型應用：開發環境引 <code>@Prerelease</code> 嘗試新版本；生產環境鎖死 <code>@Release</code>，只看見經 QA 簽核過的版本。promote 動作不複製檔案，僅在 metadata 上加標籤，零儲存成本。</p>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>三 view 設計取代了傳統「dev / staging / prod feed」三套**</strong>
+          舊作法須維護三個獨立 feed 並手動同步；單一 feed + 三 view 既節省儲存又避免同步漂移，且權限可細分到 view 級別（例：開發者可 promote 至 @Prerelease，但 promote 至 @Release 須 release manager 同意）。
+        </div>
+      </div>
+    </section>
+
+    <section id="publish">
+      <span class="section-eyebrow">06 — Pipeline 發佈</span>
+      <h2>於 Pipeline 中發佈套件</h2>
+
+      <p>內部套件多由 CI pipeline 自動發佈。以 npm 為例：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">steps</span>:
+  - <span class="tk-kw">task</span>: UseNode@1
+    <span class="tk-kw">inputs</span>: { <span class="tk-kw">version</span>: <span class="tk-st">'20.x'</span> }
+
+  <span class="tk-cm"># 1. 寫入認證至 ~/.npmrc</span>
+  - <span class="tk-kw">task</span>: npmAuthenticate@0
+    <span class="tk-kw">inputs</span>:
+      <span class="tk-kw">workingFile</span>: .npmrc           <span class="tk-cm"># repo 中已存在的 .npmrc</span>
+
+  <span class="tk-cm"># 2. 安裝、build、test</span>
+  - <span class="tk-kw">script</span>: npm ci
+  - <span class="tk-kw">script</span>: npm run build
+  - <span class="tk-kw">script</span>: npm test
+
+  <span class="tk-cm"># 3. 設定版本(以 build number 為 suffix)</span>
+  - <span class="tk-kw">script</span>: npm version $(Build.BuildNumber) <span class="tk-op">--no-git-tag-version</span>
+
+  <span class="tk-cm"># 4. publish 至 @Local view</span>
+  - <span class="tk-kw">script</span>: npm publish</code></pre>
+      </div>
+
+      <p>publish 成功後，套件即出現於 Artifacts → 該 feed → @Local。若同時欲 promote 至 @Prerelease，可於下一個 step 呼叫 az CLI：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> az artifacts universal promote <span class="tk-op">\</span>
+    <span class="tk-op">--organization</span> https://dev.azure.com/myorg <span class="tk-op">\</span>
+    <span class="tk-op">--feed</span> my-feed <span class="tk-op">\</span>
+    <span class="tk-op">--name</span> @my-org/utils <span class="tk-op">\</span>
+    <span class="tk-op">--version</span> 1.2.3 <span class="tk-op">\</span>
+    <span class="tk-op">--view</span> Prerelease</code></pre>
+      </div>
+    </section>
+
+    <section id="retention">
+      <span class="section-eyebrow">07 — Retention</span>
+      <h2>Retention Policy:控管儲存配額</h2>
+
+      <p>Azure Artifacts 依儲存量計費；長期累積的舊版本會持續消耗配額。每個 feed 可設定 retention：</p>
+
+      <table>
+        <thead>
+          <tr><th>設定</th><th>說明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Maximum versions per package</strong></td><td>每個套件最多保留 N 版；超出時最舊的被刪除</td></tr>
+          <tr><td><strong>Days to keep</strong></td><td>最後一次被下載 N 天後即可被回收</td></tr>
+          <tr><td><strong>Promoted package protection</strong></td><td>已 promote 至 @Prerelease 或 @Release 的版本不受 retention 影響，永久保留</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>典型設定:每套件保留 50 版 + 30 天未被下載即可回收</strong>
+          搭配「promoted package protection」，正式釋出的版本永遠保留，僅大量未被採用的 CI 中間版本會被清掉。如此既可滿足 audit 需求，也避免儲存配額爆炸——後者於大型 monorepo 是常見痛點。
+        </div>
+      </div>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="09_azure_pipelines.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 09 · Azure Pipelines</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="../../index.html">
+        <div class="lesson-nav-eyebrow">回到入口 →</div>
+        <div class="lesson-nav-title">課程系列已完結</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">10 堂課程系列 <span class="progress-pill">10 / 10</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
+        <li><a class="course-nav-item" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
+        <li><a class="course-nav-item" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇 / Issue</span></a></li>
+        <li><a class="course-nav-item" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
+        <li><a class="course-nav-item" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
+        <li><a class="course-nav-item" href="06_testing_tdd.html"><span class="course-nav-num">06</span><span>軟體測試</span></a></li>
+        <li><a class="course-nav-item" href="07_azure_boards.html"><span class="course-nav-num">07</span><span>Azure Boards</span></a></li>
+        <li><a class="course-nav-item" href="08_azure_repos.html"><span class="course-nav-num">08</span><span>Azure Repos</span></a></li>
+        <li><a class="course-nav-item" href="09_azure_pipelines.html"><span class="course-nav-num">09</span><span>Azure Pipelines</span></a></li>
+        <li><a class="course-nav-item current" href="10_azure_artifacts.html"><span class="course-nav-num">10</span><span>Azure Artifacts</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的開源協作課程系列 · Lesson 10
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

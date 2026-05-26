@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 06｜軟體測試 — 開源貢獻課程</title>
+<meta name="description" content="測試金字塔/獎盃/蜂巢、TDD Red-Green-Refactor、F.I.R.S.T、AAA 模式、Coverage 何時 80% 才合理 — 業界測試實務一次學完。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 06 · 自動化與測試篇</div>
+    <h1 class="hero-title">軟體<span>測試</span></h1>
+    <p class="hero-desc">測試的目的並非追求 coverage 數字，而是<strong>提供使改動得以安全進行的保護網</strong>。本課將建立對測試類型、TDD 流程與覆蓋率的正確認知。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 6 / 10 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 13 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>中階</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#shapes">測試形狀總覽</a></li>
+      <li><a class="toc-link" href="#pyramid">金字塔</a></li>
+      <li><a class="toc-link" href="#trophy">獎盃</a></li>
+      <li><a class="toc-link" href="#honeycomb">蜂巢</a></li>
+      <li><a class="toc-link" href="#methodology">撰寫好測試</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="shapes">
+      <span class="section-eyebrow">01 — 測試形狀總覽</span>
+      <h2>金字塔、獎盃、蜂巢——三種測試結構</h2>
+
+      <p>測試形狀（test shape）描述<strong>各類測試在整套測試套件中所佔的比例</strong>。在比較三種形狀之前，須先建立對各層測試類型的基本認識。</p>
+
+      <h3>四種主要測試類型</h3>
+      <p>以下以「使用者登入」功能為例，說明後續三種形狀中反覆出現的測試類型：</p>
+
+      <table>
+        <thead>
+          <tr><th>類型</th><th>測試對象</th><th>具體範例（登入功能）</th><th>典型工具</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Static</strong><br><span style="color:#6b6b7e;font-size:0.85em;">靜態檢查</span></td>
+            <td>程式碼未執行，由編譯器、型別系統或 linter 於編寫期捕捉問題</td>
+            <td>TypeScript 編譯器發現呼叫 <code>login(username)</code> 時遺漏必填的 <code>password</code> 參數；ESLint 偵測未使用變數</td>
+            <td>TypeScript、ESLint</td>
+          </tr>
+          <tr>
+            <td><strong>Unit</strong><br><span style="color:#6b6b7e;font-size:0.85em;">單元測試</span></td>
+            <td>單一函式或元件本身的邏輯；資料庫、外部 API、其他模組等依賴以「假物件」（mock，預先寫好回傳值的替身）取代，使測試只驗證目標函式自身、執行快且結果穩定</td>
+            <td>驗證 <code>hashPassword('abc123')</code> 回傳長度為 60 的 bcrypt 字串；<code>validateEmail('foo@bar')</code> 回傳 <code>false</code></td>
+            <td>Jest、Vitest、pytest、JUnit</td>
+          </tr>
+          <tr>
+            <td><strong>Integration</strong><br><span style="color:#6b6b7e;font-size:0.85em;">整合測試</span></td>
+            <td>多個模組串接，搭配真實 DB、HTTP client、message queue 等依賴</td>
+            <td>對 <code>POST /login</code> 發出請求，驗證資料庫成功建立 session 紀錄、回應為 200 與合法 JWT</td>
+            <td>Supertest、Testcontainers</td>
+          </tr>
+          <tr>
+            <td><strong>E2E</strong><br><span style="color:#6b6b7e;font-size:0.85em;">端對端測試</span></td>
+            <td>啟動真實瀏覽器或 client，從使用者視角執行完整流程</td>
+            <td>Playwright 開啟登入頁面、填入帳號密碼、點擊「登入」按鈕、驗證跳轉至 dashboard 並顯示使用者名稱</td>
+            <td>Playwright、Cypress、Selenium</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>除上述四種核心類型外，業界另有以下衍生分類，多由前四種類型組合而成：</p>
+
+      <table>
+        <thead>
+          <tr><th>類型</th><th>說明</th><th>典型工具</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Contract</strong><br><span style="color:#6b6b7e;font-size:0.85em;">契約測試</span></td>
+            <td>驗證服務間 API 的請求／回應契約（consumer / provider）是否相容，可於不啟動整個系統的前提下進行</td>
+            <td>Pact、OpenAPI schema</td>
+          </tr>
+          <tr>
+            <td><strong>Smoke</strong><br><span style="color:#6b6b7e;font-size:0.85em;">冒煙測試</span></td>
+            <td>部署後執行少量關鍵流程，確認系統可正常運作；通常為精選的 E2E 子集</td>
+            <td>少量精選 E2E</td>
+          </tr>
+          <tr>
+            <td><strong>Regression</strong><br><span style="color:#6b6b7e;font-size:0.85em;">回歸測試</span></td>
+            <td>持續累積的測試集合，確保已修補的 bug 不再復發；前四種類型皆可累積為回歸測試</td>
+            <td>—</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>範圍對照：同一個登入功能，三種測試怎麼測</h3>
+      <p>讀完上表仍不易區分三者，因為差異不在「測試對象」的字面描述，而在<strong>「測試實際啟動了哪些真實元件」</strong>。下圖以登入流程為例，標示各類測試實際涵蓋的系統範圍：</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 600 320" xmlns="http://www.w3.org/2000/svg" aria-label="Unit / Integration / E2E 範圍對照">
+          <g font-family="JetBrains Mono, monospace" font-size="10">
+            <text x="300" y="22" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">三種測試的系統覆蓋範圍（登入功能）</text>
+
+            <!-- Column headers -->
+            <text x="130" y="50" text-anchor="middle" font-size="10" fill="#6b6b7e">瀏覽器</text>
+            <text x="224" y="50" text-anchor="middle" font-size="10" fill="#6b6b7e">前端</text>
+            <text x="318" y="50" text-anchor="middle" font-size="10" fill="#6b6b7e">HTTP API</text>
+            <text x="412" y="50" text-anchor="middle" font-size="10" fill="#6b6b7e">商業邏輯</text>
+            <text x="506" y="50" text-anchor="middle" font-size="10" fill="#6b6b7e">資料庫</text>
+
+            <!-- Unit row -->
+            <text x="40" y="103" text-anchor="middle" font-weight="700" font-size="11" fill="#14532d">Unit</text>
+            <rect x="85" y="75" width="90" height="50" rx="4" fill="#f9fafb" stroke="#d1d5db" stroke-width="1" stroke-dasharray="3 3"/>
+            <rect x="179" y="75" width="90" height="50" rx="4" fill="#f9fafb" stroke="#d1d5db" stroke-width="1" stroke-dasharray="3 3"/>
+            <rect x="273" y="75" width="90" height="50" rx="4" fill="#f9fafb" stroke="#d1d5db" stroke-width="1" stroke-dasharray="3 3"/>
+            <rect x="367" y="75" width="90" height="50" rx="4" fill="#dcfce7" stroke="#15803d" stroke-width="2"/>
+            <text x="412" y="104" text-anchor="middle" font-size="10" font-weight="700" fill="#14532d">hashPassword()</text>
+            <rect x="461" y="75" width="90" height="50" rx="4" fill="#f9fafb" stroke="#d1d5db" stroke-width="1" stroke-dasharray="3 3"/>
+            <text x="318" y="145" text-anchor="middle" font-size="10" fill="#6b6b7e" font-style="italic">只呼叫單一函式，其餘元件不啟動</text>
+
+            <!-- Integration row -->
+            <text x="40" y="183" text-anchor="middle" font-weight="700" font-size="11" fill="#78350f">Integration</text>
+            <rect x="85" y="155" width="90" height="50" rx="4" fill="#f9fafb" stroke="#d1d5db" stroke-width="1" stroke-dasharray="3 3"/>
+            <rect x="179" y="155" width="90" height="50" rx="4" fill="#f9fafb" stroke="#d1d5db" stroke-width="1" stroke-dasharray="3 3"/>
+            <rect x="273" y="155" width="90" height="50" rx="4" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+            <text x="318" y="184" text-anchor="middle" font-size="10" font-weight="700" fill="#78350f">POST /login</text>
+            <rect x="367" y="155" width="90" height="50" rx="4" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+            <text x="412" y="184" text-anchor="middle" font-size="10" font-weight="700" fill="#78350f">login service</text>
+            <rect x="461" y="155" width="90" height="50" rx="4" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+            <text x="506" y="184" text-anchor="middle" font-size="10" font-weight="700" fill="#78350f">真實 DB</text>
+            <text x="318" y="225" text-anchor="middle" font-size="10" fill="#6b6b7e" font-style="italic">啟動完整後端 + 真實 DB，但不開啟瀏覽器與前端</text>
+
+            <!-- E2E row -->
+            <text x="40" y="263" text-anchor="middle" font-weight="700" font-size="11" fill="#7f1d1d">E2E</text>
+            <rect x="85" y="235" width="90" height="50" rx="4" fill="#fee2e2" stroke="#b91c1c" stroke-width="2"/>
+            <text x="130" y="264" text-anchor="middle" font-size="10" font-weight="700" fill="#7f1d1d">Playwright</text>
+            <rect x="179" y="235" width="90" height="50" rx="4" fill="#fee2e2" stroke="#b91c1c" stroke-width="2"/>
+            <text x="224" y="264" text-anchor="middle" font-size="10" font-weight="700" fill="#7f1d1d">真實前端</text>
+            <rect x="273" y="235" width="90" height="50" rx="4" fill="#fee2e2" stroke="#b91c1c" stroke-width="2"/>
+            <text x="318" y="264" text-anchor="middle" font-size="10" font-weight="700" fill="#7f1d1d">POST /login</text>
+            <rect x="367" y="235" width="90" height="50" rx="4" fill="#fee2e2" stroke="#b91c1c" stroke-width="2"/>
+            <text x="412" y="264" text-anchor="middle" font-size="10" font-weight="700" fill="#7f1d1d">login service</text>
+            <rect x="461" y="235" width="90" height="50" rx="4" fill="#fee2e2" stroke="#b91c1c" stroke-width="2"/>
+            <text x="506" y="264" text-anchor="middle" font-size="10" font-weight="700" fill="#7f1d1d">真實 DB</text>
+            <text x="318" y="305" text-anchor="middle" font-size="10" fill="#6b6b7e" font-style="italic">瀏覽器到資料庫全部使用真實元件</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 8.1 — 三種測試的系統覆蓋範圍對照</div>
+      </div>
+
+      <ul>
+        <li><strong>Unit</strong>——僅呼叫單一函式（如 <code>hashPassword</code>）。HTTP server 不啟動、資料庫不連線、瀏覽器不開啟；其他依賴皆以 mock 假物件取代。</li>
+        <li><strong>Integration</strong>——啟動後端進程，發出真實 HTTP 請求至 <code>POST /login</code>，由真實程式碼讀寫真實資料庫。但不開啟瀏覽器、不執行前端 JS。</li>
+        <li><strong>E2E</strong>——Playwright 開啟真實瀏覽器，載入前端網頁，模擬使用者點擊「登入」按鈕觸發前端發出 HTTP，後端再讀寫資料庫。整個系統皆為真實元件。</li>
+      </ul>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>越底層的測試越快、越穩定；越上層越貼近真實使用情境，但成本也越高</strong>
+          三種測試形狀的差異，本質就在於「把測試比重放在哪一層」。
+        </div>
+      </div>
+
+      <h3>三種主流形狀</h3>
+      <p>隨著測試工具與軟體架構的演進，業界逐步發展出三種主流形狀，各自對應不同的專案類型：</p>
+
+      <table>
+        <thead>
+          <tr><th>形狀</th><th>提倡者</th><th>核心觀點</th><th>適用場景</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>金字塔</strong></td>
+            <td>Mike Cohn（2009）</td>
+            <td>大量 unit、少量 E2E</td>
+            <td>後端 monolith、邏輯密集的服務</td>
+          </tr>
+          <tr>
+            <td><strong>獎盃（Trophy）</strong></td>
+            <td>Kent C. Dodds（2018）</td>
+            <td>以整合測試為主，並以靜態檢查為基底</td>
+            <td>前端應用、TypeScript 專案</td>
+          </tr>
+          <tr>
+            <td><strong>蜂巢（Honeycomb）</strong></td>
+            <td>Spotify Engineering</td>
+            <td>服務之間的整合測試最具價值</td>
+            <td>後端微服務架構</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>形狀的選擇取決於專案類型，而非個人偏好</strong>
+          接下來三節將分別說明各形狀的層級組成與設計動機。理解設計脈絡後再依專案性質做選擇，避免將單一形狀套用至所有情境。
+        </div>
+      </div>
+    </section>
+
+    <section id="pyramid">
+      <span class="section-eyebrow">02 — 金字塔</span>
+      <h2>Mike Cohn 的測試金字塔（2009）</h2>
+
+      <p>金字塔的核心理念：<strong>越底層的測試數量越多、執行越快、越穩定；越頂層的測試數量越少、執行越慢、越容易失效</strong>。傳統後端應用中，業務邏輯多集中於函式與類別層級，因此 unit test 是最具成本效益的測試類型。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 600 320" xmlns="http://www.w3.org/2000/svg" aria-label="測試金字塔">
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <!-- 金字塔三層 -->
+            <polygon points="200,80 400,80 460,180 140,180" fill="#fee2e2" stroke="#b91c1c" stroke-width="2"/>
+            <polygon points="140,180 460,180 510,260 90,260" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+            <polygon points="90,260 510,260 550,310 50,310" fill="#dcfce7" stroke="#15803d" stroke-width="2"/>
+
+            <text x="300" y="135" text-anchor="middle" font-weight="700" fill="#7f1d1d" font-size="14">E2E（10%）</text>
+            <text x="300" y="155" text-anchor="middle" fill="#6b6b7e" font-size="10">執行緩慢、易失效、成本高</text>
+
+            <text x="300" y="215" text-anchor="middle" font-weight="700" fill="#78350f" font-size="14">Integration（20%）</text>
+            <text x="300" y="235" text-anchor="middle" fill="#6b6b7e" font-size="10">速度中等、串接多個元件</text>
+
+            <text x="300" y="290" text-anchor="middle" font-weight="700" fill="#14532d" font-size="14">Unit（70%）</text>
+            <text x="300" y="305" text-anchor="middle" fill="#6b6b7e" font-size="10">執行極快、彼此獨立、成本低</text>
+
+            <!-- 兩側標註 -->
+            <text x="50" y="60" fill="#6b6b7e" font-size="10">↑ 慢 / 貴</text>
+            <text x="500" y="60" fill="#6b6b7e" font-size="10">少（10%）</text>
+            <text x="50" y="320" fill="#6b6b7e" font-size="10">↓ 快 / 便宜</text>
+            <text x="500" y="320" fill="#6b6b7e" font-size="10">多（70%）</text>
+
+            <text x="300" y="40" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">傳統測試金字塔</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 8.2 — Mike Cohn 測試金字塔</div>
+      </div>
+
+      <div class="callout callout-danger">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>反金字塔（倒三角）為典型反模式</strong>
+          僅有 E2E、缺乏 unit test 的後果：test suite 動輒跑半小時、隨機失敗、debug 困難。此為新手團隊最常見的測試陷阱。
+        </div>
+      </div>
+    </section>
+
+    <section id="trophy">
+      <span class="section-eyebrow">03 — 獎盃</span>
+      <h2>Kent C. Dodds 的測試獎盃（2018）</h2>
+
+      <p>Kent C. Dodds 於 React Testing Library 推出後提出此模型，反映前端測試生態的轉變。核心格言為：<strong>「Write tests. Not too many. Mostly integration.」</strong></p>
+
+      <h3>相對金字塔的三項改動</h3>
+      <p>獎盃並非全新發明，而是針對前端應用對金字塔做出三項調整：</p>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>金字塔（2009）</th><th>獎盃（2018）</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>新增基底層</td>
+            <td>無</td>
+            <td>新增 <strong>Static</strong>（TypeScript、ESLint），於編寫期即捕捉型別與語法問題</td>
+          </tr>
+          <tr>
+            <td>主體層的位置</td>
+            <td>底層的 <strong>Unit（約 70%）</strong>為主體</td>
+            <td>中段的 <strong>Integration</strong> 為主體（杯身最寬）</td>
+          </tr>
+          <tr>
+            <td>Unit 的角色</td>
+            <td>主力，涵蓋大多數邏輯</td>
+            <td>縮減至純函式、utilities、custom hooks；不再用於含 UI 的 component</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>之所以做這些改動，是因為前端 unit test 容易與 DOM 結構耦合（UI 微調即導致大量測試失敗），而 React Testing Library 提供了從使用者觀點測試元件的能力，使整合測試比 unit 更具價值。</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 600 340" xmlns="http://www.w3.org/2000/svg" aria-label="測試獎盃">
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <text x="300" y="28" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">Kent C. Dodds 測試獎盃</text>
+
+            <!-- 頂層 E2E -->
+            <rect x="240" y="48" width="120" height="44" rx="6" fill="#fee2e2" stroke="#b91c1c" stroke-width="2"/>
+            <text x="300" y="68" text-anchor="middle" font-weight="700" fill="#7f1d1d" font-size="13">E2E</text>
+            <text x="300" y="83" text-anchor="middle" fill="#6b6b7e" font-size="10">少量關鍵流程</text>
+
+            <!-- 整合測試（杯身，最寬） -->
+            <rect x="100" y="100" width="400" height="78" rx="12" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+            <text x="300" y="135" text-anchor="middle" font-weight="700" fill="#78350f" font-size="16">Integration（主體）</text>
+            <text x="300" y="155" text-anchor="middle" fill="#6b6b7e" font-size="10">React Testing Library 渲染元件，於使用者觀點驗證互動</text>
+
+            <!-- Unit（杯腳） -->
+            <rect x="220" y="186" width="160" height="48" rx="8" fill="#dcfce7" stroke="#15803d" stroke-width="2"/>
+            <text x="300" y="207" text-anchor="middle" font-weight="700" fill="#14532d" font-size="13">Unit</text>
+            <text x="300" y="222" text-anchor="middle" fill="#6b6b7e" font-size="10">純函式、utilities、custom hooks</text>
+
+            <!-- Static（基底） -->
+            <rect x="140" y="242" width="320" height="50" rx="6" fill="#dbeafe" stroke="#1d4ed8" stroke-width="2"/>
+            <text x="300" y="263" text-anchor="middle" font-weight="700" fill="#1e3a8a" font-size="13">Static</text>
+            <text x="300" y="278" text-anchor="middle" fill="#6b6b7e" font-size="10">TypeScript、ESLint：編譯期即捕捉型別與低階問題</text>
+
+            <text x="50" y="68" fill="#6b6b7e" font-size="10">↑ 慢 / 貴</text>
+            <text x="50" y="278" fill="#6b6b7e" font-size="10">↓ 快 / 便宜</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 8.3 — Kent C. Dodds 測試獎盃</div>
+      </div>
+
+    </section>
+
+    <section id="honeycomb">
+      <span class="section-eyebrow">04 — 蜂巢</span>
+      <h2>Spotify 的蜂巢模型</h2>
+
+      <p>Spotify Engineering 於微服務架構中提出此模型。在分散式系統下，<strong>單一服務的內部邏輯通常單純，真正的複雜度來自服務之間的互動</strong>，因此將測試比重集中於「單一服務搭配真實依賴」的整合測試。</p>
+
+      <h3>蜂巢使用的特殊命名</h3>
+      <p>蜂巢並未沿用前述 Unit / Integration / E2E 三分法，而採用了 Spotify 內部的命名。三者與傳統類型的對應關係如下：</p>
+      <table>
+        <thead>
+          <tr><th>蜂巢用語</th><th>對應傳統類型</th><th>內容</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Implementation Detail Tests</strong><br><span style="color:#6b6b7e;font-size:0.85em;">實作細節測試</span></td>
+            <td>≈ Unit</td>
+            <td>針對函式或類別的內部實作。蜂巢主張少寫，因為易與實作耦合，重構時容易破裂</td>
+          </tr>
+          <tr>
+            <td><strong>Integration Tests</strong><br><span style="color:#6b6b7e;font-size:0.85em;">整合測試</span></td>
+            <td>= Integration</td>
+            <td>單一服務內，搭配真實 DB、HTTP client、message queue 等依賴，驗證業務流程</td>
+          </tr>
+          <tr>
+            <td><strong>Integrated Tests</strong><br><span style="color:#6b6b7e;font-size:0.85em;">跨服務測試</span></td>
+            <td>≈ E2E</td>
+            <td>橫跨多個服務的端對端流程，啟動成本高且易失效，僅針對核心鏈路</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>Integration 與 Integrated 一字之差，意義大不同</strong>
+          <strong>Integration</strong>（單一服務內）為主體，數量最多；<strong>Integrated</strong>（跨服務）為少量。讀英文原文時請特別留意尾綴 -ion / -ed 的差異。
+        </div>
+      </div>
+
+      <div class="diagram">
+        <svg viewBox="0 0 600 280" xmlns="http://www.w3.org/2000/svg" aria-label="測試蜂巢">
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <text x="300" y="28" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">Spotify 測試蜂巢</text>
+
+            <!-- 左側小六邊形：Implementation detail -->
+            <polygon points="100,105 140,105 160,140 140,175 100,175 80,140" fill="#dcfce7" stroke="#15803d" stroke-width="2"/>
+            <text x="120" y="138" text-anchor="middle" font-weight="700" fill="#14532d" font-size="10">實作細節</text>
+            <text x="120" y="152" text-anchor="middle" fill="#6b6b7e" font-size="9">（少量）</text>
+
+            <!-- 中央大六邊形：Integration -->
+            <polygon points="257,66 343,66 385,140 343,214 257,214 215,140" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+            <text x="300" y="138" text-anchor="middle" font-weight="700" fill="#78350f" font-size="18">整合</text>
+            <text x="300" y="160" text-anchor="middle" fill="#6b6b7e" font-size="11">（主體）</text>
+
+            <!-- 右側小六邊形：Integrated -->
+            <polygon points="460,105 500,105 520,140 500,175 460,175 440,140" fill="#fee2e2" stroke="#b91c1c" stroke-width="2"/>
+            <text x="480" y="138" text-anchor="middle" font-weight="700" fill="#7f1d1d" font-size="10">跨服務</text>
+            <text x="480" y="152" text-anchor="middle" fill="#6b6b7e" font-size="9">（少量）</text>
+
+            <text x="120" y="200" text-anchor="middle" fill="#6b6b7e" font-size="10">Implementation Detail Test</text>
+            <text x="300" y="234" text-anchor="middle" fill="#6b6b7e" font-size="10">Integration Test</text>
+            <text x="480" y="200" text-anchor="middle" fill="#6b6b7e" font-size="10">Integrated Test</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 8.4 — Spotify 測試蜂巢</div>
+      </div>
+
+    </section>
+
+    <section id="methodology">
+      <span class="section-eyebrow">05 — 撰寫好測試</span>
+      <h2>TDD 流程、F.I.R.S.T 原則、AAA 結構</h2>
+
+      <p>前四章說明的是「測試的整體配比」。本章轉向「測試本身」——四個彼此互補、可同時並用的概念：</p>
+
+      <table>
+        <thead>
+          <tr><th>概念</th><th>關注層次</th><th>回答的問題</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>TDD</strong></td><td>開發流程</td><td>什麼時候寫測試？</td></tr>
+          <tr><td><strong>Coverage</strong></td><td>覆蓋度量</td><td>測試實際執行了多少程式碼？</td></tr>
+          <tr><td><strong>F.I.R.S.T</strong></td><td>測試品質</td><td>怎樣的測試算是好測試？</td></tr>
+          <tr><td><strong>AAA</strong></td><td>單一測試結構</td><td>一個測試的程式碼如何組織？</td></tr>
+        </tbody>
+      </table>
+
+      <p>四者並無互斥：以 TDD 流程驅動撰寫測試，每個測試內部遵循 AAA 結構，整體須滿足 F.I.R.S.T 原則，並以 Coverage 作為輔助度量。</p>
+
+      <h3>TDD 三步驟：Red → Green → Refactor</h3>
+
+      <p><strong>TDD（Test-Driven Development，測試驅動開發）</strong>由 Kent Beck 於《Test-Driven Development: By Example》（2002）中系統化的方法論。其為一個持續循環的流程：</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 600 240" xmlns="http://www.w3.org/2000/svg" aria-label="TDD 循環">
+          <defs>
+            <marker id="td-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <circle cx="150" cy="120" r="55" fill="#fee2e2" stroke="#b91c1c" stroke-width="2"/>
+            <text x="150" y="115" text-anchor="middle" font-weight="700" fill="#7f1d1d" font-size="16">RED</text>
+            <text x="150" y="135" text-anchor="middle" fill="#6b6b7e" font-size="10">先撰寫一個失敗的測試</text>
+
+            <circle cx="300" cy="120" r="55" fill="#dcfce7" stroke="#15803d" stroke-width="2"/>
+            <text x="300" y="115" text-anchor="middle" font-weight="700" fill="#14532d" font-size="16">GREEN</text>
+            <text x="300" y="135" text-anchor="middle" fill="#6b6b7e" font-size="10">以最小改動讓測試通過</text>
+
+            <circle cx="450" cy="120" r="55" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+            <text x="450" y="115" text-anchor="middle" font-weight="700" fill="#4c1d95" font-size="16">REFACTOR</text>
+            <text x="450" y="135" text-anchor="middle" fill="#6b6b7e" font-size="10">重整程式碼，但測試保持不變</text>
+
+            <line x1="205" y1="120" x2="245" y2="120" stroke="#7c3aed" stroke-width="2" marker-end="url(#td-arr)"/>
+            <line x1="355" y1="120" x2="395" y2="120" stroke="#7c3aed" stroke-width="2" marker-end="url(#td-arr)"/>
+
+            <!-- 回到 RED -->
+            <path d="M 450 175 Q 300 220 150 175" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#td-arr)"/>
+            <text x="300" y="220" text-anchor="middle" fill="#7c3aed" font-size="11">下一個測試</text>
+
+            <text x="300" y="40" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">無限循環直到功能完整</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 8.5 — TDD 三步驟循環</div>
+      </div>
+
+      <h4>每次循環只處理一個測試</h4>
+
+      <p>TDD 的核心紀律由 Robert C. Martin（Uncle Bob）整理為 <strong>Three Rules of TDD</strong>：</p>
+
+      <ol>
+        <li>未有失敗的測試前，不可寫任何 production code</li>
+        <li>單一測試僅寫到「剛好失敗」即停（包含編譯錯誤）</li>
+        <li>Production code 僅寫到「剛好通過該失敗測試」即停</li>
+      </ol>
+
+      <p>因此每次 R-G-R 循環嚴格限制在<strong>單一測試</strong>的範圍內。多輪循環累積後，才會於 REFACTOR 步驟出現可抽出的重複結構——這正是 TDD 與「先列完所有測試再實作」（spec-first / test-first）的根本差異所在。</p>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>勿一次列完所有測試</strong>
+          若一次寫完整份規格的所有測試再開始實作，會失去三項 TDD 的核心價值：① REFACTOR 步驟失去抽取共通結構的素材、② 邊界情況無從於後續迴圈中發現、③ 開發者容易超出「剛好通過」的範圍而過度實作。此做法在業界稱為 spec-first / test-first，可視為一種有效的測試實務，但不屬於 Kent Beck 原始定義的 TDD。
+        </div>
+      </div>
+
+      <h4>實作範例：撰寫密碼驗證函式 <code>validatePassword</code></h4>
+
+      <p>規格：密碼須長度 ≥ 8 字元，且至少含一個數字。以下示範兩輪 RED → GREEN 累積出有意義的重構機會，再於第三步驟進行 refactor。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">typescript</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm">// ===== Round 1（RED） =====</span>
+test(<span class="tk-st">'長度至少 8 字元才合法'</span>, () =&gt; {
+  expect(validatePassword(<span class="tk-st">'abc'</span>)).toBe(<span class="tk-kw">false</span>);
+  expect(validatePassword(<span class="tk-st">'abcdefgh'</span>)).toBe(<span class="tk-kw">true</span>);
+});
+<span class="tk-cm">// 執行 → 失敗（validatePassword 尚未實作）</span>
+
+<span class="tk-cm">// ===== Round 1（GREEN） =====</span>
+<span class="tk-kw">function</span> <span class="tk-fn">validatePassword</span>(p: <span class="tk-fn">string</span>) {
+  <span class="tk-kw">return</span> p.length &gt;= <span class="tk-num">8</span>;
+}
+<span class="tk-cm">// 執行 → 通過</span>
+
+<span class="tk-cm">// ===== Round 2（RED） =====</span>
+test(<span class="tk-st">'必須包含至少一個數字'</span>, () =&gt; {
+  expect(validatePassword(<span class="tk-st">'abcdefgh'</span>)).toBe(<span class="tk-kw">false</span>);  <span class="tk-cm">// 無數字</span>
+  expect(validatePassword(<span class="tk-st">'abcdefg1'</span>)).toBe(<span class="tk-kw">true</span>);
+});
+
+<span class="tk-cm">// ===== Round 2（GREEN） =====</span>
+<span class="tk-kw">function</span> <span class="tk-fn">validatePassword</span>(p: <span class="tk-fn">string</span>) {
+  <span class="tk-kw">return</span> p.length &gt;= <span class="tk-num">8</span> &amp;&amp; /\d/.test(p);
+}
+<span class="tk-cm">// 執行 → 兩個測試皆通過</span>
+
+<span class="tk-cm">// ===== Round 3（REFACTOR） =====</span>
+<span class="tk-cm">// 兩條規則混在同一行 boolean 表達式中，可讀性下降。</span>
+<span class="tk-cm">// 測試保持不動，抽出具名規則：</span>
+<span class="tk-kw">const</span> <span class="tk-fn">hasMinLength</span> = (p: <span class="tk-fn">string</span>) =&gt; p.length &gt;= <span class="tk-num">8</span>;
+<span class="tk-kw">const</span> <span class="tk-fn">hasDigit</span> = (p: <span class="tk-fn">string</span>) =&gt; /\d/.test(p);
+
+<span class="tk-kw">function</span> <span class="tk-fn">validatePassword</span>(p: <span class="tk-fn">string</span>) {
+  <span class="tk-kw">return</span> hasMinLength(p) &amp;&amp; hasDigit(p);
+}
+<span class="tk-cm">// 執行 → 全部測試仍通過 ← REFACTOR 完成</span></code></pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>TDD 真正的價值不在於「撰寫測試」</strong>
+          而在於<strong>「先釐清要實作的內容」</strong>。撰寫測試的當下，必須思考：「此函式的 input / output 為何？邊界情況有哪些？」此思考過程的價值遠高於測試本身。
+        </div>
+      </div>
+
+      <h3>Coverage——測試覆蓋率</h3>
+
+      <p>Coverage 是衡量「測試實際執行到多少程式碼」的定量指標。工具（JS 的 Istanbul / c8、Python 的 <code>coverage.py</code>、Java 的 JaCoCo、Go 內建 <code>go test -cover</code>）會於測試執行時在程式碼中插入紀錄點，計算「執行到的部分 ÷ 總量」的百分比。依「總量」如何切分，常見四種指標：</p>
+
+      <table>
+        <thead>
+          <tr><th>指標</th><th>計算依據</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Line</strong></td><td>程式碼<strong>行</strong>數中被執行過的比例</td></tr>
+          <tr><td><strong>Statement</strong></td><td><strong>語句</strong>中被執行的比例（單一行可能含多個 statement）</td></tr>
+          <tr><td><strong>Branch</strong></td><td><strong>分支</strong>（<code>if</code> / <code>else</code>、<code>switch</code>）中被執行的比例——通常最具參考價值</td></tr>
+          <tr><td><strong>Function</strong></td><td><strong>函式</strong>中至少被呼叫過一次的比例</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>Coverage 數字並非測試品質的同義詞</strong>
+          Coverage 僅衡量「測試覆蓋了多少程式碼」，無法反映邏輯正確性——一個無 <code>expect</code> 卻呼叫過函式的測試亦能貢獻覆蓋率。業界以 <strong>80% 為健康度參考值</strong>（高品質開源專案多落於 80–90%），但追求 100% 邊際效益急遽下降，且易催生為了數字而撰寫的低價值測試。Coverage 應與 F.I.R.S.T、AAA 並用，作為輔助指標而非單一目標。
+        </div>
+      </div>
+
+      <h3>F.I.R.S.T——五項測試品質原則</h3>
+
+      <p>由 Robert C. Martin（Uncle Bob）提出，每個字母代表一項原則：</p>
+
+      <table>
+        <thead>
+          <tr><th>字母</th><th>原則</th><th>實務意涵</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>F</strong>ast</td><td>快速</td><td>整套 unit test 應於數秒內完成，否則開發者將不願頻繁執行</td></tr>
+          <tr><td><strong>I</strong>solated</td><td>獨立</td><td>每個測試彼此獨立，不依賴執行順序、不互相影響</td></tr>
+          <tr><td><strong>R</strong>epeatable</td><td>可重複</td><td>相同 input 永遠產生相同結果，不依賴時間、亂數或外部服務。違反此原則即為 <strong>flaky test（不穩定測試）</strong>——有時通過、有時失敗，會使團隊習慣性忽略 CI 紅燈</td></tr>
+          <tr><td><strong>S</strong>elf-validating</td><td>自我驗證</td><td>執行後直接顯示成功或失敗，無須人工檢視 log 判讀</td></tr>
+          <tr><td><strong>T</strong>imely</td><td>及時</td><td>測試應緊隨 production code 撰寫，理想方式即為 TDD 的 R-G-R 循環</td></tr>
+        </tbody>
+      </table>
+
+      <h3>AAA——Arrange / Act / Assert</h3>
+
+      <p>每個測試於結構上清楚劃分為三段，可顯著提升可讀性。三段各自的角色如下：</p>
+
+      <table>
+        <thead>
+          <tr><th>字母</th><th>階段</th><th>實務意涵</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>A</strong>rrange</td><td>準備</td><td>建立測試所需的初始狀態：建構物件、預設資料、設定 mock 回傳值。此段只做準備，不觸發任何被測行為</td></tr>
+          <tr><td><strong>A</strong>ct</td><td>執行</td><td>呼叫一次被測函式或觸發一次事件，即為本測試要驗證的「動作」。理想上僅一行</td></tr>
+          <tr><td><strong>A</strong>ssert</td><td>驗證</td><td>以 <code>expect</code> 檢查 Act 後的結果是否符合預期；若需多個 <code>expect</code>，應皆驗證同一件事</td></tr>
+        </tbody>
+      </table>
+
+      <p>以下為三段清楚分隔的測試範例：</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">typescript</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>test(<span class="tk-st">'logout: clears all user state'</span>, () =&gt; {
+  <span class="tk-cm">// Arrange——設定測試情境</span>
+  <span class="tk-kw">const</span> store = createStore({ user: { id: <span class="tk-num">42</span>, name: <span class="tk-st">'Jason'</span> } });
+
+  <span class="tk-cm">// Act——觸發目標行為</span>
+  store.dispatch(logout());
+
+  <span class="tk-cm">// Assert——驗證結果</span>
+  expect(store.getState().user).toBeNull();
+  expect(store.getState().token).toBeNull();
+});</code></pre>
+      </div>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>每個測試僅驗證單一事項</strong>
+          單一 test 內最好僅包含一個邏輯上的 assert（可有多個 expect，但皆驗證同一件事）。若發現需要第二組 act → assert，應將其拆分為新的測試。
+        </div>
+      </div>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="05_code_review.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 05 · Code Review</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="07_azure_boards.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 07 · Azure Boards 與 Work Item</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">10 堂課程系列 <span class="progress-pill">6 / 10</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
+        <li><a class="course-nav-item" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
+        <li><a class="course-nav-item" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇 / Issue</span></a></li>
+        <li><a class="course-nav-item" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
+        <li><a class="course-nav-item" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
+        <li><a class="course-nav-item current" href="06_testing_tdd.html"><span class="course-nav-num">06</span><span>軟體測試</span></a></li>
+        <li><a class="course-nav-item" href="07_azure_boards.html"><span class="course-nav-num">07</span><span>Azure Boards</span></a></li>
+        <li><a class="course-nav-item" href="08_azure_repos.html"><span class="course-nav-num">08</span><span>Azure Repos</span></a></li>
+        <li><a class="course-nav-item" href="09_azure_pipelines.html"><span class="course-nav-num">09</span><span>Azure Pipelines</span></a></li>
+        <li><a class="course-nav-item" href="10_azure_artifacts.html"><span class="course-nav-num">10</span><span>Azure Artifacts</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的開源協作課程系列 · Lesson 06
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

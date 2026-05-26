@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 09｜Azure Pipelines — 開源貢獻課程</title>
+<meta name="description" content="Azure Pipelines:YAML 結構、Stage/Job/Step、Triggers、Service Connection、Variable Group + Key Vault、Environments + Approvals、Templates、Deployment Strategies。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 09 · Azure DevOps 實戰篇</div>
+    <h1 class="hero-title">Azure Pipelines<span> YAML 與部署</span></h1>
+    <p class="hero-desc">Azure Pipelines 是 Azure DevOps 的 CI/CD 引擎。本課從 YAML 結構出發，逐步介紹 Trigger、Stage / Job / Step、Service Connection、Variable Group + Key Vault、Environments + Approvals、Templates 與 Deployment Strategies——一份 pipeline.yml 看完即可寫得出來。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 9 / 10 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 16 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>Azure DevOps</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#yaml-vs-classic">YAML vs Classic</a></li>
+      <li><a class="toc-link" href="#structure">YAML 結構</a></li>
+      <li><a class="toc-link" href="#triggers">Triggers</a></li>
+      <li><a class="toc-link" href="#agents">Agents</a></li>
+      <li><a class="toc-link" href="#variables">Variables 與 Key Vault</a></li>
+      <li><a class="toc-link" href="#environments">Environments 與 Approvals</a></li>
+      <li><a class="toc-link" href="#templates">Templates</a></li>
+      <li><a class="toc-link" href="#strategies">Deployment Strategies</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="yaml-vs-classic">
+      <span class="section-eyebrow">01 — YAML vs Classic</span>
+      <h2>為什麼 2026 後一律寫 YAML</h2>
+
+      <p>Azure Pipelines 歷史上有兩種設定模型：</p>
+
+      <ul>
+        <li><strong>Classic UI Editor</strong>——拖拉式介面，設定儲存於 Azure DevOps 內部資料庫</li>
+        <li><strong>YAML Pipelines</strong>——設定檔以 <code>azure-pipelines.yml</code> 存放於 repo，隨程式碼版本控制</li>
+      </ul>
+
+      <p>Microsoft 已宣告<strong>所有新功能僅實作於 YAML pipeline</strong>。具體列舉如下，這些能力於 Classic 不可用：</p>
+
+      <ul>
+        <li>Pipeline templates 與參數化</li>
+        <li>Environment approvals 與其他 checks</li>
+        <li>Container jobs</li>
+        <li>Pipeline resources（跨 pipeline 觸發）</li>
+        <li>Stages 之間的 dependency expression</li>
+      </ul>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>Classic pipeline 仍可運行，但新建議一律寫 YAML</strong>
+          既有 Classic pipeline 可繼續使用，但若有任何修改機會即建議遷移至 YAML——除了享受新功能，pipeline 設定亦會進入 PR review 流程，與程式碼一同被審視。
+        </div>
+      </div>
+    </section>
+
+    <section id="structure">
+      <span class="section-eyebrow">02 — YAML 結構</span>
+      <h2>Pipeline / Stage / Job / Step 四層</h2>
+
+      <p>Azure Pipelines 的 YAML 採四層結構：</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" aria-label="Azure Pipelines 四層結構">
+          <g font-family="JetBrains Mono, monospace" font-size="12">
+            <!-- Pipeline -->
+            <rect x="40" y="20" width="640" height="50" rx="10" fill="#0a0a0f"/>
+            <text x="60" y="48" fill="#fafaf8" font-weight="700" font-size="14">Pipeline</text>
+            <text x="200" y="48" fill="#a8a8b8" font-size="11">azure-pipelines.yml,trigger + variables + resources + stages</text>
+
+            <!-- Stages -->
+            <g>
+              <rect x="60" y="90" width="200" height="50" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+              <text x="80" y="118" fill="#4c1d95" font-weight="700">Stage: Build</text>
+              <text x="80" y="132" fill="#6b6b7e" font-size="10">依賴:無</text>
+            </g>
+            <g>
+              <rect x="280" y="90" width="200" height="50" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+              <text x="300" y="118" fill="#4c1d95" font-weight="700">Stage: Deploy_Dev</text>
+              <text x="300" y="132" fill="#6b6b7e" font-size="10">dependsOn: Build</text>
+            </g>
+            <g>
+              <rect x="500" y="90" width="180" height="50" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+              <text x="520" y="118" fill="#4c1d95" font-weight="700">Stage: Deploy_Prod</text>
+              <text x="520" y="132" fill="#6b6b7e" font-size="10">dependsOn: Deploy_Dev</text>
+            </g>
+
+            <!-- Jobs -->
+            <g>
+              <rect x="80" y="160" width="160" height="40" rx="6" fill="#cffafe" stroke="#06b6d4"/>
+              <text x="100" y="184" fill="#155e63" font-weight="700" font-size="11">Job: compile</text>
+            </g>
+            <g>
+              <rect x="80" y="210" width="160" height="40" rx="6" fill="#cffafe" stroke="#06b6d4"/>
+              <text x="100" y="234" fill="#155e63" font-weight="700" font-size="11">Job: test</text>
+            </g>
+
+            <!-- Steps -->
+            <g>
+              <rect x="260" y="160" width="160" height="40" rx="6" fill="#dcfce7" stroke="#16a34a"/>
+              <text x="280" y="184" fill="#166534" font-weight="700" font-size="11">Step: AzureWebApp</text>
+            </g>
+            <g>
+              <rect x="260" y="210" width="160" height="40" rx="6" fill="#dcfce7" stroke="#16a34a"/>
+              <text x="280" y="234" fill="#166534" font-weight="700" font-size="11">Step: Smoke Test</text>
+            </g>
+
+            <line x1="160" y1="140" x2="160" y2="160" stroke="#06b6d4" stroke-width="1.2"/>
+            <line x1="380" y1="140" x2="340" y2="160" stroke="#16a34a" stroke-width="1.2"/>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 11.1 — Pipeline → Stages → Jobs → Steps</div>
+      </div>
+
+      <h3>多 stage YAML 骨架</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># azure-pipelines.yml</span>
+<span class="tk-kw">trigger</span>:
+  <span class="tk-kw">branches</span>:
+    <span class="tk-kw">include</span>: [main, release/*]
+
+<span class="tk-kw">pool</span>:
+  <span class="tk-kw">vmImage</span>: ubuntu-latest
+
+<span class="tk-kw">variables</span>:
+  <span class="tk-kw">buildConfiguration</span>: <span class="tk-st">'Release'</span>
+
+<span class="tk-kw">stages</span>:
+  - <span class="tk-kw">stage</span>: Build
+    <span class="tk-kw">jobs</span>:
+      - <span class="tk-kw">job</span>: Compile
+        <span class="tk-kw">steps</span>:
+          - <span class="tk-kw">task</span>: UseDotNet@2
+            <span class="tk-kw">inputs</span>: { <span class="tk-kw">version</span>: <span class="tk-st">'8.x'</span> }
+          - <span class="tk-kw">script</span>: dotnet build <span class="tk-op">--configuration</span> $(buildConfiguration)
+          - <span class="tk-kw">script</span>: dotnet test <span class="tk-op">--logger</span> trx
+          - <span class="tk-kw">task</span>: PublishTestResults@2
+            <span class="tk-kw">inputs</span>: { <span class="tk-kw">testResultsFormat</span>: VSTest, <span class="tk-kw">testResultsFiles</span>: <span class="tk-st">'**/*.trx'</span> }
+          - <span class="tk-kw">task</span>: PublishPipelineArtifact@1
+            <span class="tk-kw">inputs</span>: { <span class="tk-kw">targetPath</span>: <span class="tk-st">'$(Build.ArtifactStagingDirectory)'</span>, <span class="tk-kw">artifact</span>: drop }
+
+  - <span class="tk-kw">stage</span>: Deploy_Dev
+    <span class="tk-kw">dependsOn</span>: Build
+    <span class="tk-kw">jobs</span>:
+      - <span class="tk-kw">deployment</span>: DeployToDev
+        <span class="tk-kw">environment</span>: <span class="tk-st">'dev'</span>
+        <span class="tk-kw">strategy</span>:
+          <span class="tk-kw">runOnce</span>:
+            <span class="tk-kw">deploy</span>:
+              <span class="tk-kw">steps</span>:
+                - <span class="tk-kw">task</span>: AzureWebApp@1
+                  <span class="tk-kw">inputs</span>:
+                    <span class="tk-kw">azureSubscription</span>: <span class="tk-st">'svc-conn-dev'</span>
+                    <span class="tk-kw">appName</span>: myapp-dev
+                    <span class="tk-kw">package</span>: $(Pipeline.Workspace)/drop/**/*.zip</code></pre>
+      </div>
+
+      <h3>關鍵詞速查</h3>
+      <ul>
+        <li><strong>job</strong>——一般執行單位；於單一 agent 上跑所有 step</li>
+        <li><strong>deployment</strong>——特殊 job 類型，指向一個 environment、支援部署策略（runOnce / rolling / canary）</li>
+        <li><strong>task</strong>——預封裝步驟，例如 <code>AzureWebApp@1</code>、<code>UseDotNet@2</code>；數字為主版號</li>
+        <li><strong>script</strong> / <strong>bash</strong> / <strong>pwsh</strong>——直接執行 shell 指令</li>
+      </ul>
+    </section>
+
+    <section id="triggers">
+      <span class="section-eyebrow">03 — Triggers</span>
+      <h2>CI Trigger 與 PR Trigger</h2>
+
+      <p>Pipeline 由「事件」觸發。最常見三種：</p>
+
+      <table>
+        <thead>
+          <tr><th>觸發類型</th><th>YAML 區塊</th><th>典型情境</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>CI trigger</strong></td><td><code>trigger:</code></td><td>push 至特定分支即啟動，常用於合併後自動部署 dev</td></tr>
+          <tr><td><strong>PR trigger</strong></td><td><code>pr:</code></td><td>建立 / 更新 PR 時啟動，用於 build validation 與 review feedback</td></tr>
+          <tr><td><strong>Scheduled trigger</strong></td><td><code>schedules:</code></td><td>cron 規則，例如每晚跑完整 E2E test suite</td></tr>
+          <tr><td><strong>Pipeline resource trigger</strong></td><td><code>resources.pipelines:</code></td><td>另一條 pipeline 完成時啟動，例如 build pipeline 成功後跑 deployment pipeline</td></tr>
+        </tbody>
+      </table>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">trigger</span>:
+  <span class="tk-kw">branches</span>:
+    <span class="tk-kw">include</span>: [main, release/*]
+    <span class="tk-kw">exclude</span>: [feature/experimental]
+  <span class="tk-kw">paths</span>:
+    <span class="tk-kw">exclude</span>: [docs/*, README.md]   <span class="tk-cm"># 純文件修改不啟動</span>
+
+<span class="tk-kw">pr</span>:
+  <span class="tk-kw">branches</span>:
+    <span class="tk-kw">include</span>: [main]
+
+<span class="tk-kw">schedules</span>:
+  - <span class="tk-kw">cron</span>: <span class="tk-st">'0 22 * * *'</span>           <span class="tk-cm"># UTC 每晚 22:00</span>
+    <span class="tk-kw">displayName</span>: Nightly E2E
+    <span class="tk-kw">branches</span>:
+      <span class="tk-kw">include</span>: [main]</code></pre>
+      </div>
+    </section>
+
+    <section id="agents">
+      <span class="section-eyebrow">04 — Agents</span>
+      <h2>Microsoft-hosted vs Self-hosted Agents</h2>
+
+      <p>Pipeline 須在 agent 上執行。兩種選擇：</p>
+
+      <table>
+        <thead>
+          <tr><th>類型</th><th>優點</th><th>缺點</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Microsoft-hosted</strong></td>
+            <td>無需維護；每次執行皆為乾淨 VM；常見映像（ubuntu-latest、windows-latest、macOS-latest）皆已預裝主流工具鏈</td>
+            <td>免費方案有月度分鐘上限；無法存取內網資源；環境受限於 Microsoft 提供的映像</td>
+          </tr>
+          <tr>
+            <td><strong>Self-hosted</strong></td>
+            <td>可置於 VNet 內存取內部服務；可預裝特殊工具（GPU driver、商用 SDK）；無分鐘限制</td>
+            <td>需自行維護 OS patch、agent 版本、磁碟空間；可能殘留前次 build 狀態</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>Managed DevOps Pools 為新中間選項</strong>
+          2025 年推出的 Managed DevOps Pools 提供「self-hosted 的彈性 + Microsoft-hosted 的免維護」——Microsoft 代管 VM 池，可自訂映像並接入 VNet。對中大型企業是常見折衷方案。
+        </div>
+      </div>
+    </section>
+
+    <section id="variables">
+      <span class="section-eyebrow">05 — Variables 與 Key Vault</span>
+      <h2>Variables、Variable Groups 與 Key Vault 整合</h2>
+
+      <p>變數有三種來源層級，由高至低優先：</p>
+
+      <table>
+        <thead>
+          <tr><th>來源</th><th>定義位置</th><th>用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Runtime parameter</strong></td><td>YAML <code>parameters:</code></td><td>Queue pipeline 時人為輸入</td></tr>
+          <tr><td><strong>YAML inline variable</strong></td><td>YAML <code>variables:</code></td><td>環境無關常數，例如 <code>buildConfiguration: Release</code></td></tr>
+          <tr><td><strong>Variable group</strong></td><td>Pipelines → Library → Variable groups</td><td>跨 pipeline 共用；可標記為 secret；可連結 Key Vault</td></tr>
+        </tbody>
+      </table>
+
+      <h3>連結 Key Vault</h3>
+      <p><strong>機敏資料絕不應寫在 YAML 或 variable group 的文字欄位中。</strong>正確做法：將 secret 存於 Azure Key Vault，於 variable group 切到「Link secrets from an Azure key vault as variables」，授權 service connection 後選擇要曝露的 secret 名稱：</p>
+
+      <div class="section-card">
+<pre style="background:var(--paper2);padding:0.9rem 1.1rem;border-radius:8px;font-size:13px;line-height:1.7;font-family:var(--mono);overflow-x:auto;">設定流程:
+
+1. Azure Portal:建立 Key Vault,放入 secret
+   例:secret 名稱 db-connection-string,值 = "Server=...;Password=..."
+
+2. Azure DevOps:Project Settings → Service connections
+   新建 Azure Resource Manager 連線,使用 Service Principal 或 Managed Identity
+
+3. Azure DevOps:Pipelines → Library → 新建 Variable group
+   開啟「Link secrets from an Azure key vault」
+   選 service connection、選 Key Vault、勾選要 expose 的 secret
+
+4. YAML 引用:
+   variables:
+     - group: db-secrets
+   steps:
+     - script: echo "$(db-connection-string)"
+       env:
+         DB_CONN: $(db-connection-string)</pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>Key Vault secret 名稱的 dash 會自動轉 underscore</strong>
+          Key Vault 中名為 <code>db-connection-string</code> 的 secret 暴露至環境變數時會成為 <code>db_connection_string</code>。<strong>引用時兩種寫法都行</strong>——YAML <code>$()</code> 語法仍用原始名稱，但若要當作 env var 在腳本內以 <code>$VAR</code> 形式讀，須以 underscore 寫。
+        </div>
+      </div>
+
+      <h3>為什麼 Key Vault 優於 Variable Group 純 secret</h3>
+      <ul>
+        <li><strong>單一來源</strong>——secret 在 Key Vault 輪替後，所有依賴的 pipeline 自動取得新值，無須更新</li>
+        <li><strong>Audit trail</strong>——Key Vault 內建存取記錄，誰於何時取走哪個 secret 可追溯</li>
+        <li><strong>細粒度權限</strong>——可由 Key Vault access policy 控制不同 pipeline 看到不同 secret</li>
+        <li><strong>強化保護</strong>——可設定 soft-delete、purge protection，避免誤刪</li>
+      </ul>
+    </section>
+
+    <section id="environments">
+      <span class="section-eyebrow">06 — Environments 與 Approvals</span>
+      <h2>Environments、Approvals 與 Checks</h2>
+
+      <p><strong>Environment</strong> 是「部署目標」的邏輯抽象——例如 dev、staging、prod。`deployment` job 透過 <code>environment:</code> 欄位指向之，所有部署紀錄、批准與檢查皆掛於 environment 上。</p>
+
+      <div class="section-card">
+<pre style="background:var(--paper2);padding:0.9rem 1.1rem;border-radius:8px;font-size:13px;line-height:1.7;font-family:var(--mono);overflow-x:auto;">Pipelines → Environments → 新建「prod」→ Approvals and checks → 新增:
+
+✓ Approvals       :指派 1 至 N 位人員,部署前須點按鈕
+✓ Branch control  :只允許 main / release/* 部署本 environment
+✓ Business hours  :僅在指定時段內部署(例:平日 09:00–17:00)
+✓ Exclusive lock  :同時最多一條 pipeline 部署本 environment
+✓ Required template :pipeline 必須 extends 自指定模板(集中安全策略)
+✓ Invoke REST API :對外部系統送 webhook,由其回應 pass/fail 決定能否部署
+✓ Query work items:檢查相關 work item 是否處於合法狀態</pre>
+      </div>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>Approvals 與 Checks 不寫於 YAML，而是綁在 Environment 上</strong>
+          這個設計使「誰能部署什麼」由平台團隊集中控管，application team 即使能修改 YAML 亦無法繞過。<strong>這是 Azure Pipelines 與 GitHub Actions 重要差異</strong>——GitHub 中相當功能須透過 environment + repo settings 拼湊。
+        </div>
+      </div>
+    </section>
+
+    <section id="templates">
+      <span class="section-eyebrow">07 — Templates</span>
+      <h2>Templates:Pipeline 模組化</h2>
+
+      <p>大型組織常有「所有應用都該跑安全掃描、製品上傳」之類的標準化需求。Templates 允許將共用片段抽出為獨立檔案：</p>
+
+      <h3>三種模板用法</h3>
+      <table>
+        <thead>
+          <tr><th>用法</th><th>適用</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Includes</strong>（<code>steps: - template: foo.yml</code>）</td><td>把 steps、jobs 或 stages 段落抽出共用</td></tr>
+          <tr><td><strong>Extends</strong>（<code>extends: template: base.yml</code>）</td><td>父模板提供完整骨架；子 pipeline 僅填入差異參數。常配合 Required Template check 強制使用</td></tr>
+          <tr><td><strong>Parameters</strong>（<code>parameters:</code>）</td><td>讓 template 接受參數（string / number / object / step list 等）</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Extends 模板範例</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># templates/secure-pipeline.yml(平台團隊維護)</span>
+<span class="tk-kw">parameters</span>:
+  - <span class="tk-kw">name</span>: buildSteps
+    <span class="tk-kw">type</span>: stepList
+    <span class="tk-kw">default</span>: []
+
+<span class="tk-kw">stages</span>:
+  - <span class="tk-kw">stage</span>: SecurityScan
+    <span class="tk-kw">jobs</span>:
+      - <span class="tk-kw">job</span>: scan
+        <span class="tk-kw">steps</span>:
+          - <span class="tk-kw">task</span>: SonarCloudPrepare@1
+          - <span class="tk-kw">task</span>: CredScan@3
+          - <span class="tk-kw">task</span>: SonarCloudAnalyze@1
+  - <span class="tk-kw">stage</span>: Build
+    <span class="tk-kw">jobs</span>:
+      - <span class="tk-kw">job</span>: build
+        <span class="tk-kw">steps</span>: ${{ parameters.buildSteps }}
+
+<span class="tk-cm"># azure-pipelines.yml(application team 撰寫)</span>
+<span class="tk-kw">extends</span>:
+  <span class="tk-kw">template</span>: templates/secure-pipeline.yml
+  <span class="tk-kw">parameters</span>:
+    <span class="tk-kw">buildSteps</span>:
+      - <span class="tk-kw">script</span>: npm ci
+      - <span class="tk-kw">script</span>: npm run build</code></pre>
+      </div>
+
+      <p>配合 Environment 的「Required template」check，可強制所有部署 prod 的 pipeline 必須 extends 自此模板——應用團隊無法跳過安全掃描階段。</p>
+    </section>
+
+    <section id="strategies">
+      <span class="section-eyebrow">08 — Deployment Strategies</span>
+      <h2>三種內建部署策略</h2>
+
+      <p>`deployment` job 的 <code>strategy:</code> 欄位支援三種內建策略：</p>
+
+      <table>
+        <thead>
+          <tr><th>策略</th><th>行為</th><th>適用</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>runOnce</strong></td><td>對所有目標一次部署完畢</td><td>dev / staging；節點少；可接受短暫 downtime</td></tr>
+          <tr><td><strong>rolling</strong></td><td>分批部署，可設 <code>maxParallel: 25%</code>，每批完成後再進下一批</td><td>VM Scale Set、Kubernetes 多 replica</td></tr>
+          <tr><td><strong>canary</strong></td><td>先部署小比例（例 5% / 20% / 50% / 100%），每階段間可暫停觀察 metrics</td><td>高流量、需 progressive rollout 的 prod 服務</td></tr>
+        </tbody>
+      </table>
+
+      <p>三種策略皆提供四個生命週期 hook：<code>preDeploy</code>、<code>deploy</code>、<code>routeTraffic</code>、<code>postRouteTraffic</code>，外加 <code>on: success</code> 與 <code>on: failure</code>——可在任一階段插入 smoke test 或 rollback 邏輯。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code>- <span class="tk-kw">stage</span>: Deploy_Prod
+  <span class="tk-kw">jobs</span>:
+    - <span class="tk-kw">deployment</span>: DeployToProd
+      <span class="tk-kw">environment</span>: <span class="tk-st">'prod'</span>
+      <span class="tk-kw">strategy</span>:
+        <span class="tk-kw">canary</span>:
+          <span class="tk-kw">increments</span>: [10, 25, 50, 100]
+          <span class="tk-kw">preDeploy</span>:
+            <span class="tk-kw">steps</span>:
+              - <span class="tk-kw">script</span>: ./scripts/pre-deploy-check.sh
+          <span class="tk-kw">deploy</span>:
+            <span class="tk-kw">steps</span>:
+              - <span class="tk-kw">task</span>: KubernetesManifest@1
+                <span class="tk-kw">inputs</span>:
+                  <span class="tk-kw">action</span>: deploy
+                  <span class="tk-kw">strategy</span>: canary
+                  <span class="tk-kw">percentage</span>: $(strategy.increment)
+          <span class="tk-kw">postRouteTraffic</span>:
+            <span class="tk-kw">steps</span>:
+              - <span class="tk-kw">script</span>: ./scripts/smoke-test.sh
+          <span class="tk-kw">on</span>:
+            <span class="tk-kw">failure</span>:
+              <span class="tk-kw">steps</span>:
+                - <span class="tk-kw">task</span>: KubernetesManifest@1
+                  <span class="tk-kw">inputs</span>: { <span class="tk-kw">action</span>: reject, <span class="tk-kw">strategy</span>: canary }</code></pre>
+      </div>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="08_azure_repos.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 08 · Azure Repos</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="10_azure_artifacts.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 10 · Azure Artifacts</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">10 堂課程系列 <span class="progress-pill">9 / 10</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
+        <li><a class="course-nav-item" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
+        <li><a class="course-nav-item" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇 / Issue</span></a></li>
+        <li><a class="course-nav-item" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
+        <li><a class="course-nav-item" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
+        <li><a class="course-nav-item" href="06_testing_tdd.html"><span class="course-nav-num">06</span><span>軟體測試</span></a></li>
+        <li><a class="course-nav-item" href="07_azure_boards.html"><span class="course-nav-num">07</span><span>Azure Boards</span></a></li>
+        <li><a class="course-nav-item" href="08_azure_repos.html"><span class="course-nav-num">08</span><span>Azure Repos</span></a></li>
+        <li><a class="course-nav-item current" href="09_azure_pipelines.html"><span class="course-nav-num">09</span><span>Azure Pipelines</span></a></li>
+        <li><a class="course-nav-item" href="10_azure_artifacts.html"><span class="course-nav-num">10</span><span>Azure Artifacts</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的開源協作課程系列 · Lesson 09
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

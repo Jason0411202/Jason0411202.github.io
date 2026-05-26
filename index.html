@@ -496,15 +496,13 @@ a { color: inherit; text-decoration: none; }
 
       <div class="side-card">
         <div class="side-title">課程系列：開源協作</div>
-        <div class="side-text">11 堂實務導向課程，從 Git 進階、PR/Code Review、測試 CI、到第一次貢獻全流程，目標是上工立刻能用。</div>
+        <div class="side-text">10 堂實務導向課程。前 6 堂借鏡開源世界的通用協作做法；後 4 堂落地到 Azure DevOps（Boards / Repos / Pipelines / Artifacts），對齊 2026 最新 UI 與 YAML 慣例。</div>
         <div class="side-list">
           <div>· Git 日常 + 進階 (rebase/bisect 等)</div>
-          <div>· 分支策略 / Fork / PR / Code Review</div>
-          <div>· Issue 撰寫 + 專案管理</div>
-          <div>· 測試金字塔 + TDD</div>
+          <div>· 分支策略 / Issue / Fork / PR / Code Review</div>
+          <div>· 軟體測試（金字塔／獎盃／蜂巢、TDD、F.I.R.S.T、AAA）</div>
           <div>· CI/CD + Hooks + Lint</div>
-          <div>· RFC / ADR / 供應鏈安全</div>
-          <div>· 第一次貢獻實戰 checklist</div>
+          <div>· Azure Boards / Repos / Pipelines / Artifacts</div>
         </div>
       </div>
 
@@ -590,15 +588,14 @@ const aiToolsLessons = [
 const gitLessons = [
   { n: '01', file: 'lessons/opensource/01_git_daily.html',                title: 'Git 日常實務速成',           desc: '從四區心智模型出發，掌握每天會用到的 status / add / commit / log / diff / stash / restore。', minutes: 12, tags: ['Git', '基礎'] },
   { n: '02', file: 'lessons/opensource/02_git_advanced.html',             title: 'Git 進階操作',                desc: 'rebase / cherry-pick / reflog / bisect / worktree / reset vs revert / --force-with-lease。',     minutes: 15, tags: ['Git', '進階'] },
-  { n: '03', file: 'lessons/opensource/03_branching_strategies.html',     title: '分支策略選擇',                desc: 'Git Flow / GitHub Flow / GitLab Flow / Trunk-Based — 怎麼選最適合自己的團隊。',                  minutes: 10, tags: ['協作', '分支'] },
+  { n: '03', file: 'lessons/opensource/03_branching_strategies.html',     title: '分支策略選擇 / Issue',         desc: 'Git Flow / GitHub Flow / GitLab Flow / Trunk-Based — 怎麼選最適合自己的團隊；後半段補上 Issue 三大類與 Bug Report / Feature Request 撰寫結構。',                  minutes: 12, tags: ['協作', '分支', 'Issue'] },
   { n: '04', file: 'lessons/opensource/04_fork_pr_workflow.html',         title: 'Fork、Upstream、PR 完整流程',  desc: '從 fork 開始一直到 PR 被合併的全流程，包含 sync upstream、衝突解決、PR 描述。',                 minutes: 14, tags: ['協作', 'PR'] },
   { n: '05', file: 'lessons/opensource/05_code_review.html',              title: 'Code Review 文化與技巧',       desc: 'Google eng-practices、Conventional Comments、CODEOWNERS — Reviewer 與 Author 雙視角。',          minutes: 12, tags: ['協作', 'Review'] },
-  { n: '06', file: 'lessons/opensource/06_issues_project_mgmt.html',      title: 'Issue 撰寫與專案管理',         desc: 'Bug report / Feature request 模板、標籤系統、Milestone、GitHub Projects、Issue triage。',         minutes: 11, tags: ['規範', 'Issue'] },
-  { n: '07', file: 'lessons/opensource/07_testing_tdd.html',              title: '測試金字塔與 TDD',             desc: '測試金字塔/獎盃/蜂巢、TDD 三步驟、F.I.R.S.T、AAA、Coverage 何時 80% 才合理。',                 minutes: 13, tags: ['測試', 'TDD'] },
-  { n: '08', file: 'lessons/opensource/08_ci_cd_hooks.html',              title: 'CI/CD、Git Hooks、Lint/Format', desc: 'GitHub Actions、Branch Protection、husky/lint-staged/pre-commit、commitlint。',                  minutes: 14, tags: ['CI', '自動化'] },
-  { n: '09', file: 'lessons/opensource/09_rfc_adr_release.html',          title: 'RFC、ADR、Release Management', desc: 'Rust RFCs / Python PEP 模式、Michael Nygard ADR 範本、feature freeze → RC → GA 流程。',          minutes: 13, tags: ['大型專案', '文件'] },
-  { n: '10', file: 'lessons/opensource/10_dependencies_supply_chain.html', title: '依賴管理與供應鏈安全',         desc: 'Dependabot vs Renovate、CVE/GHSA、SECURITY.md、SBOM、xz utils 等真實案例。',                     minutes: 12, tags: ['安全', '依賴'] },
-  { n: '11', file: 'lessons/opensource/11_first_contribution.html',       title: '第一次貢獻實戰 Checklist',      desc: '從找專案、判斷適合度、認領 issue 到 PR 被合併全流程 — 把前 10 堂收尾成一份可執行清單。',           minutes: 14, tags: ['實戰', 'Checklist'] }
+  { n: '06', file: 'lessons/opensource/06_testing_tdd.html',              title: '軟體測試',                     desc: '測試金字塔/獎盃/蜂巢、TDD 三步驟、F.I.R.S.T、AAA、Coverage 何時 80% 才合理。',                 minutes: 13, tags: ['測試', 'TDD'] },
+  { n: '07', file: 'lessons/opensource/07_azure_boards.html',             title: 'Azure Boards 與 Work Item', desc: 'Process Template、Epic/Feature/Story/Task 階層、Backlog 與 Sprint、Kanban Board、WIQL Query、2026 UI 更新。',                                              minutes: 13, tags: ['Azure DevOps', 'Boards'] },
+  { n: '08', file: 'lessons/opensource/08_azure_repos.html',              title: 'Azure Repos 分支治理',       desc: 'Branch Policies、Pull Request、Required Reviewers、Automatic Reviewers、Vote Reset、Code Search 內建。',                                                  minutes: 12, tags: ['Azure DevOps', 'Repos'] },
+  { n: '09', file: 'lessons/opensource/09_azure_pipelines.html',          title: 'Azure Pipelines YAML',       desc: 'YAML 四層結構、Triggers、Agents、Variable Group + Key Vault、Environments + Approvals、Templates、三種 Deployment Strategies。',                          minutes: 16, tags: ['Azure DevOps', 'Pipelines'] },
+  { n: '10', file: 'lessons/opensource/10_azure_artifacts.html',          title: 'Azure Artifacts 套件治理',   desc: 'Feed 設計、六種套件格式、Upstream Sources 自動快取、@Local/@Prerelease/@Release Views、Retention Policy。',                                                minutes: 11, tags: ['Azure DevOps', 'Artifacts'] }
 ];
 
 const grpcLessons = [
@@ -659,7 +656,7 @@ const posts = [
     minutes: l.minutes,
     tags: l.tags,
     category: '開源協作',
-    series: `第 ${l.n} / 11 堂`
+    series: `第 ${l.n} / ${gitLessons.length} 堂`
   })),
   ...grpcLessons.map((l) => ({
     title: l.title,

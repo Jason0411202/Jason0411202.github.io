@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lesson 03｜分支策略選擇 — 開源貢獻課程</title>
-<meta name="description" content="Git Flow / GitHub Flow / GitLab Flow / Trunk-Based Development — 怎麼依團隊規模、發布頻率、CI 成熟度選最適合的分支策略。">
+<title>Lesson 03｜分支策略選擇 / Issue — 開源貢獻課程</title>
+<meta name="description" content="Git Flow / GitHub Flow / GitLab Flow / Trunk-Based Development — 依團隊規模、發布頻率、CI 成熟度選最適合的分支策略；並介紹 Issue 三大類與 Bug Report / Feature Request 撰寫結構。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../_shared.css">
@@ -16,11 +16,11 @@
   <div class="hero-inner">
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 03 · 協作工作流篇</div>
-    <h1 class="hero-title">分支策略<span>選擇</span></h1>
-    <p class="hero-desc">四種主流分支策略——Git Flow、GitHub Flow、GitLab Flow、Trunk-Based。<strong>並無絕對最佳的選擇，僅有最適合團隊現況的方案。</strong></p>
+    <h1 class="hero-title">分支策略選擇<span> / Issue</span></h1>
+    <p class="hero-desc">四種主流分支策略——Git Flow、GitHub Flow、GitLab Flow、Trunk-Based。<strong>並無絕對最佳的選擇，僅有最適合團隊現況的方案。</strong>後半段補上 Issue 三大類與 Bug Report / Feature Request 的業界通用結構。</p>
     <div class="hero-badges">
-      <span class="hero-badge"><span class="dot"></span>第 3 / 11 堂</span>
-      <span class="hero-badge"><span class="dot"></span>約 10 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>第 3 / 10 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 12 分鐘</span>
       <span class="hero-badge"><span class="dot"></span>中階</span>
     </div>
   </div>
@@ -34,6 +34,7 @@
       <li><a class="toc-link" href="#github-flow">GitHub Flow</a></li>
       <li><a class="toc-link" href="#gitlab-flow">GitLab Flow</a></li>
       <li><a class="toc-link" href="#naming">分支命名</a></li>
+      <li><a class="toc-link" href="#issue">Issue</a></li>
     </ul>
   </div>
 </nav>
@@ -314,6 +315,125 @@
       </div>
     </section>
 
+    <section id="issue">
+      <span class="section-eyebrow">03 — Issue</span>
+      <h2>Issue 兩大類與撰寫結構</h2>
+
+      <p>無論使用 GitHub Issues、GitLab Issues、Jira 或 Linear，issue 通常可劃分為兩大類，各自具備不同目的與撰寫方式：</p>
+
+      <table>
+        <thead>
+          <tr><th>類型</th><th>用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Bug Report</strong></td><td>回報軟體的錯誤行為</td></tr>
+          <tr><td><strong>Feature Request</strong></td><td>提議新功能或改善建議</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Bug Report 區塊說明</h3>
+      <table>
+        <thead>
+          <tr><th>區塊</th><th>用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Describe the bug</code></td><td>以一兩句話簡述問題現象，使 reviewer 一眼掌握主題</td></tr>
+          <tr><td><code>Steps to Reproduce</code></td><td>描述 bug 的重現步驟，條列式撰寫，maintainer 依序即可復現</td></tr>
+          <tr><td><code>Expected behavior</code></td><td>依規格或常理應出現的行為</td></tr>
+          <tr><td><code>Actual behavior</code></td><td>實際觀察到的行為，與 expected 形成對照</td></tr>
+          <tr><td><code>Environment</code></td><td>OS、瀏覽器、應用版本、Node / Python 等執行環境資訊</td></tr>
+          <tr><td><code>Screenshots / Video</code></td><td>附上錄影、截圖或 log，協助 reviewer 直接看見現象</td></tr>
+          <tr><td><code>Additional context</code></td><td>補充資訊：相關 issue、推測原因、首次發現時間等</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Bug Report 範例</h3>
+
+      <div class="section-card">
+<pre style="background:var(--paper2);padding:0.9rem 1.1rem;border-radius:8px;font-size:13px;line-height:1.7;font-family:var(--mono);overflow-x:auto;"># [Bug] Logout doesn't clear React Query cache (v1.4.2)
+
+## Describe the bug
+登出後 token 未完全清除，下次登入其他帳號時會短暫看到上一位使用者的資料。
+
+## Steps to Reproduce
+1. 以 user A 登入
+2. 點選右上角的「登出」
+3. 以 user B 登入
+4. 首頁顯示 user A 的 profile
+
+## Expected behavior
+登出後應完全清除所有 user 相關資料，登入新帳號時應顯示新使用者的資料。
+
+## Actual behavior
+頁面短暫閃現 user A 的 avatar 與 name，刷新後才恢復正常。
+
+## Environment
+- OS: macOS 14.5
+- Browser: Chrome 124.0.6367
+- App version: 1.4.2
+- Node: 18.19.0
+
+## Screenshots / Video
+（附上錄影或截圖）
+
+## Additional context
+推測可能是 React Query cache 未清除。首次發現於 2026-04-25 部署後。</pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>缺少重現步驟即無從處理</strong>
+          無法重現的 bug 即無法 debug。「<em>有時候會壞</em>」屬於品質最低的 bug report。<strong>提供明確的重現步驟、影片、log 與版本資訊，才能進入 triage 流程。</strong>
+        </div>
+      </div>
+
+      <h3>Feature Request 區塊說明</h3>
+      <p>新功能請求應描述<strong>痛點</strong>而非<strong>解法</strong>。直接寫「請新增 X 功能」常會被拒絕，因 maintainer 無從判斷實際的使用情境。</p>
+      <table>
+        <thead>
+          <tr><th>區塊</th><th>用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Is your feature request related to a problem?</code></td><td>描述當前痛點與使用情境，說明為何需要此功能</td></tr>
+          <tr><td><code>Describe the solution you'd like</code></td><td>提議的解決方案，可附上 API 設計或介面草稿</td></tr>
+          <tr><td><code>Describe alternatives you've considered</code></td><td>已嘗試或評估過的替代做法，以及為何不採用</td></tr>
+          <tr><td><code>Additional context</code></td><td>補充資訊：類似專案的實作參考、相關討論、是否願意送出 PR</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Feature Request 範例</h3>
+
+      <div class="section-card">
+<pre style="background:var(--paper2);padding:0.9rem 1.1rem;border-radius:8px;font-size:13px;line-height:1.7;font-family:var(--mono);overflow-x:auto;"># [Feature] Allow custom date format in &lt;DatePicker&gt;
+
+## Is your feature request related to a problem?
+應用需顯示中文日期格式（民國年），目前 DatePicker 僅支援
+ISO 格式，必須於 component 外額外進行轉換。
+
+## Describe the solution you'd like
+新增 `format` prop，使用者可傳入 day.js 或 date-fns 的格式字串：
+```tsx
+&lt;DatePicker format="民國 YYY 年 M 月 D 日" /&gt;
+```
+
+## Describe alternatives you've considered
+- 以 wrapper component 自行轉換（目前做法，但 onChange 處理較為繁瑣）
+- 整合 i18n library（過於厚重）
+
+## Additional context
+react-aria/Calendar 具備類似功能，可作為參考。</pre>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>「願意親自實作」可顯著提升被接受的機率</strong>
+          在 issue 末尾附上一句「願意送出 PR」，可大幅降低 maintainer 評估時的心理成本——對於企業內部 backlog 亦同。
+        </div>
+      </div>
+    </section>
+
     <nav class="lesson-nav" aria-label="上一課/下一課">
       <a class="lesson-nav-card lesson-nav-prev" href="02_git_advanced.html">
         <div class="lesson-nav-eyebrow">← 上一課</div>
@@ -329,19 +449,18 @@
 
   <aside class="lesson-aside">
     <div class="aside-card">
-      <div class="aside-title">11 堂課程系列 <span class="progress-pill">3 / 11</span></div>
+      <div class="aside-title">10 堂課程系列 <span class="progress-pill">3 / 10</span></div>
       <ul class="course-nav">
         <li><a class="course-nav-item" href="01_git_daily.html"><span class="course-nav-num">01</span><span>Git 日常實務速成</span></a></li>
         <li><a class="course-nav-item" href="02_git_advanced.html"><span class="course-nav-num">02</span><span>Git 進階操作</span></a></li>
-        <li><a class="course-nav-item current" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇</span></a></li>
+        <li><a class="course-nav-item current" href="03_branching_strategies.html"><span class="course-nav-num">03</span><span>分支策略選擇 / Issue</span></a></li>
         <li><a class="course-nav-item" href="04_fork_pr_workflow.html"><span class="course-nav-num">04</span><span>Fork、PR 完整流程</span></a></li>
         <li><a class="course-nav-item" href="05_code_review.html"><span class="course-nav-num">05</span><span>Code Review</span></a></li>
-        <li><a class="course-nav-item" href="06_issues_project_mgmt.html"><span class="course-nav-num">06</span><span>Issue 與專案管理</span></a></li>
-        <li><a class="course-nav-item" href="07_testing_tdd.html"><span class="course-nav-num">07</span><span>測試金字塔與 TDD</span></a></li>
-        <li><a class="course-nav-item" href="08_ci_cd_hooks.html"><span class="course-nav-num">08</span><span>CI/CD、Hooks、Lint</span></a></li>
-        <li><a class="course-nav-item" href="09_rfc_adr_release.html"><span class="course-nav-num">09</span><span>RFC、ADR、Release</span></a></li>
-        <li><a class="course-nav-item" href="10_dependencies_supply_chain.html"><span class="course-nav-num">10</span><span>依賴管理與供應鏈安全</span></a></li>
-        <li><a class="course-nav-item" href="11_first_contribution.html"><span class="course-nav-num">11</span><span>第一次貢獻實戰</span></a></li>
+        <li><a class="course-nav-item" href="06_testing_tdd.html"><span class="course-nav-num">06</span><span>軟體測試</span></a></li>
+        <li><a class="course-nav-item" href="07_azure_boards.html"><span class="course-nav-num">07</span><span>Azure Boards</span></a></li>
+        <li><a class="course-nav-item" href="08_azure_repos.html"><span class="course-nav-num">08</span><span>Azure Repos</span></a></li>
+        <li><a class="course-nav-item" href="09_azure_pipelines.html"><span class="course-nav-num">09</span><span>Azure Pipelines</span></a></li>
+        <li><a class="course-nav-item" href="10_azure_artifacts.html"><span class="course-nav-num">10</span><span>Azure Artifacts</span></a></li>
       </ul>
     </div>
   </aside>
