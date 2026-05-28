@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lesson 06｜軟體測試 — 開源貢獻課程</title>
-<meta name="description" content="測試金字塔/獎盃/蜂巢、TDD Red-Green-Refactor、F.I.R.S.T、AAA 模式、Coverage 何時 80% 才合理 — 業界測試實務一次學完。">
+<meta name="description" content="測試金字塔/獎盃/蜂巢、Coverage 何時 80% 才合理、F.I.R.S.T、AAA 模式 — 業界測試實務一次學完。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../_shared.css">
@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 06 · 自動化與測試篇</div>
     <h1 class="hero-title">軟體<span>測試</span></h1>
-    <p class="hero-desc">測試的目的並非追求 coverage 數字，而是<strong>提供使改動得以安全進行的保護網</strong>。本課將建立對測試類型、TDD 流程與覆蓋率的正確認知。</p>
+    <p class="hero-desc">測試的目的並非追求 coverage 數字，而是<strong>提供使改動得以安全進行的保護網</strong>。本課將建立對測試類型、形狀配比、覆蓋率與品質原則的正確認知。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 6 / 10 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 13 分鐘</span>
@@ -34,6 +34,7 @@
       <li><a class="toc-link" href="#pyramid">金字塔</a></li>
       <li><a class="toc-link" href="#trophy">獎盃</a></li>
       <li><a class="toc-link" href="#honeycomb">蜂巢</a></li>
+      <li><a class="toc-link" href="#coverage">測試覆蓋率</a></li>
       <li><a class="toc-link" href="#methodology">撰寫好測試</a></li>
     </ul>
   </div>
@@ -361,7 +362,7 @@
         <div class="callout-icon">!</div>
         <div class="callout-body">
           <strong>Integration 與 Integrated 一字之差，意義大不同</strong>
-          <strong>Integration</strong>（單一服務內）為主體，數量最多；<strong>Integrated</strong>（跨服務）為少量。讀英文原文時請特別留意尾綴 -ion / -ed 的差異。
+          <span style="font-weight:700">Integration</span>（單一服務內）為主體，數量最多；<span style="font-weight:700">Integrated</span>（跨服務）為少量。讀英文原文時請特別留意尾綴 -ion / -ed 的差異。
         </div>
       </div>
 
@@ -395,138 +396,9 @@
 
     </section>
 
-    <section id="methodology">
-      <span class="section-eyebrow">05 — 撰寫好測試</span>
-      <h2>TDD 流程、F.I.R.S.T 原則、AAA 結構</h2>
-
-      <p>前四章說明的是「測試的整體配比」。本章轉向「測試本身」——四個彼此互補、可同時並用的概念：</p>
-
-      <table>
-        <thead>
-          <tr><th>概念</th><th>關注層次</th><th>回答的問題</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>TDD</strong></td><td>開發流程</td><td>什麼時候寫測試？</td></tr>
-          <tr><td><strong>Coverage</strong></td><td>覆蓋度量</td><td>測試實際執行了多少程式碼？</td></tr>
-          <tr><td><strong>F.I.R.S.T</strong></td><td>測試品質</td><td>怎樣的測試算是好測試？</td></tr>
-          <tr><td><strong>AAA</strong></td><td>單一測試結構</td><td>一個測試的程式碼如何組織？</td></tr>
-        </tbody>
-      </table>
-
-      <p>四者並無互斥：以 TDD 流程驅動撰寫測試，每個測試內部遵循 AAA 結構，整體須滿足 F.I.R.S.T 原則，並以 Coverage 作為輔助度量。</p>
-
-      <h3>TDD 三步驟：Red → Green → Refactor</h3>
-
-      <p><strong>TDD（Test-Driven Development，測試驅動開發）</strong>由 Kent Beck 於《Test-Driven Development: By Example》（2002）中系統化的方法論。其為一個持續循環的流程：</p>
-
-      <div class="diagram">
-        <svg viewBox="0 0 600 240" xmlns="http://www.w3.org/2000/svg" aria-label="TDD 循環">
-          <defs>
-            <marker id="td-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
-              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
-            </marker>
-          </defs>
-          <g font-family="JetBrains Mono, monospace" font-size="11">
-            <circle cx="150" cy="120" r="55" fill="#fee2e2" stroke="#b91c1c" stroke-width="2"/>
-            <text x="150" y="115" text-anchor="middle" font-weight="700" fill="#7f1d1d" font-size="16">RED</text>
-            <text x="150" y="135" text-anchor="middle" fill="#6b6b7e" font-size="10">先撰寫一個失敗的測試</text>
-
-            <circle cx="300" cy="120" r="55" fill="#dcfce7" stroke="#15803d" stroke-width="2"/>
-            <text x="300" y="115" text-anchor="middle" font-weight="700" fill="#14532d" font-size="16">GREEN</text>
-            <text x="300" y="135" text-anchor="middle" fill="#6b6b7e" font-size="10">以最小改動讓測試通過</text>
-
-            <circle cx="450" cy="120" r="55" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
-            <text x="450" y="115" text-anchor="middle" font-weight="700" fill="#4c1d95" font-size="16">REFACTOR</text>
-            <text x="450" y="135" text-anchor="middle" fill="#6b6b7e" font-size="10">重整程式碼，但測試保持不變</text>
-
-            <line x1="205" y1="120" x2="245" y2="120" stroke="#7c3aed" stroke-width="2" marker-end="url(#td-arr)"/>
-            <line x1="355" y1="120" x2="395" y2="120" stroke="#7c3aed" stroke-width="2" marker-end="url(#td-arr)"/>
-
-            <!-- 回到 RED -->
-            <path d="M 450 175 Q 300 220 150 175" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#td-arr)"/>
-            <text x="300" y="220" text-anchor="middle" fill="#7c3aed" font-size="11">下一個測試</text>
-
-            <text x="300" y="40" text-anchor="middle" font-family="Syne, sans-serif" font-size="14" font-weight="700" fill="#0a0a0f">無限循環直到功能完整</text>
-          </g>
-        </svg>
-        <div class="diagram-caption">圖 8.5 — TDD 三步驟循環</div>
-      </div>
-
-      <h4>每次循環只處理一個測試</h4>
-
-      <p>TDD 的核心紀律由 Robert C. Martin（Uncle Bob）整理為 <strong>Three Rules of TDD</strong>：</p>
-
-      <ol>
-        <li>未有失敗的測試前，不可寫任何 production code</li>
-        <li>單一測試僅寫到「剛好失敗」即停（包含編譯錯誤）</li>
-        <li>Production code 僅寫到「剛好通過該失敗測試」即停</li>
-      </ol>
-
-      <p>因此每次 R-G-R 循環嚴格限制在<strong>單一測試</strong>的範圍內。多輪循環累積後，才會於 REFACTOR 步驟出現可抽出的重複結構——這正是 TDD 與「先列完所有測試再實作」（spec-first / test-first）的根本差異所在。</p>
-
-      <div class="callout callout-warn">
-        <div class="callout-icon">!</div>
-        <div class="callout-body">
-          <strong>勿一次列完所有測試</strong>
-          若一次寫完整份規格的所有測試再開始實作，會失去三項 TDD 的核心價值：① REFACTOR 步驟失去抽取共通結構的素材、② 邊界情況無從於後續迴圈中發現、③ 開發者容易超出「剛好通過」的範圍而過度實作。此做法在業界稱為 spec-first / test-first，可視為一種有效的測試實務，但不屬於 Kent Beck 原始定義的 TDD。
-        </div>
-      </div>
-
-      <h4>實作範例：撰寫密碼驗證函式 <code>validatePassword</code></h4>
-
-      <p>規格：密碼須長度 ≥ 8 字元，且至少含一個數字。以下示範兩輪 RED → GREEN 累積出有意義的重構機會，再於第三步驟進行 refactor。</p>
-
-      <div class="code-block">
-        <div class="code-block-header">
-          <span class="code-block-lang">typescript</span>
-          <button class="code-copy-btn" type="button">複製</button>
-        </div>
-<pre><code><span class="tk-cm">// ===== Round 1（RED） =====</span>
-test(<span class="tk-st">'長度至少 8 字元才合法'</span>, () =&gt; {
-  expect(validatePassword(<span class="tk-st">'abc'</span>)).toBe(<span class="tk-kw">false</span>);
-  expect(validatePassword(<span class="tk-st">'abcdefgh'</span>)).toBe(<span class="tk-kw">true</span>);
-});
-<span class="tk-cm">// 執行 → 失敗（validatePassword 尚未實作）</span>
-
-<span class="tk-cm">// ===== Round 1（GREEN） =====</span>
-<span class="tk-kw">function</span> <span class="tk-fn">validatePassword</span>(p: <span class="tk-fn">string</span>) {
-  <span class="tk-kw">return</span> p.length &gt;= <span class="tk-num">8</span>;
-}
-<span class="tk-cm">// 執行 → 通過</span>
-
-<span class="tk-cm">// ===== Round 2（RED） =====</span>
-test(<span class="tk-st">'必須包含至少一個數字'</span>, () =&gt; {
-  expect(validatePassword(<span class="tk-st">'abcdefgh'</span>)).toBe(<span class="tk-kw">false</span>);  <span class="tk-cm">// 無數字</span>
-  expect(validatePassword(<span class="tk-st">'abcdefg1'</span>)).toBe(<span class="tk-kw">true</span>);
-});
-
-<span class="tk-cm">// ===== Round 2（GREEN） =====</span>
-<span class="tk-kw">function</span> <span class="tk-fn">validatePassword</span>(p: <span class="tk-fn">string</span>) {
-  <span class="tk-kw">return</span> p.length &gt;= <span class="tk-num">8</span> &amp;&amp; /\d/.test(p);
-}
-<span class="tk-cm">// 執行 → 兩個測試皆通過</span>
-
-<span class="tk-cm">// ===== Round 3（REFACTOR） =====</span>
-<span class="tk-cm">// 兩條規則混在同一行 boolean 表達式中，可讀性下降。</span>
-<span class="tk-cm">// 測試保持不動，抽出具名規則：</span>
-<span class="tk-kw">const</span> <span class="tk-fn">hasMinLength</span> = (p: <span class="tk-fn">string</span>) =&gt; p.length &gt;= <span class="tk-num">8</span>;
-<span class="tk-kw">const</span> <span class="tk-fn">hasDigit</span> = (p: <span class="tk-fn">string</span>) =&gt; /\d/.test(p);
-
-<span class="tk-kw">function</span> <span class="tk-fn">validatePassword</span>(p: <span class="tk-fn">string</span>) {
-  <span class="tk-kw">return</span> hasMinLength(p) &amp;&amp; hasDigit(p);
-}
-<span class="tk-cm">// 執行 → 全部測試仍通過 ← REFACTOR 完成</span></code></pre>
-      </div>
-
-      <div class="callout callout-tip">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>TDD 真正的價值不在於「撰寫測試」</strong>
-          而在於<strong>「先釐清要實作的內容」</strong>。撰寫測試的當下，必須思考：「此函式的 input / output 為何？邊界情況有哪些？」此思考過程的價值遠高於測試本身。
-        </div>
-      </div>
-
-      <h3>Coverage——測試覆蓋率</h3>
+    <section id="coverage">
+      <span class="section-eyebrow">05 — 測試覆蓋率</span>
+      <h2>Coverage——測試覆蓋率</h2>
 
       <p>Coverage 是衡量「測試實際執行到多少程式碼」的定量指標。工具（JS 的 Istanbul / c8、Python 的 <code>coverage.py</code>、Java 的 JaCoCo、Go 內建 <code>go test -cover</code>）會於測試執行時在程式碼中插入紀錄點，計算「執行到的部分 ÷ 總量」的百分比。依「總量」如何切分，常見四種指標：</p>
 
@@ -546,26 +418,28 @@ test(<span class="tk-st">'必須包含至少一個數字'</span>, () =&gt; {
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong>Coverage 數字並非測試品質的同義詞</strong>
-          Coverage 僅衡量「測試覆蓋了多少程式碼」，無法反映邏輯正確性——一個無 <code>expect</code> 卻呼叫過函式的測試亦能貢獻覆蓋率。業界以 <strong>80% 為健康度參考值</strong>（高品質開源專案多落於 80–90%），但追求 100% 邊際效益急遽下降，且易催生為了數字而撰寫的低價值測試。Coverage 應與 F.I.R.S.T、AAA 並用，作為輔助指標而非單一目標。
+          Coverage 僅衡量「測試覆蓋了多少程式碼」，無法反映邏輯正確性——一個無 <code>expect</code> 卻呼叫過函式的測試亦能貢獻覆蓋率。業界以 <span style="font-weight:700">80% 為健康度參考值</span>（高品質開源專案多落於 80–90%），但追求 100% 邊際效益急遽下降，且易催生為了數字而撰寫的低價值測試。Coverage 應作為輔助指標，與下一章的 AAA、F.I.R.S.T 並用，而非單一目標。
         </div>
       </div>
+    </section>
 
-      <h3>F.I.R.S.T——五項測試品質原則</h3>
+    <section id="methodology">
+      <span class="section-eyebrow">06 — 撰寫好測試</span>
+      <h2>撰寫好測試：結構與品質</h2>
 
-      <p>由 Robert C. Martin（Uncle Bob）提出，每個字母代表一項原則：</p>
+      <p>前五章說明的是「測試的整體配比」與「覆蓋率度量」。本章轉向「單一測試本身」——兩個彼此互補、可同時並用的概念：</p>
 
       <table>
         <thead>
-          <tr><th>字母</th><th>原則</th><th>實務意涵</th></tr>
+          <tr><th>概念</th><th>關注層次</th><th>回答的問題</th></tr>
         </thead>
         <tbody>
-          <tr><td><strong>F</strong>ast</td><td>快速</td><td>整套 unit test 應於數秒內完成，否則開發者將不願頻繁執行</td></tr>
-          <tr><td><strong>I</strong>solated</td><td>獨立</td><td>每個測試彼此獨立，不依賴執行順序、不互相影響</td></tr>
-          <tr><td><strong>R</strong>epeatable</td><td>可重複</td><td>相同 input 永遠產生相同結果，不依賴時間、亂數或外部服務。違反此原則即為 <strong>flaky test（不穩定測試）</strong>——有時通過、有時失敗，會使團隊習慣性忽略 CI 紅燈</td></tr>
-          <tr><td><strong>S</strong>elf-validating</td><td>自我驗證</td><td>執行後直接顯示成功或失敗，無須人工檢視 log 判讀</td></tr>
-          <tr><td><strong>T</strong>imely</td><td>及時</td><td>測試應緊隨 production code 撰寫，理想方式即為 TDD 的 R-G-R 循環</td></tr>
+          <tr><td><strong>AAA</strong></td><td>單一測試結構</td><td>一個測試的程式碼如何組織？</td></tr>
+          <tr><td><strong>F.I.R.S.T</strong></td><td>測試品質</td><td>怎樣的測試算是好測試？</td></tr>
         </tbody>
       </table>
+
+      <p>兩者並無互斥：每個測試內部遵循 AAA 結構，整體須滿足 F.I.R.S.T 原則。</p>
 
       <h3>AAA——Arrange / Act / Assert</h3>
 
@@ -609,6 +483,23 @@ test(<span class="tk-st">'必須包含至少一個數字'</span>, () =&gt; {
           單一 test 內最好僅包含一個邏輯上的 assert（可有多個 expect，但皆驗證同一件事）。若發現需要第二組 act → assert，應將其拆分為新的測試。
         </div>
       </div>
+
+      <h3>F.I.R.S.T——五項測試品質原則</h3>
+
+      <p>由 Robert C. Martin（Uncle Bob）提出，每個字母代表一項原則：</p>
+
+      <table>
+        <thead>
+          <tr><th>字母</th><th>原則</th><th>實務意涵</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>F</strong>ast</td><td>快速</td><td>整套 unit test 應於數秒內完成，否則開發者將不願頻繁執行</td></tr>
+          <tr><td><strong>I</strong>solated</td><td>獨立</td><td>每個測試彼此獨立，不依賴執行順序、不互相影響</td></tr>
+          <tr><td><strong>R</strong>epeatable</td><td>可重複</td><td>相同 input 永遠產生相同結果，不依賴時間、亂數或外部服務。違反此原則即為 <span style="font-weight:700">flaky test（不穩定測試）</span>——有時通過、有時失敗，會使團隊習慣性忽略 CI 紅燈</td></tr>
+          <tr><td><strong>S</strong>elf-validating</td><td>自我驗證</td><td>執行後直接顯示成功或失敗，無須人工檢視 log 判讀</td></tr>
+          <tr><td><strong>T</strong>imely</td><td>及時</td><td>測試應緊隨 production code 撰寫，避免功能交付許久後才補上——延後撰寫的測試常淪為形式</td></tr>
+        </tbody>
+      </table>
     </section>
 
     <nav class="lesson-nav" aria-label="上一課/下一課">
