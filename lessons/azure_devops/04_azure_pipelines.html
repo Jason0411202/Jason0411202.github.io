@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 04｜Azure Pipelines — Azure DevOps 課程</title>
+<meta name="description" content="Azure Pipelines CI/CD 自動化:CI 與 CD 概念、YAML 與 Classic 兩種定義方式、pipeline → stage → job → step 層級結構、第一條 YAML pipeline、triggers、agents 與 environments 核准關卡。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="reading-progress"></div>
+
+<header class="lesson-hero">
+  <div class="hero-inner">
+    <a class="hero-back" href="../../index.html">← 回到文章入口</a>
+    <div class="hero-eyebrow">Lesson 04 · Azure DevOps 實戰篇</div>
+    <h1 class="hero-title">Azure Pipelines<span> CI/CD 自動化</span></h1>
+    <p class="hero-desc">原始碼進入 Repos 後,下一步是讓建置、測試與部署不再依賴人工執行。本課介紹 Azure Pipelines:先釐清 CI/CD 的概念,再認識 pipeline 的層級結構,接著以一份完整的 YAML 範例走過第一條自動化流程,最後說明觸發時機、執行環境與 production 的核准關卡。</p>
+    <div class="hero-badges">
+      <span class="hero-badge"><span class="dot"></span>第 4 / 5 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 15 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>Azure DevOps</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sticky-nav">
+  <div class="sticky-nav-inner">
+    <span class="toc-label">章節</span>
+    <ul class="toc-list">
+      <li><a class="toc-link" href="#what">什麼是 CI/CD</a></li>
+      <li><a class="toc-link" href="#yaml-classic">YAML 還是 Classic</a></li>
+      <li><a class="toc-link" href="#hierarchy">核心詞彙與層級</a></li>
+      <li><a class="toc-link" href="#first">第一條 Pipeline</a></li>
+      <li><a class="toc-link" href="#triggers">Triggers 觸發時機</a></li>
+      <li><a class="toc-link" href="#agents">Agents 執行環境</a></li>
+      <li><a class="toc-link" href="#environments">環境與核准</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="lesson-main">
+  <article class="lesson-article">
+
+    <section id="what">
+      <span class="section-eyebrow">01 — 什麼是 CI/CD / Pipelines</span>
+      <h2>讓建置、測試、部署自動化</h2>
+
+      <p>Azure Pipelines 是 Azure DevOps 中負責 CI/CD 自動化的服務。所謂 CI/CD,由兩個概念組成:</p>
+
+      <ul>
+        <li><strong>持續整合 (Continuous Integration, CI)</strong>——每當有人提交程式碼,系統便自動將變更與主線合併並執行測試。問題在最早期就被發現,避免缺陷累積到上線前才爆發。CI 同時產出可供後續部署使用的 artifact。</li>
+        <li><strong>持續交付 (Continuous Delivery, CD)</strong>——將通過驗證的 artifact 自動建置、測試,並部署到一個或多個環境 (測試、預備、生產)。release 流程自動化,降低人工部署的失誤與延遲。</li>
+      </ul>
+
+      <p>Azure Pipelines 結合 CI、持續測試與 CD 於同一服務,<strong>支援所有主要語言與專案類型</strong>,並可在 Windows、Linux、macOS 上平行執行。部署目標也相當廣:虛擬機器、container、地端伺服器、雲端與 PaaS 皆可,甚至能將行動 app 發行到應用商店。唯一的前提是<strong>原始碼必須置於版本控制之下</strong> (支援 Azure Repos 與 GitHub)。</p>
+
+      <div class="diagram">
+        <img src="assets/azure/pipelines-overview.png" alt="Azure Pipelines 概觀圖" class="shot-md">
+        <div class="diagram-caption">圖 4.1 — Azure Pipelines 概觀:從原始碼到部署的自動化流程 (來源:Microsoft Learn)</div>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>CI 與 CD 的分工</strong>
+          可以把 CI 想成「對程式碼本身的把關」——合併、編譯、測試,確保程式碼健康;CD 則是「把健康的成品送到各環境」——部署與發布。兩者銜接的關鍵是 artifact:CI 產出它,CD 取用它。
+        </div>
+      </div>
+    </section>
+
+    <section id="yaml-classic">
+      <span class="section-eyebrow">02 — YAML 還是 Classic?</span>
+      <h2>兩種定義 pipeline 的方式</h2>
+
+      <p>Azure Pipelines 提供兩種定義流程的方式。理解差異,有助於選對起點:</p>
+
+      <table>
+        <thead>
+          <tr><th>方式</th><th>如何定義</th><th>特性</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>YAML</strong></td><td>以 <code>azure-pipelines.yml</code> 檔案描述流程,存放於 repo 內</td><td>pipeline as code、隨程式碼一起版本控管、可審查與重現;官方推薦</td></tr>
+          <tr><td><strong>Classic</strong></td><td>透過 Web UI 的拖拉式編輯器設定</td><td>不需撰寫 YAML、上手快,但定義不在 repo 內、難以追蹤變更歷史;屬舊式做法</td></tr>
+        </tbody>
+      </table>
+
+      <p>兩者最大的差別在於<strong>「定義放在哪裡」</strong>。YAML 把流程定義當作程式碼的一部分,放進 repo 並接受版本控管——誰改了什麼、何時改的,都能在 commit 歷史中查到,也能透過 Pull Request 審查。Classic 的設定則存於 UI,脫離了原始碼的追蹤鏈。</p>
+
+      <p>基於可重現性與可追蹤性,<strong>本課聚焦於 YAML 方式</strong>,後續範例皆以 YAML 撰寫。</p>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>新專案直接採用 YAML</strong>
+          除非維護的是早已存在的 Classic pipeline,新建立的流程建議一律使用 YAML。流程定義與程式碼同步演進,回溯與複製到其他 repo 都更為單純。
+        </div>
+      </div>
+    </section>
+
+    <section id="hierarchy">
+      <span class="section-eyebrow">03 — 核心詞彙:pipeline → stage → job → step</span>
+      <h2>由大到小的四層結構</h2>
+
+      <p>YAML pipeline 的結構由外而內分為四層。先建立這張層級圖,後續閱讀任何 pipeline 定義時都能對應到正確的層級:</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 720 340" xmlns="http://www.w3.org/2000/svg" aria-label="Azure Pipelines 層級結構:pipeline 包含 stages、stage 包含 jobs、job 包含 steps">
+          <g font-family="JetBrains Mono, monospace" font-size="12">
+            <rect x="20" y="20" width="680" height="300" rx="12" fill="#e9d5ff" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="44" y="44" font-weight="700" fill="#4c1d95">Pipeline</text>
+            <text x="120" y="44" fill="#6b6b7e" font-size="10">整條自動化流程</text>
+
+            <rect x="44" y="60" width="632" height="118" rx="10" fill="#cffafe" stroke="#06b6d4" stroke-width="1.5"/>
+            <text x="64" y="82" font-weight="700" fill="#155e63">Stage:build</text>
+            <text x="170" y="82" fill="#6b6b7e" font-size="10">一個階段 (建置 / 測試 / 部署)</text>
+
+            <rect x="64" y="96" width="592" height="68" rx="9" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+            <text x="84" y="117" font-weight="700" fill="#166534">Job</text>
+            <text x="140" y="117" fill="#6b6b7e" font-size="10">在單一 agent 上執行的一組 step</text>
+
+            <rect x="84" y="128" width="170" height="28" rx="7" fill="#fde7c7" stroke="#d97706" stroke-width="1.3"/>
+            <text x="169" y="146" text-anchor="middle" fill="#7c2d12">step:npm ci</text>
+            <rect x="266" y="128" width="170" height="28" rx="7" fill="#fde7c7" stroke="#d97706" stroke-width="1.3"/>
+            <text x="351" y="146" text-anchor="middle" fill="#7c2d12">step:npm test</text>
+            <rect x="448" y="128" width="190" height="28" rx="7" fill="#fde7c7" stroke="#d97706" stroke-width="1.3"/>
+            <text x="543" y="146" text-anchor="middle" fill="#7c2d12">step:npm run build</text>
+
+            <rect x="44" y="192" width="632" height="110" rx="10" fill="#cffafe" stroke="#06b6d4" stroke-width="1.5"/>
+            <text x="64" y="214" font-weight="700" fill="#155e63">Stage:deploy</text>
+            <text x="182" y="214" fill="#6b6b7e" font-size="10">部署到 environment,可加核准關卡</text>
+
+            <rect x="64" y="228" width="592" height="58" rx="9" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+            <text x="84" y="250" font-weight="700" fill="#166534">deployment job</text>
+            <rect x="84" y="258" width="240" height="22" rx="6" fill="#fde7c7" stroke="#d97706" stroke-width="1.3"/>
+            <text x="204" y="273" text-anchor="middle" fill="#7c2d12">step:部署到 production</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">圖 4.2 — pipeline &gt; stage &gt; job &gt; step 的巢狀層級</div>
+      </div>
+
+      <p>四個層級加上幾個常用的關聯概念,整理如下:</p>
+
+      <table>
+        <thead>
+          <tr><th>層級 / 概念</th><th>定義</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>pipeline</strong></td><td>整條自動化流程,由一個 YAML 檔定義,內含一個或多個 stage</td></tr>
+          <tr><td><strong>stage</strong></td><td>流程中的主要階段,例如 build、test、deploy。stage 之間可設定依賴順序</td></tr>
+          <tr><td><strong>job</strong></td><td>一個 stage 內可執行於單一 agent 的工作單位;同一 stage 的多個 job 可平行執行</td></tr>
+          <tr><td><strong>step / task</strong></td><td>job 內最小的執行單位。<code>script</code> 執行任意命令列指令;<code>task</code> 則是預先封裝的可重用動作 (如安裝 Node.js)</td></tr>
+          <tr><td><strong>agent</strong></td><td>實際執行 job 的運算機器 (VM 或容器)</td></tr>
+          <tr><td><strong>trigger</strong></td><td>啟動 pipeline 的條件,例如 push 到某分支或建立 Pull Request</td></tr>
+          <tr><td><strong>artifact</strong></td><td>job 產出並可傳遞給後續 stage 或部署使用的成品 (如建置好的檔案)</td></tr>
+          <tr><td><strong>environment</strong></td><td>部署的目標環境 (如 staging、production),可附加核准與檢查</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>step 與 task 的關係</strong>
+          step 是 job 內動作的統稱;<code>script</code> 與 <code>task</code> 都是 step 的形式。<code>script</code> 直接跑命令列指令,適合簡單操作;<code>task</code> 是封裝好的可重用元件,封裝了較複雜的邏輯與參數 (如版本選擇、相依設定)。
+        </div>
+      </div>
+    </section>
+
+    <section id="first">
+      <span class="section-eyebrow">04 — 第一條 Pipeline (YAML 範例)</span>
+      <h2>一份可讀懂的 azure-pipelines.yml</h2>
+
+      <p>下面是一份完整、可直接理解的 Node.js 專案 pipeline。它在每次 push 到 <code>main</code> 時,於一台乾淨的 Linux 機器上安裝 Node.js、裝相依套件、跑測試並建置專案:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-fn">trigger</span>:
+  - main
+
+<span class="tk-fn">pool</span>:
+  <span class="tk-fn">vmImage</span>: <span class="tk-st">'ubuntu-latest'</span>
+
+<span class="tk-fn">steps</span>:
+  - <span class="tk-fn">task</span>: NodeTool@0
+    <span class="tk-fn">inputs</span>:
+      <span class="tk-fn">versionSpec</span>: <span class="tk-st">'20.x'</span>
+    <span class="tk-fn">displayName</span>: <span class="tk-st">'安裝 Node.js'</span>
+
+  - <span class="tk-fn">script</span>: npm ci
+    <span class="tk-fn">displayName</span>: <span class="tk-st">'安裝相依套件'</span>
+
+  - <span class="tk-fn">script</span>: npm test
+    <span class="tk-fn">displayName</span>: <span class="tk-st">'執行測試'</span>
+
+  - <span class="tk-fn">script</span>: npm run build
+    <span class="tk-fn">displayName</span>: <span class="tk-st">'建置專案'</span></code></pre>
+      </div>
+
+      <p>逐段拆解這份定義:</p>
+
+      <ul>
+        <li><code>trigger</code>——指定觸發條件。此處設定為 <code>main</code>,表示任何 push 到 <code>main</code> 分支都會啟動這條 pipeline。</li>
+        <li><code>pool</code> 與 <code>vmImage</code>——指定執行環境。<code>ubuntu-latest</code> 代表使用 Microsoft 代管的最新 Ubuntu 映像,每次執行都是乾淨的 VM。</li>
+        <li><code>steps</code>——依序執行的動作清單。第一個是 <code>task</code> (<code>NodeTool@0</code>),用封裝好的元件安裝指定版本的 Node.js;其餘三個是 <code>script</code>,直接執行命令列指令。</li>
+        <li><code>displayName</code>——每個 step 在執行記錄中顯示的名稱,讓記錄易於閱讀。</li>
+      </ul>
+
+      <p>這份範例沒有明確宣告 stage 與 job,因為當 pipeline 只有單一 stage、單一 job 時,可省略外層而直接寫 <code>steps</code>。Azure Pipelines 會自動將其包進一個隱含的 stage 與 job。需要多階段 (例如先 build 再 deploy) 時,才需展開成完整的 <code>stages</code> 結構。</p>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>YAML 對縮排敏感</strong>
+          YAML 以縮排表達層級,且僅接受空格、不可使用 Tab。縮排錯誤是初學者最容易忽略的細節,常導致 pipeline 無法解析。建議在編輯器中啟用「顯示空白字元」並統一以兩個空格縮排。
+        </div>
+      </div>
+    </section>
+
+    <section id="triggers">
+      <span class="section-eyebrow">05 — Triggers — 何時觸發</span>
+      <h2>四種啟動 pipeline 的時機</h2>
+
+      <p>trigger 決定 pipeline 何時自動執行。常見的觸發方式有四種:</p>
+
+      <table>
+        <thead>
+          <tr><th>觸發方式</th><th>啟動時機</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>CI trigger</strong></td><td>程式碼 push 到指定分支時 (最常見)</td></tr>
+          <tr><td><strong>PR trigger</strong></td><td>建立或更新針對指定分支的 Pull Request 時,用於合併前驗證</td></tr>
+          <tr><td><strong>Scheduled</strong></td><td>依排程定時執行 (例如每晚一次的夜間建置)</td></tr>
+          <tr><td><strong>Manual</strong></td><td>不設自動觸發,由人手動於 UI 啟動</td></tr>
+        </tbody>
+      </table>
+
+      <p>以下片段示範 CI trigger 與排程 trigger 的寫法。<code>trigger</code> 監聽 push,<code>schedules</code> 則以 cron 語法設定每日定時執行:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 推送到 main 或 release/* 時觸發 (CI)</span>
+<span class="tk-fn">trigger</span>:
+  <span class="tk-fn">branches</span>:
+    <span class="tk-fn">include</span>:
+      - main
+      - release/*
+
+<span class="tk-cm"># 每天 02:00 在 main 上執行一次 (排程)</span>
+<span class="tk-fn">schedules</span>:
+  - <span class="tk-fn">cron</span>: <span class="tk-st">'0 2 * * *'</span>
+    <span class="tk-fn">displayName</span>: <span class="tk-st">'每日夜間建置'</span>
+    <span class="tk-fn">branches</span>:
+      <span class="tk-fn">include</span>:
+        - main</code></pre>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>CI 與 PR trigger 互補</strong>
+          CI trigger 在程式碼「已合併」後驗證主線健康;PR trigger 則在程式碼「尚未合併」時先行檢查,讓問題在進入主線前就被攔下。多數團隊兩者並用,構成合併前後的雙重防線。
+        </div>
+      </div>
+    </section>
+
+    <section id="agents">
+      <span class="section-eyebrow">06 — Agents — 在哪裡跑</span>
+      <h2>代管 agent 與自架 agent</h2>
+
+      <p>pipeline 的每個 job 都需要一台 agent 來執行。agent 分為兩類:</p>
+
+      <table>
+        <thead>
+          <tr><th>類型</th><th>說明</th><th>適用情境</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Microsoft-hosted</strong></td><td>由 Microsoft 維護,每次執行皆提供乾淨的全新 VM,用完即回收</td><td>免維護、需求標準的多數專案</td></tr>
+          <tr><td><strong>Self-hosted</strong></td><td>自行架設於自有機器,可預先安裝特定工具、保留快取與環境</td><td>需特定軟體、特殊硬體或快取加速時</td></tr>
+        </tbody>
+      </table>
+
+      <p>代管 agent 的優點是免維護且環境一致;缺點是每次都從乾淨狀態開始,無法保留前次的快取。自架 agent 則相反——能保留環境與快取以加速建置,但須自行負責安裝、更新與安全維護。範例中的 <code>vmImage: 'ubuntu-latest'</code> 即指定使用代管 agent。</p>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>免費額度</strong>
+          私有專案享有一個免費的平行作業,每月 1,800 分鐘的代管 agent 執行時間 (單次作業最長 60 分鐘)。小型專案通常無須付費即可起步;額度用罄後可購買額外的平行作業。
+        </div>
+      </div>
+    </section>
+
+    <section id="environments">
+      <span class="section-eyebrow">07 — 環境與核准 (Environments &amp; Approvals)</span>
+      <h2>部署到 environment,為 production 設關卡</h2>
+
+      <p>當 pipeline 進入部署階段,目標通常是一個 <strong>environment</strong> (例如 <code>staging</code> 或 <code>production</code>)。部署到環境的工作須使用特殊的 <strong>deployment job</strong>,而非一般 job——它會記錄每次部署的歷程,讓「哪個版本部署到哪個環境」可被追蹤。</p>
+
+      <p>更重要的是,environment 可附加<strong>核准關卡 (approval gate)</strong>。對 <code>production</code> 設定核准後,pipeline 執行到部署步驟會暫停,等待指定的人員在 UI 上手動核准,才繼續執行。這道關卡讓自動化流程在最關鍵的一步保留人工把關。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-fn">stages</span>:
+  - <span class="tk-fn">stage</span>: deploy
+    <span class="tk-fn">jobs</span>:
+      - <span class="tk-fn">deployment</span>: deployProd
+        <span class="tk-fn">environment</span>: <span class="tk-st">'production'</span>   <span class="tk-cm"># 對此環境設定核准後,部署前會暫停等待</span>
+        <span class="tk-fn">strategy</span>:
+          <span class="tk-fn">runOnce</span>:
+            <span class="tk-fn">deploy</span>:
+              <span class="tk-fn">steps</span>:
+                - <span class="tk-fn">script</span>: ./deploy.sh
+                  <span class="tk-fn">displayName</span>: <span class="tk-st">'部署到 production'</span></code></pre>
+      </div>
+
+      <p>核准本身不在 YAML 中設定,而是在 Azure DevOps 的 <strong>Environments</strong> 頁面,針對該環境加入「Approvals and checks」。如此一來,YAML 只負責描述「部署到哪個環境」,而誰能核准、需要幾人核准等治理規則,則由環境設定集中管理。</p>
+
+      <div class="diagram">
+        <img src="assets/azure/pipelines-landing.png" alt="Azure Pipelines 最近執行的管線清單" class="shot-md">
+        <div class="diagram-caption">圖 4.3 — Pipelines 頁面列出最近執行的管線與其狀態 (來源:Microsoft Learn)</div>
+      </div>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>pipeline 隨程式碼版控,production 設核准關卡</strong>
+          建議將 <code>azure-pipelines.yml</code> 與程式碼放在同一 repo 一起版本控管,讓流程定義可審查、可回溯;同時為 production 環境設定核准關卡,在自動化的便利與部署的安全之間取得平衡。自動化負責重複勞動,人工保留最後一道判斷。
+        </div>
+      </div>
+    </section>
+
+    <nav class="lesson-nav" aria-label="上一課/下一課">
+      <a class="lesson-nav-card lesson-nav-prev" href="03_azure_repos.html">
+        <div class="lesson-nav-eyebrow">← 上一課</div>
+        <div class="lesson-nav-title">Lesson 03 · Azure Repos</div>
+      </a>
+      <a class="lesson-nav-card lesson-nav-next" href="05_azure_test_plans.html">
+        <div class="lesson-nav-eyebrow">下一課 →</div>
+        <div class="lesson-nav-title">Lesson 05 · Azure Test Plans</div>
+      </a>
+    </nav>
+
+  </article>
+
+  <aside class="lesson-aside">
+    <div class="aside-card">
+      <div class="aside-title">5 堂課程系列 <span class="progress-pill">4 / 5</span></div>
+      <ul class="course-nav">
+        <li><a class="course-nav-item" href="01_azure_overview.html"><span class="course-nav-num">01</span><span>Azure DevOps 總覽</span></a></li>
+        <li><a class="course-nav-item" href="02_azure_boards.html"><span class="course-nav-num">02</span><span>Azure Boards</span></a></li>
+        <li><a class="course-nav-item" href="03_azure_repos.html"><span class="course-nav-num">03</span><span>Azure Repos</span></a></li>
+        <li><a class="course-nav-item current" href="04_azure_pipelines.html"><span class="course-nav-num">04</span><span>Azure Pipelines</span></a></li>
+        <li><a class="course-nav-item" href="05_azure_test_plans.html"><span class="course-nav-num">05</span><span>Azure Test Plans</span></a></li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<footer class="lesson-footer">
+  Jason 的 Azure DevOps 課程系列 · Lesson 04
+</footer>
+
+<script src="../_shared.js"></script>
+</body>
+</html>

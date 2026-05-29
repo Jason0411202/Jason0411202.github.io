@@ -115,8 +115,8 @@ Automation utilities + ChatGPT bot
 
 🌐 **[jason0411202.github.io](https://jason0411202.github.io)** — 技術筆記入口
 
-🎓 **開源協作課程系列** — 10 堂實務導向 HTML 互動式課程  
-   前 6 堂為通用觀念，後 4 堂落地到 Azure DevOps 平台實務。
+🎓 **多人協作課程系列** — 6 堂實務導向 HTML 互動式課程  
+   借鏡開源世界的通用協作做法，建立團隊協作的共同基礎。
 
 | # | 課程主題 |
 |---|---|
@@ -126,10 +126,17 @@ Automation utilities + ChatGPT bot
 | 04 | Fork、Upstream、PR 完整流程 |
 | 05 | Code Review 文化與技巧 |
 | 06 | 軟體測試 |
-| 07 | Azure Boards (Work Item / Backlog / Kanban / WIQL) |
-| 08 | Azure Repos (Branch Policies / PR / Required Reviewers) |
-| 09 | Azure Pipelines (YAML / Variables + Key Vault / Environments / Templates) |
-| 10 | Azure Artifacts (Feed / Upstream Sources / Views / Retention) |
+
+🎓 **Azure DevOps 課程系列** — 5 堂課程  
+   落地到 Azure DevOps 雲端平台，以 Microsoft Learn 官方文件為基準。
+
+| # | 課程主題 |
+|---|---|
+| 01 | Azure DevOps 總覽 (Organization / Project / 生命週期) |
+| 02 | Azure Boards (Work Item / Backlog / Kanban / Queries) |
+| 03 | Azure Repos (Branch Policies / PR / Required Reviewers) |
+| 04 | Azure Pipelines (YAML / CI/CD / Environments) |
+| 05 | Azure Test Plans (測試案例 / Runner / 探索性測試) |
 
 ---
 

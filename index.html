@@ -447,7 +447,7 @@ a { color: inherit; text-decoration: none; }
       <p class="hero-desc">用一個乾淨、有層次的入口整理所有文章。每篇文章都是一個小小里程碑，這裡會持續更新。</p>
       <div class="hero-badges">
         <div class="hero-badge"><span class="dot"></span>AI 工具</div>
-        <div class="hero-badge"><span class="dot"></span>開源協作</div>
+        <div class="hero-badge"><span class="dot"></span>多人協作</div>
         <div class="hero-badge"><span class="dot"></span>工作流程</div>
         <div class="hero-badge"><span class="dot"></span>筆記整理</div>
       </div>
@@ -495,14 +495,24 @@ a { color: inherit; text-decoration: none; }
       </div>
 
       <div class="side-card">
-        <div class="side-title">課程系列：開源協作</div>
-        <div class="side-text">10 堂實務導向課程。前 6 堂借鏡開源世界的通用協作做法；後 4 堂落地到 Azure DevOps（Boards / Repos / Pipelines / Artifacts），對齊 2026 最新 UI 與 YAML 慣例。</div>
+        <div class="side-title">課程系列：多人協作</div>
+        <div class="side-text">6 堂實務導向課程，借鏡開源世界的通用協作做法，從 Git 日常與進階操作，到分支策略、Fork/PR 流程、Code Review 文化與軟體測試，建立團隊協作的共同基礎。</div>
         <div class="side-list">
           <div>· Git 日常 + 進階 (rebase/bisect 等)</div>
           <div>· 分支策略 / Issue / Fork / PR / Code Review</div>
           <div>· 軟體測試（金字塔／獎盃／蜂巢、Coverage、F.I.R.S.T、AAA）</div>
-          <div>· CI/CD + Hooks + Lint</div>
-          <div>· Azure Boards / Repos / Pipelines / Artifacts</div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="side-title">課程系列：Azure DevOps</div>
+        <div class="side-text">5 堂課程，落地到 Azure DevOps 雲端平台。從平台總覽到 Boards / Repos / Pipelines / Test Plans 四大服務，以 Microsoft Learn 官方文件為基準。</div>
+        <div class="side-list">
+          <div>· 平台總覽：Organization / Project 階層與生命週期</div>
+          <div>· Boards：Work Item / 看板 / Backlog / Sprint</div>
+          <div>· Repos：分支策略 / PR / Branch Policies</div>
+          <div>· Pipelines：YAML / CI/CD / Environments</div>
+          <div>· Test Plans：測試案例 / Runner / 探索性測試</div>
         </div>
       </div>
 
@@ -575,6 +585,7 @@ a { color: inherit; text-decoration: none; }
 
 <script>
 const COURSE_DATE = '2026-04-27';
+const COURSE_DATE_AZURE = '2026-04-27';
 const COURSE_DATE_GRPC = '2026-04-27';
 const COURSE_DATE_DEVOPS = '2026-04-28';
 const COURSE_DATE_CASSANDRA = '2026-04-28';
@@ -591,11 +602,15 @@ const gitLessons = [
   { n: '03', file: 'lessons/opensource/03_branching_strategies.html',     title: '分支策略選擇 / Issue',         desc: 'Git Flow / GitHub Flow / GitLab Flow / Trunk-Based — 怎麼選最適合自己的團隊；後半段補上 Issue 三大類與 Bug Report / Feature Request 撰寫結構。',                  minutes: 12, tags: ['協作', '分支', 'Issue'] },
   { n: '04', file: 'lessons/opensource/04_fork_pr_workflow.html',         title: 'Fork、Upstream、PR 完整流程',  desc: '從 fork 開始一直到 PR 被合併的全流程，包含 sync upstream、衝突解決、PR 描述。',                 minutes: 14, tags: ['協作', 'PR'] },
   { n: '05', file: 'lessons/opensource/05_code_review.html',              title: 'Code Review 文化與技巧',       desc: 'Google eng-practices、Conventional Comments、CODEOWNERS — Reviewer 與 Author 雙視角。',          minutes: 12, tags: ['協作', 'Review'] },
-  { n: '06', file: 'lessons/opensource/06_testing_tdd.html',              title: '軟體測試',                     desc: '測試金字塔/獎盃/蜂巢、Coverage 何時 80% 才合理、F.I.R.S.T、AAA。',                                  minutes: 13, tags: ['測試', 'AAA'] },
-  { n: '07', file: 'lessons/opensource/07_azure_boards.html',             title: 'Azure Boards 與 Work Item', desc: 'Process Template、Epic/Feature/Story/Task 階層、Backlog 與 Sprint、Kanban Board、WIQL Query、2026 UI 更新。',                                              minutes: 13, tags: ['Azure DevOps', 'Boards'] },
-  { n: '08', file: 'lessons/opensource/08_azure_repos.html',              title: 'Azure Repos 分支治理',       desc: 'Branch Policies、Pull Request、Required Reviewers、Automatic Reviewers、Vote Reset、Code Search 內建。',                                                  minutes: 12, tags: ['Azure DevOps', 'Repos'] },
-  { n: '09', file: 'lessons/opensource/09_azure_pipelines.html',          title: 'Azure Pipelines YAML',       desc: 'YAML 四層結構、Triggers、Agents、Variable Group + Key Vault、Environments + Approvals、Templates、三種 Deployment Strategies。',                          minutes: 16, tags: ['Azure DevOps', 'Pipelines'] },
-  { n: '10', file: 'lessons/opensource/10_azure_artifacts.html',          title: 'Azure Artifacts 套件治理',   desc: 'Feed 設計、六種套件格式、Upstream Sources 自動快取、@Local/@Prerelease/@Release Views、Retention Policy。',                                                minutes: 11, tags: ['Azure DevOps', 'Artifacts'] }
+  { n: '06', file: 'lessons/opensource/06_testing_tdd.html',              title: '軟體測試',                     desc: '測試金字塔/獎盃/蜂巢、Coverage 何時 80% 才合理、F.I.R.S.T、AAA。',                                  minutes: 13, tags: ['測試', 'AAA'] }
+];
+
+const azureLessons = [
+  { n: '01', file: 'lessons/azure_devops/01_azure_overview.html',     title: 'Azure DevOps 總覽',          desc: 'Organization/Project 階層、左側五大服務、Plan→Code→Build→Test→Deploy 生命週期、存取層級與免費方案。',                                                      minutes: 12, tags: ['Azure DevOps', '總覽'] },
+  { n: '02', file: 'lessons/azure_devops/02_azure_boards.html',       title: 'Azure Boards',               desc: '六大 hub、Work Item 階層 (Epic→Task)、看板與 WIP、Backlog 與 Sprint、Queries、交付計劃與可追蹤性。',                                                       minutes: 14, tags: ['Azure DevOps', 'Boards'] },
+  { n: '03', file: 'lessons/azure_devops/03_azure_repos.html',        title: 'Azure Repos',                desc: 'Git vs TFVC、Files/Commits/Branches、Pull Request、Branch Policies、Tags 與跨服務可追蹤性。',                                                            minutes: 13, tags: ['Azure DevOps', 'Repos'] },
+  { n: '04', file: 'lessons/azure_devops/04_azure_pipelines.html',    title: 'Azure Pipelines',            desc: 'CI/CD 概念、YAML vs Classic、pipeline→stage→job→step、第一條 YAML、Triggers、Agents、Environments 與核准。',                                              minutes: 15, tags: ['Azure DevOps', 'Pipelines'] },
+  { n: '05', file: 'lessons/azure_devops/05_azure_test_plans.html',   title: 'Azure Test Plans',           desc: '測試工作項目類型、測試計劃與套件、撰寫測試案例、Test Runner 手動測試、探索性測試與利害關係人回饋、進度報告。',                                                  minutes: 13, tags: ['Azure DevOps', 'Test Plans'] }
 ];
 
 const grpcLessons = [
@@ -655,8 +670,18 @@ const posts = [
     date: COURSE_DATE,
     minutes: l.minutes,
     tags: l.tags,
-    category: '開源協作',
+    category: '多人協作',
     series: `第 ${l.n} / ${gitLessons.length} 堂`
+  })),
+  ...azureLessons.map((l) => ({
+    title: l.title,
+    desc: l.desc,
+    href: l.file,
+    date: COURSE_DATE_AZURE,
+    minutes: l.minutes,
+    tags: l.tags,
+    category: 'Azure DevOps',
+    series: `第 ${l.n} / ${azureLessons.length} 堂`
   })),
   ...grpcLessons.map((l) => ({
     title: l.title,
@@ -710,7 +735,8 @@ const seriesPicker = document.getElementById('series-picker');
 const searchInput = document.getElementById('search');
 
 const seriesMeta = {
-  '開源協作':   { label: '開源協作',     short: 'Open Source',  accent: '#ff3d1f' },
+  '多人協作':   { label: '多人協作',     short: 'Collaboration', accent: '#ff3d1f' },
+  'Azure DevOps': { label: 'Azure DevOps', short: 'Azure DevOps', accent: '#0078d4' },
   'gRPC':       { label: 'gRPC (Go)',    short: 'gRPC',         accent: '#06b6d4' },
   'DevOps 實務': { label: 'DevOps 實務', short: 'DevOps',       accent: '#22c55e' },
   'Cassandra':  { label: 'Cassandra',    short: 'Cassandra',    accent: '#a855f7' },

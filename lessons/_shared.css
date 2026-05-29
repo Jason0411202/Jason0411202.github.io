@@ -549,6 +549,16 @@ code.cmd { background: var(--ink); color: #fcd34d; padding: 2px 7px; }
   box-shadow: var(--shadow);
 }
 .diagram svg { max-width: 100%; height: auto; }
+.diagram img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: block;
+  margin: 0 auto;
+}
+.diagram img.shot-sm { max-width: 320px; }
+.diagram img.shot-md { max-width: 520px; }
 .diagram-caption {
   margin-top: 0.8rem;
   font-size: 12px;
