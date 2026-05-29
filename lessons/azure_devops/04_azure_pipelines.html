@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 04 · Azure DevOps 實戰篇</div>
     <h1 class="hero-title">Azure Pipelines<span> CI/CD 自動化</span></h1>
-    <p class="hero-desc">原始碼進入 Repos 後,下一步是讓建置、測試與部署不再依賴人工執行。本課介紹 Azure Pipelines:先釐清 CI/CD 的概念,再認識 pipeline 的層級結構,接著以一份完整的 YAML 範例走過第一條自動化流程,最後說明觸發時機、執行環境與 production 的核准關卡。</p>
+    <p class="hero-desc">原始碼進入 Repos 後,下一步是讓 build、測試與部署不再依賴人工執行。本課介紹 Azure Pipelines:先釐清 CI/CD 的概念,再認識 pipeline 的層級結構,接著以一份完整的 YAML 範例走過第一條自動化流程,最後說明觸發時機、執行環境與 production 的核准關卡。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 4 / 5 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 15 分鐘</span>
@@ -46,13 +46,13 @@
 
     <section id="what">
       <span class="section-eyebrow">01 — 什麼是 CI/CD / Pipelines</span>
-      <h2>讓建置、測試、部署自動化</h2>
+      <h2>讓 build、測試、部署自動化</h2>
 
       <p>Azure Pipelines 是 Azure DevOps 中負責 CI/CD 自動化的服務。所謂 CI/CD,由兩個概念組成:</p>
 
       <ul>
         <li><strong>持續整合 (Continuous Integration, CI)</strong>——每當有人提交程式碼,系統便自動將變更與主線合併並執行測試。問題在最早期就被發現,避免缺陷累積到上線前才爆發。CI 同時產出可供後續部署使用的 artifact。</li>
-        <li><strong>持續交付 (Continuous Delivery, CD)</strong>——將通過驗證的 artifact 自動建置、測試,並部署到一個或多個環境 (測試、預備、生產)。release 流程自動化,降低人工部署的失誤與延遲。</li>
+        <li><strong>持續交付 (Continuous Delivery, CD)</strong>——將通過驗證的 artifact 自動 build、測試,並部署到一個或多個環境 (測試、預備、生產)。release 流程自動化,降低人工部署的失誤與延遲。</li>
       </ul>
 
       <p>Azure Pipelines 結合 CI、持續測試與 CD 於同一服務,<strong>支援所有主要語言與專案類型</strong>,並可在 Windows、Linux、macOS 上平行執行。部署目標也相當廣:虛擬機器、container、地端伺服器、雲端與 PaaS 皆可,甚至能將行動 app 發行到應用商店。唯一的前提是<strong>原始碼必須置於版本控制之下</strong> (支援 Azure Repos 與 GitHub)。</p>
@@ -115,7 +115,7 @@
 
             <rect x="44" y="60" width="632" height="118" rx="10" fill="#cffafe" stroke="#06b6d4" stroke-width="1.5"/>
             <text x="64" y="82" font-weight="700" fill="#155e63">Stage:build</text>
-            <text x="170" y="82" fill="#6b6b7e" font-size="10">一個階段 (建置 / 測試 / 部署)</text>
+            <text x="170" y="82" fill="#6b6b7e" font-size="10">一個階段 (build / 測試 / 部署)</text>
 
             <rect x="64" y="96" width="592" height="68" rx="9" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
             <text x="84" y="117" font-weight="700" fill="#166534">Job</text>
@@ -154,7 +154,7 @@
           <tr><td><strong>step / task</strong></td><td>job 內最小的執行單位。<code>script</code> 執行任意命令列指令;<code>task</code> 則是預先封裝的可重用動作 (如安裝 Node.js)</td></tr>
           <tr><td><strong>agent</strong></td><td>實際執行 job 的運算機器 (VM 或容器)</td></tr>
           <tr><td><strong>trigger</strong></td><td>啟動 pipeline 的條件,例如 push 到某分支或建立 Pull Request</td></tr>
-          <tr><td><strong>artifact</strong></td><td>job 產出並可傳遞給後續 stage 或部署使用的成品 (如建置好的檔案)</td></tr>
+          <tr><td><strong>artifact</strong></td><td>job 產出並可傳遞給後續 stage 或部署使用的成品 (如 build 好的檔案)</td></tr>
           <tr><td><strong>environment</strong></td><td>部署的目標環境 (如 staging、production),可附加核准與檢查</td></tr>
         </tbody>
       </table>
@@ -172,7 +172,7 @@
       <span class="section-eyebrow">04 — 第一條 Pipeline (YAML 範例)</span>
       <h2>一份可讀懂的 azure-pipelines.yml</h2>
 
-      <p>下面是一份完整、可直接理解的 Node.js 專案 pipeline。它在每次 push 到 <code>main</code> 時,於一台乾淨的 Linux 機器上安裝 Node.js、裝相依套件、跑測試並建置專案:</p>
+      <p>下面是一份完整、可直接理解的 Node.js 專案 pipeline。它在每次 push 到 <code>main</code> 時,於一台乾淨的 Linux 機器上安裝 Node.js、裝相依套件、跑測試並 build 專案:</p>
 
       <div class="code-block">
         <div class="code-block-header">
@@ -198,7 +198,7 @@
     <span class="tk-fn">displayName</span>: <span class="tk-st">'執行測試'</span>
 
   - <span class="tk-fn">script</span>: npm run build
-    <span class="tk-fn">displayName</span>: <span class="tk-st">'建置專案'</span></code></pre>
+    <span class="tk-fn">displayName</span>: <span class="tk-st">'build 專案'</span></code></pre>
       </div>
 
       <p>逐段拆解這份定義:</p>
@@ -234,7 +234,7 @@
         <tbody>
           <tr><td><strong>CI trigger</strong></td><td>程式碼 push 到指定分支時 (最常見)</td></tr>
           <tr><td><strong>PR trigger</strong></td><td>建立或更新針對指定分支的 Pull Request 時,用於合併前驗證</td></tr>
-          <tr><td><strong>Scheduled</strong></td><td>依排程定時執行 (例如每晚一次的夜間建置)</td></tr>
+          <tr><td><strong>Scheduled</strong></td><td>依排程定時執行 (例如每晚一次的夜間 build)</td></tr>
           <tr><td><strong>Manual</strong></td><td>不設自動觸發,由人手動於 UI 啟動</td></tr>
         </tbody>
       </table>
@@ -256,7 +256,7 @@
 <span class="tk-cm"># 每天 02:00 在 main 上執行一次 (排程)</span>
 <span class="tk-fn">schedules</span>:
   - <span class="tk-fn">cron</span>: <span class="tk-st">'0 2 * * *'</span>
-    <span class="tk-fn">displayName</span>: <span class="tk-st">'每日夜間建置'</span>
+    <span class="tk-fn">displayName</span>: <span class="tk-st">'每日夜間 build'</span>
     <span class="tk-fn">branches</span>:
       <span class="tk-fn">include</span>:
         - main</code></pre>
@@ -287,7 +287,7 @@
         </tbody>
       </table>
 
-      <p>代管 agent 的優點是免維護且環境一致;缺點是每次都從乾淨狀態開始,無法保留前次的快取。自架 agent 則相反——能保留環境與快取以加速建置,但須自行負責安裝、更新與安全維護。範例中的 <code>vmImage: 'ubuntu-latest'</code> 即指定使用代管 agent。</p>
+      <p>代管 agent 的優點是免維護且環境一致;缺點是每次都從乾淨狀態開始,無法保留前次的快取。自架 agent 則相反——能保留環境與快取以加速 build,但須自行負責安裝、更新與安全維護。範例中的 <code>vmImage: 'ubuntu-latest'</code> 即指定使用代管 agent。</p>
 
       <div class="callout callout-info">
         <div class="callout-icon">i</div>

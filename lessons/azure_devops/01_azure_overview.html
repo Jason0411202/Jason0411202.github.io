@@ -17,7 +17,7 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 01 · Azure DevOps 實戰篇</div>
     <h1 class="hero-title">Azure DevOps<span> 平台總覽</span></h1>
-    <p class="hero-desc">本系列共五堂，帶你掌握 Azure DevOps——一個整合規劃、編碼、建置、測試與部署的雲端平台。本課先建立全景:組織與專案的階層、左側五大服務各自負責什麼，以及它們如何串成一條完整的開發生命週期。</p>
+    <p class="hero-desc">本系列共五堂，帶你掌握 Azure DevOps——一個整合規劃、編碼、build、測試與部署的雲端平台。本課先建立全景:組織與專案的階層、左側五大服務各自負責什麼，以及它們如何串成一條完整的開發生命週期。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 1 / 5 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 12 分鐘</span>
@@ -33,10 +33,8 @@
       <li><a class="toc-link" href="#what">什麼是 Azure DevOps</a></li>
       <li><a class="toc-link" href="#hierarchy">Organization 與 Project</a></li>
       <li><a class="toc-link" href="#services">左側五大服務</a></li>
-      <li><a class="toc-link" href="#lifecycle">服務如何串起來</a></li>
-      <li><a class="toc-link" href="#collab">協作與儀表板</a></li>
-      <li><a class="toc-link" href="#access">存取層級與免費方案</a></li>
-      <li><a class="toc-link" href="#start">建立第一個專案</a></li>
+      <li><a class="toc-link" href="#lifecycle">開發生命週期的串接</a></li>
+      <li><a class="toc-link" href="#collab">Overview 區塊</a></li>
     </ul>
   </div>
 </nav>
@@ -48,9 +46,11 @@
       <span class="section-eyebrow">01 — 什麼是 Azure DevOps</span>
       <h2>一個平台,涵蓋整個開發生命週期</h2>
 
-      <p>Azure DevOps 是 Microsoft 提供的雲端開發平台,將軟體專案從「規劃」到「上線」所需的工具整合於同一處。它不是單一工具,而是<strong>一組可獨立使用、又能彼此串接的服務</strong>——需求管理、原始碼控制、自動化建置部署、測試管理與套件托管,各司其職。</p>
+      <p>Azure DevOps 是 Microsoft 提供的雲端開發平台,將軟體專案從「規劃」到「上線」所需的工具整合於同一處。它不是單一工具,而是<strong>一組可獨立使用、又能彼此串接的服務</strong>——需求管理、原始碼控制、自動化 build 與部署、測試管理與套件托管,各司其職。</p>
 
-      <p>相較於把 Jira、GitHub、Jenkins、Nexus 等工具各自串接,Azure DevOps 的核心價值在於<strong>可追蹤性 (traceability)</strong>:一個 work item 可以直接連結到提交它的 commit、驗證它的 pull request、建置它的 pipeline 與測試它的 test case。整條鏈在同一平台內自動串起。</p>
+      <p>相較於把 Jira、GitHub、Jenkins、Nexus 等工具各自串接,Azure DevOps 的核心價值在於<strong>可追蹤性 (traceability)</strong>:一個 work item 可以直接連結到提交它的 commit、驗證它的 pull request、build 它的 pipeline 與測試它的 test case。整條鏈在同一平台內自動串起。</p>
+
+      <p>跨服務的協作能力也內建於各處:work item 表單可 @mention 成員與留言、commit 與 PR 可雙向連結 work item、變更可訂閱通知。這些設計讓溝通保持在「有上下文」的位置,而非散落於外部聊天工具。</p>
     </section>
 
     <section id="hierarchy">
@@ -90,7 +90,7 @@
         <tbody>
           <tr><td><strong>Boards</strong></td><td>以 work item 規劃與追蹤工作:Epic / Feature / User Story / Task、Backlog、看板、Sprint</td><td>PM、Scrum Master、全體成員</td></tr>
           <tr><td><strong>Repos</strong></td><td>Git 原始碼托管:分支、Pull Request、分支原則、程式碼審查</td><td>開發人員</td></tr>
-          <tr><td><strong>Pipelines</strong></td><td>CI/CD 自動化:程式碼推送後自動建置、測試、打包與部署到各環境</td><td>開發、DevOps</td></tr>
+          <tr><td><strong>Pipelines</strong></td><td>CI/CD 自動化:程式碼推送後自動 build、測試、打包與部署到各環境</td><td>開發、DevOps</td></tr>
           <tr><td><strong>Test Plans</strong></td><td>測試管理:手動測試案例、探索性測試、利害關係人意見回饋</td><td>測試人員</td></tr>
           <tr><td><strong>Artifacts</strong></td><td>套件托管:NuGet / npm / Maven / Python 等套件 feed 與版本管理</td><td>開發、平台團隊</td></tr>
         </tbody>
@@ -108,7 +108,7 @@
     </section>
 
     <section id="lifecycle">
-      <span class="section-eyebrow">04 — 服務如何串起來</span>
+      <span class="section-eyebrow">04 — 開發生命週期的串接</span>
       <h2>Plan → Code → Build → Test → Deploy</h2>
 
       <p>五大服務並非孤立存在,而是對應軟體開發生命週期的各個階段。一個需求從提出到上線,會依序流經這些服務:</p>
@@ -131,7 +131,7 @@
 
             <rect x="320" y="40" width="120" height="58" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
             <text x="380" y="65" text-anchor="middle" font-weight="700" fill="#166534">Pipelines</text>
-            <text x="380" y="84" text-anchor="middle" fill="#6b6b7e" font-size="10">Build 建置</text>
+            <text x="380" y="84" text-anchor="middle" fill="#6b6b7e" font-size="10">Build</text>
 
             <rect x="470" y="40" width="120" height="58" rx="10" fill="#fde7c7" stroke="#d97706" stroke-width="1.5"/>
             <text x="530" y="65" text-anchor="middle" font-weight="700" fill="#7c2d12">Test Plans</text>
@@ -158,8 +158,8 @@
       <ol>
         <li>在 <strong>Boards</strong> 規劃 work item,排入 Sprint。</li>
         <li>開發人員在 <strong>Repos</strong> 開分支寫程式,送 Pull Request 並關聯 work item。</li>
-        <li>合併觸發 <strong>Pipelines</strong> 自動建置、跑測試、打包,必要時取用 <strong>Artifacts</strong> 的套件。</li>
-        <li>測試人員於 <strong>Test Plans</strong> 執行手動測試,缺陷自動連回需求與建置。</li>
+        <li>合併觸發 <strong>Pipelines</strong> 自動 build、跑測試、打包,必要時取用 <strong>Artifacts</strong> 的套件。</li>
+        <li>測試人員於 <strong>Test Plans</strong> 執行手動測試,缺陷自動連回需求與 build。</li>
         <li><strong>Pipelines</strong> 將通過驗證的版本部署到各環境,並透過儀表板監控進度與品質。</li>
       </ol>
 
@@ -167,13 +167,13 @@
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong>整條鏈的價值在於「往回追」</strong>
-          當生產環境出現問題,可從部署版本反查:這個版本由哪次建置產生?建置來自哪個 PR?PR 解決了哪個 work item?需求由誰提出、經誰測試?在分散工具的環境裡,這條鏈往往斷裂;Azure DevOps 的整合讓它自動成形。
+          當生產環境出現問題,可從部署版本反查:這個版本由哪次 build 產生?build 來自哪個 PR?PR 解決了哪個 work item?需求由誰提出、經誰測試?在分散工具的環境裡,這條鏈往往斷裂;Azure DevOps 的整合讓它自動成形。
         </div>
       </div>
     </section>
 
     <section id="collab">
-      <span class="section-eyebrow">05 — 協作與儀表板</span>
+      <span class="section-eyebrow">05 — Overview 區塊</span>
       <h2>導覽列頂端的 Overview 區塊</h2>
 
       <p>除了五大服務,左側導覽列頂端還有一組以「資訊呈現與協作」為主的 hub,歸在 Overview 之下:</p>
@@ -184,99 +184,16 @@
         </thead>
         <tbody>
           <tr><td><strong>Summary</strong></td><td>專案首頁:README、成員、近期活動與各服務的快速入口</td></tr>
-          <tr><td><strong>Dashboards</strong></td><td>可自訂的儀表板,以 widget 拼出建置狀態、燃盡圖、查詢結果等即時資訊</td></tr>
+          <tr><td><strong>Dashboards</strong></td><td>可自訂的儀表板,以 widget 拼出 build 狀態、burndown chart、查詢結果等即時資訊</td></tr>
           <tr><td><strong>Wiki</strong></td><td>專案知識庫,以 Markdown 撰寫文件、架構說明與操作手冊</td></tr>
         </tbody>
       </table>
 
-      <p>其中 <strong>Dashboards</strong> 最值得善用——它是團隊每日站立會議的共同畫面。將「目前 Sprint 燃盡圖」「進行中的 work item」「最近建置結果」等 widget 集中於一頁,即可一眼掌握專案健康度。</p>
+      <p>其中 <strong>Dashboards</strong> 最值得善用——它是團隊每日 standup 的共同畫面。將「目前 Sprint burndown chart」「進行中的 work item」「最近 build 結果」等 widget 集中於一頁,即可一眼掌握專案健康度。</p>
 
       <div class="diagram">
         <img src="assets/azure/overview-dashboard.png" alt="Azure DevOps 儀表板,顯示週期時間、未來 Sprint、進行中工作與團隊速度等 widget" class="shot-md">
         <div class="diagram-caption">圖 1.3 — 可自訂的專案儀表板 (來源:Microsoft Learn)</div>
-      </div>
-
-      <p>此外,跨服務的協作能力也內建於各處:work item 表單可 @mention 成員與留言、commit 與 PR 可雙向連結 work item、變更可訂閱通知。這些設計讓溝通保持在「有上下文」的位置,而非散落於外部聊天工具。</p>
-    </section>
-
-    <section id="access">
-      <span class="section-eyebrow">06 — 存取層級與免費方案</span>
-      <h2>三種存取層級,免費起步</h2>
-
-      <p>Azure DevOps 以「存取層級 (access level)」決定每位使用者能用哪些功能。理解三種層級,有助於規劃團隊授權成本:</p>
-
-      <table>
-        <thead>
-          <tr><th>存取層級</th><th>能做什麼</th><th>費用</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>Stakeholder</strong></td><td>檢視儀表板與 work item、建立與編輯 work item;不能用完整的 Repos/Pipelines 功能</td><td>免費、不限人數</td></tr>
-          <tr><td><strong>Basic</strong></td><td>完整使用 Boards、Repos、Pipelines、Artifacts</td><td>前 5 位使用者免費</td></tr>
-          <tr><td><strong>Basic + Test Plans</strong></td><td>Basic 的全部功能,外加 Test Plans 的測試規劃與執行</td><td>付費授權</td></tr>
-        </tbody>
-      </table>
-
-      <p>對小型團隊而言,起步幾乎零成本:<strong>最多 5 位 Basic 使用者免費,加上不限數量的 Stakeholder</strong>。PM、業務、利害關係人等非工程角色可用免費的 Stakeholder 層級參與需求討論與檢視進度。Pipelines 另有免費的平行作業額度 (私有專案每月 1,800 分鐘)。</p>
-
-      <div class="callout callout-info">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>Test Plans 是唯一需額外付費的核心服務</strong>
-          手動測試管理功能 (建立測試計劃、測試套件、執行測試) 需要「Basic + Test Plans」授權;但用 Test &amp; Feedback 擴充功能進行探索性測試,連 Stakeholder 都能參與。規劃預算時須留意這條界線。
-        </div>
-      </div>
-    </section>
-
-    <section id="start">
-      <span class="section-eyebrow">07 — 建立第一個專案</span>
-      <h2>從零到可用的起步流程</h2>
-
-      <p>實際開通一個可用環境,大致經過以下步驟:</p>
-
-      <div class="timeline">
-        <div class="timeline-step">
-          <div class="timeline-num">1</div>
-          <div class="timeline-content">
-            <div class="timeline-title">建立 Organization</div>
-            <div class="timeline-desc">以 Microsoft 帳號登入 <code>dev.azure.com</code>,建立組織並選擇資料存放區域。</div>
-          </div>
-        </div>
-        <div class="timeline-step">
-          <div class="timeline-num">2</div>
-          <div class="timeline-content">
-            <div class="timeline-title">建立 Project</div>
-            <div class="timeline-desc">輸入專案名稱、選擇可見性 (Private / Public) 與版本控制 (Git) 及流程範本 (Agile / Scrum / Basic)。</div>
-          </div>
-        </div>
-        <div class="timeline-step">
-          <div class="timeline-num">3</div>
-          <div class="timeline-content">
-            <div class="timeline-title">邀請成員、指派存取層級</div>
-            <div class="timeline-desc">於 Organization Settings 加入成員,並依角色指派 Stakeholder / Basic / Basic + Test Plans。</div>
-          </div>
-        </div>
-        <div class="timeline-step">
-          <div class="timeline-num">4</div>
-          <div class="timeline-content">
-            <div class="timeline-title">匯入或建立 Repo</div>
-            <div class="timeline-desc">於 Repos 建立新的 Git 儲存庫,或從 GitHub / 既有 Git 來源匯入既有程式碼。</div>
-          </div>
-        </div>
-        <div class="timeline-step">
-          <div class="timeline-num">5</div>
-          <div class="timeline-content">
-            <div class="timeline-title">設定第一條 Pipeline</div>
-            <div class="timeline-desc">於 Pipelines 連結 Repo,以 YAML 定義建置流程,完成從提交到自動建置的閉環。</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="callout callout-success">
-        <div class="callout-icon">✓</div>
-        <div class="callout-body">
-          <strong>先把骨架搭起來,再逐服務深入</strong>
-          建議第一次接觸時,先用 Basic 流程範本、Git、Private 專案最快速地開出一個可用環境,熟悉左側導覽後,再依本系列順序逐一深入 Boards、Repos、Pipelines 與 Test Plans。不必一開始就追求完整配置。
-        </div>
       </div>
     </section>
 

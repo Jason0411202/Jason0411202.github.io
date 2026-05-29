@@ -315,12 +315,12 @@
           <tr><td><strong>最少核准數</strong></td><td>合併前須有指定數量的 reviewer 投 Approve</td></tr>
           <tr><td><strong>要求關聯 work item</strong></td><td>PR 必須連結至少一個 work item 方可合併,確保需求可追蹤</td></tr>
           <tr><td><strong>要求 comment 已解決</strong></td><td>所有審查留言須標記為 Resolved,避免意見被忽略</td></tr>
-          <tr><td><strong>Build validation</strong></td><td>合併前須通過指定的 pipeline 建置與測試,失敗則無法合併</td></tr>
+          <tr><td><strong>Build validation</strong></td><td>合併前須通過指定的 pipeline build 與測試,失敗則無法合併</td></tr>
           <tr><td><strong>限制合併類型</strong></td><td>強制只能用某種合併策略 (如僅允許 squash),統一主線歷史風格</td></tr>
         </tbody>
       </table>
 
-      <p>其中 <strong>build validation</strong> 把 Pipelines 與 Repos 串起來:每個 PR 都會先跑一次建置與測試,確認不會把壞掉的程式碼併入主線。這正是下一堂 Pipelines 與本堂 PR 流程的交會點。</p>
+      <p>其中 <strong>build validation</strong> 把 Pipelines 與 Repos 串起來:每個 PR 都會先跑一次 build 與測試,確認不會把壞掉的程式碼併入主線。這正是下一堂 Pipelines 與本堂 PR 流程的交會點。</p>
 
       <div class="callout callout-danger">
         <div class="callout-icon">!</div>
