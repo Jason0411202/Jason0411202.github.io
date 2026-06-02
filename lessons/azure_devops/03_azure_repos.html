@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lesson 03｜Azure Repos — Azure DevOps 課程</title>
-<meta name="description" content="Azure Repos 原始碼托管與協作:Git vs TFVC、Files 上傳程式碼、Commits 與 Pushes 歷史、Branches 分支管理、Pull Requests 核心協作流程、Branch Policies 保護重要分支與 Tags 可追蹤性。">
+<meta name="description" content="Azure Repos 速覽:一個專案可容納多個 Git repo (預設 repo 與專案同名),以及 Files、Commits、Pushes、Branches、Tags、Pull requests 六個子功能的用途,與 Azure 對 Boards、Pipelines 的跨服務整合加值。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../_shared.css">
@@ -17,10 +17,10 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 03 · Azure DevOps 實戰篇</div>
     <h1 class="hero-title">Azure Repos<span> 原始碼托管與協作</span></h1>
-    <p class="hero-desc">在已具備 Git 與 Pull Request 觀念的前提下，本課聚焦 Azure Repos——Azure DevOps 內建的原始碼托管服務。除了標準 Git 的全部能力,Repos 還補上線上瀏覽、跨服務連結與分支原則 (branch policies),讓團隊的程式碼審查與分支保護有制度可循。</p>
+    <p class="hero-desc">讀者已具備 Git 與 Pull Request 操作基礎,本課不重述 Git 指令,而聚焦 Azure Repos 的定位與介面:一個專案如何容納多個 Git repo,以及 Files、Commits、Pushes、Branches、Tags、Pull requests 六個子功能各自的用途。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 3 / 5 堂</span>
-      <span class="hero-badge"><span class="dot"></span>約 13 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>約 5 分鐘</span>
       <span class="hero-badge"><span class="dot"></span>Azure DevOps</span>
     </div>
   </div>
@@ -30,13 +30,8 @@
   <div class="sticky-nav-inner">
     <span class="toc-label">章節</span>
     <ul class="toc-list">
-      <li><a class="toc-link" href="#what">Repos 是什麼</a></li>
-      <li><a class="toc-link" href="#files">Files — 放上程式碼</a></li>
-      <li><a class="toc-link" href="#commits">Commits 與 Pushes</a></li>
-      <li><a class="toc-link" href="#branches">Branches 分支管理</a></li>
-      <li><a class="toc-link" href="#pr">Pull Requests</a></li>
-      <li><a class="toc-link" href="#policies">Branch Policies</a></li>
-      <li><a class="toc-link" href="#tags">Tags 與可追蹤性</a></li>
+      <li><a class="toc-link" href="#overview">Overview</a></li>
+      <li><a class="toc-link" href="#features">子功能一覽</a></li>
     </ul>
   </div>
 </nav>
@@ -44,324 +39,45 @@
 <main class="lesson-main">
   <article class="lesson-article">
 
-    <section id="what">
-      <span class="section-eyebrow">01 — Repos 是什麼</span>
-      <h2>原始碼托管:Git 與 TFVC 兩種選擇</h2>
+    <section id="overview">
+      <span class="section-eyebrow">01 — Overview</span>
+      <h2>一個專案,多個 Git repo</h2>
 
-      <p>版本控制負責記錄程式碼的每一次變更、支援多人並行開發並保留完整歷史 (Git 的運作機制屬於本課的先備知識)。Azure Repos 即是 Azure DevOps 中負責這項工作的服務,提供兩種版本控制系統:</p>
+      <p>Azure Repos 是 Azure DevOps 內建的原始碼托管服務,提供的是<strong>標準 Git</strong>——既有的 Git 指令與任何 Git 用戶端、IDE 在此完全適用,差別只在於遠端托管於 <code>dev.azure.com</code>。因此本課不重述 Git 操作,而聚焦 Repos 的結構與介面。</p>
 
-      <table>
-        <thead>
-          <tr><th>類型</th><th>模型</th><th>分支方式</th><th>適用</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>Git</strong></td><td>分散式:每位開發者本機都有完整 repo 副本,可離線提交</td><td>輕量分支,合併為常態操作</td><td>新專案預設,絕大多數情境</td></tr>
-          <tr><td><strong>TFVC</strong></td><td>集中式:單一版本工作區,歷史與檔案存於伺服器</td><td>路徑式分支 (以資料夾路徑切分)</td><td>既有 TFVC 專案、需集中控管的少數情境</td></tr>
-        </tbody>
-      </table>
-
-      <p>Azure Repos 的 Git 是<strong>標準 Git</strong>——可搭配任何 Git 用戶端或 IDE 使用,例如 VS Code、Visual Studio、命令列、Xcode、Eclipse 與 IntelliJ。既有的所有 Git 指令在此完全適用,差別只在於遠端托管於 <code>dev.azure.com</code>。</p>
+      <p>關鍵在於層級:一個專案可容納<strong>多個</strong> Git repo,而非僅限一個。建立專案時系統會產生一個與專案同名的預設 repo,之後可於 Repos 頁面右上角的 repo 選單持續新增;微服務拆分或獨立共用函式庫等情境,常以多個 repo 分而治之。每個 repo 各自獨立,擁有專屬的分支、提交歷史與設定。</p>
 
       <div class="diagram">
         <img src="assets/azure/repos-landing.png" alt="Azure Repos 首頁,顯示 main 分支的資料夾與 README" class="shot-md">
-        <div class="diagram-caption">圖 3.1 — Azure Repos Files 頁,瀏覽預設分支的檔案與 README (來源:Microsoft Learn)</div>
-      </div>
-
-      <div class="callout callout-info">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>本課聚焦 Git</strong>
-          TFVC 屬於早期集中式版本控制的延續,新專案幾乎都選 Git。後續所有說明 (Files、Commits、Branches、Pull Requests、Branch Policies) 皆以 Git repo 為對象。Repos 左側子功能也依此順序排列:Files、Commits、Pushes、Branches、Tags、Pull requests。
-        </div>
+        <div class="diagram-caption">圖 3.1 — Azure Repos Files 頁,右上角的 repo 選單可切換與新增 repo (來源:Microsoft Learn)</div>
       </div>
     </section>
 
-    <section id="files">
-      <span class="section-eyebrow">02 — Files</span>
-      <h2>把程式碼放上去的三種起點</h2>
+    <section id="features">
+      <span class="section-eyebrow">02 — 子功能一覽</span>
+      <h2>Repos 左側六個子功能</h2>
 
-      <p>Files 是 Repos 的入口頁,顯示目前所選分支的資料夾結構、檔案內容與 README。要讓程式碼進到這裡,依專案狀態有三種起點:</p>
-
-      <p><strong>一、Clone 既有 repo。</strong>Repo 已存在於 Azure Repos,在本機取得一份副本後即可開始作業。複製頁面會提供 HTTPS 或 SSH 網址:</p>
-
-      <div class="code-block">
-        <div class="code-block-header">
-          <span class="code-block-lang">bash</span>
-          <button class="code-copy-btn" type="button">複製</button>
-        </div>
-<pre><code><span class="tk-cm"># 複製 Azure Repos 上的 Git 儲存庫</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> clone https://dev.azure.com/&lt;org&gt;/&lt;project&gt;/_git/&lt;repo&gt;
-<span class="tk-pn">$</span> <span class="tk-fn">cd</span> &lt;repo&gt;</code></pre>
-      </div>
-
-      <p><strong>二、把既有本機專案推上一個空 repo。</strong>本機已有程式碼但尚未托管,先在 Repos 建立空 repo,再加上遠端並推送:</p>
-
-      <div class="code-block">
-        <div class="code-block-header">
-          <span class="code-block-lang">bash</span>
-          <button class="code-copy-btn" type="button">複製</button>
-        </div>
-<pre><code><span class="tk-cm"># 在既有專案目錄初始化並推上遠端</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> init
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> add .
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> commit <span class="tk-op">-m</span> <span class="tk-st">"chore: initial commit"</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> remote add origin https://dev.azure.com/&lt;org&gt;/&lt;project&gt;/_git/&lt;repo&gt;
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> push <span class="tk-op">-u</span> origin main</code></pre>
-      </div>
-
-      <p><strong>三、直接在 Repos 建立新 repo。</strong>於 Repos 頁面右上角的 repo 選單選擇「New repository」,設定名稱並可勾選自動建立 README 與 <code>.gitignore</code>,之後再 clone 下來。</p>
-
-      <p>檔案進到 repo 後,Files 頁可線上瀏覽任一資料夾、檢視檔案內容,README 會自動渲染於頁面下方;單一檔案也支援直接於瀏覽器內編輯並提交,適合修正錯字或調整設定這類小幅變更。</p>
-
-      <div class="callout callout-info">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>線上編輯仍是一次 commit</strong>
-          在瀏覽器內修改檔案,Azure Repos 會要求填寫 commit message,並可選擇直接提交到當前分支或另開新分支。本質上與本機 <code>git commit</code> 相同,只是介面不同。涉及多檔變更時,仍建議在本機開發以利測試與審查。
-        </div>
-      </div>
-    </section>
-
-    <section id="commits">
-      <span class="section-eyebrow">03 — Commits 與 Pushes</span>
-      <h2>兩個檢視歷史的角度</h2>
-
-      <p>Repos 將「歷史」拆為兩個子頁,觀看角度不同:</p>
+      <p>Repos 左側子功能依下列順序排列,各自對應一個熟悉的 Git 概念,僅以介面化方式呈現。逐項用途如下:</p>
 
       <table>
         <thead>
-          <tr><th>子頁</th><th>呈現內容</th></tr>
+          <tr><th>子功能</th><th>用途</th></tr>
         </thead>
         <tbody>
-          <tr><td><strong>Commits</strong></td><td>所選分支的提交歷史,逐筆列出 commit message、作者、時間與變更檔案;點入可看完整 diff</td></tr>
-          <tr><td><strong>Pushes</strong></td><td>每一次 <code>git push</code> 的記錄,顯示誰、在何時、把哪些 commit 推到哪個分支</td></tr>
+          <tr><td><strong>Files</strong></td><td>瀏覽所選分支的資料夾與檔案內容,README 自動渲染;支援於瀏覽器內直接編輯並提交。</td></tr>
+          <tr><td><strong>Commits</strong></td><td>所選分支的提交歷史,逐筆列出 message、作者、時間與 diff;commit message 內以 <code>#編號</code> 可雙向關聯 Boards work item。</td></tr>
+          <tr><td><strong>Pushes</strong></td><td>每一次 <code>git push</code> 的記錄,顯示誰、在何時、把哪些 commit 推到哪個分支;粒度比 Commits 粗,一次 push 可含多個 commit。</td></tr>
+          <tr><td><strong>Branches</strong></td><td>建立、刪除、比較分支與設定預設分支;可對受保護分支套用<strong>分支原則 (branch policies)</strong>,強制走 PR 並通過審查才能合併。</td></tr>
+          <tr><td><strong>Tags</strong></td><td>在特定 commit 上標記版本點 (如 <code>v1.0.0</code>),用於標示發行版本,可於此瀏覽、建立與刪除。</td></tr>
+          <tr><td><strong>Pull requests</strong></td><td>Repos 的協作核心,把分支合併變成可審查、可投票的提案;可加入 reviewers、關聯 work item,並搭配分支原則設為必要核准。</td></tr>
         </tbody>
       </table>
-
-      <p>兩者的差異在於粒度:一次 push 可能包含多個 commit。Commits 頁回答「程式碼如何逐步演進」,Pushes 頁回答「變更何時、由誰送上遠端」。</p>
-
-      <p>Azure Repos 的關鍵加值在於 commit message 可直接關聯 work item。在訊息中加入 <code>#</code> 加 work item 編號,提交後即自動建立雙向連結:</p>
-
-      <div class="code-block">
-        <div class="code-block-header">
-          <span class="code-block-lang">bash</span>
-          <button class="code-copy-btn" type="button">複製</button>
-        </div>
-<pre><code><span class="tk-cm"># 在 commit message 內以 #123 關聯 Boards 上的 work item</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> commit <span class="tk-op">-m</span> <span class="tk-st">"fix(auth): 修正登入逾時 #123"</span></code></pre>
-      </div>
-
-      <p>之後在該 work item 表單可看到此 commit,在 commit 詳情亦可反查對應需求。這正是 Lesson 01 所述「可追蹤性」在 Repos 層的具體展現。</p>
-    </section>
-
-    <section id="branches">
-      <span class="section-eyebrow">04 — Branches</span>
-      <h2>分支隔離與管理介面</h2>
-
-      <p>分支讓不同功能、修補與實驗在各自的軌道上並行推進,彼此不互相干擾,完成後再合併回主線。這項 Git 的核心概念屬於本課的先備知識,此處說明 Repos 提供的管理介面。</p>
-
-      <p>於 Repos 的 Branches 子頁,可進行下列操作而無須切到命令列:</p>
-
-      <ul>
-        <li><strong>建立 / 刪除分支</strong>——可指定以哪個分支或 commit 為基準建立新分支。</li>
-        <li><strong>設定預設分支</strong>——指定 clone 與 PR 預設指向的分支 (通常為 <code>main</code>)。</li>
-        <li><strong>比較分支</strong>——以「Compare」檢視兩分支間的差異與落後/領先的 commit 數。</li>
-        <li><strong>Favorite (加星)</strong>——把常用分支標記為我的最愛,固定於清單頂端方便存取。</li>
-      </ul>
-
-      <p>命令列端的操作與標準 Git 完全一致,例如建立並推送新分支:</p>
-
-      <div class="code-block">
-        <div class="code-block-header">
-          <span class="code-block-lang">bash</span>
-          <button class="code-copy-btn" type="button">複製</button>
-        </div>
-<pre><code><span class="tk-pn">$</span> <span class="tk-fn">git</span> checkout <span class="tk-op">-b</span> feature/profile-page
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> push <span class="tk-op">-u</span> origin feature/profile-page</code></pre>
-      </div>
-
-      <div class="callout callout-info">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>分支命名與 work item 連動</strong>
-          Repos 支援從 Boards 的 work item 直接「建立分支」,系統會以該 work item 為名建立分支並自動連結。維持一致的命名 (如 <code>feature/</code>、<code>bugfix/</code> 前綴) 有助於在 Branches 清單中快速辨識用途。
-        </div>
-      </div>
-    </section>
-
-    <section id="pr">
-      <span class="section-eyebrow">05 — Pull Requests</span>
-      <h2>Repos 的核心協作流程</h2>
-
-      <p>Pull Request (PR) 是 Azure Repos 進行 code review 的主要機制。它把「某分支的變更要合併進目標分支」這件事變成一個可審查、可討論、可投票的提案,而非直接覆蓋主線。既有的 PR 觀念在此完全適用,以下說明 Repos 介面的具體操作。</p>
-
-      <p>建立 PR 時須指定<strong>來源分支</strong>與<strong>目標分支</strong> (通常為 <code>main</code>),並填寫標題與描述。建立後可進行:</p>
-
-      <ul>
-        <li><strong>加入 Reviewers</strong>——指定必審或選審的審查者;搭配分支原則可設為必要核准。</li>
-        <li><strong>留 Comment 與投票</strong>——審查者於差異處逐行留言,並以 Approve / Approve with suggestions / Wait for author / Reject 表態。</li>
-        <li><strong>關聯 work item</strong>——將此 PR 連到對應需求,合併後可自動更新 work item 狀態。</li>
-        <li><strong>完成合併 (Complete)</strong>——通過審查與原則後合併,可選擇合併策略。</li>
-      </ul>
-
-      <p>合併策略 (merge type) 決定歷史的呈現方式:</p>
-
-      <table>
-        <thead>
-          <tr><th>策略</th><th>行為</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>Merge commit</strong></td><td>保留來源分支所有 commit,並新增一個合併 commit</td></tr>
-          <tr><td><strong>Squash merge</strong></td><td>把來源分支的多個 commit 壓成單一 commit 併入,主線歷史最乾淨</td></tr>
-          <tr><td><strong>Rebase</strong></td><td>將來源 commit 逐一接到目標分支頂端,維持線性歷史而不留合併 commit</td></tr>
-        </tbody>
-      </table>
-
-      <p>一次完整的 PR 協作流程如下:</p>
-
-      <div class="timeline">
-        <div class="timeline-step">
-          <div class="timeline-num">1</div>
-          <div class="timeline-content">
-            <div class="timeline-title">開分支</div>
-            <div class="timeline-desc">從 <code>main</code> 建立功能分支,於本機開發並提交。</div>
-          </div>
-        </div>
-        <div class="timeline-step">
-          <div class="timeline-num">2</div>
-          <div class="timeline-content">
-            <div class="timeline-title">Push 到 Repos</div>
-            <div class="timeline-desc">以 <code>git push -u origin &lt;branch&gt;</code> 將分支推上遠端。</div>
-          </div>
-        </div>
-        <div class="timeline-step">
-          <div class="timeline-num">3</div>
-          <div class="timeline-content">
-            <div class="timeline-title">建立 Pull Request</div>
-            <div class="timeline-desc">指定目標分支、填寫描述、加入 reviewers,並關聯對應 work item。</div>
-          </div>
-        </div>
-        <div class="timeline-step">
-          <div class="timeline-num">4</div>
-          <div class="timeline-content">
-            <div class="timeline-title">Review 與投票</div>
-            <div class="timeline-desc">審查者逐行留 comment、提出修改,作者回應並更新;審查者投票表態。</div>
-          </div>
-        </div>
-        <div class="timeline-step">
-          <div class="timeline-num">5</div>
-          <div class="timeline-content">
-            <div class="timeline-title">完成合併</div>
-            <div class="timeline-desc">通過原則後選擇合併策略完成 (Complete),可一併刪除來源分支。</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="callout callout-info">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>Draft PR 與自動完成</strong>
-          尚未準備好審查時可先建為 Draft PR,僅分享進度而不觸發必要審查者通知。若希望原則一過即自動合併,可開啟「Set auto-complete」,系統會在所有分支原則滿足後自動完成,免去等待時手動操作。
-        </div>
-      </div>
-    </section>
-
-    <section id="policies">
-      <span class="section-eyebrow">06 — Branch Policies</span>
-      <h2>保護重要分支:Repos 相較裸 Git 的關鍵加值</h2>
-
-      <p>裸 Git 本身不限制誰能 push 到 <code>main</code>;團隊的審查紀律全靠人為約定。Azure Repos 的<strong>分支原則 (branch policies)</strong> 把這些約定變成系統強制執行的規則,套用在受保護分支 (通常是 <code>main</code>) 上。設定後,該分支只能透過符合原則的 PR 合併,任何直接 push 都會被拒絕。</p>
-
-      <div class="diagram">
-        <svg viewBox="0 0 720 230" xmlns="http://www.w3.org/2000/svg" aria-label="分支原則作為合併前的關卡">
-          <defs>
-            <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-              <path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/>
-            </marker>
-          </defs>
-          <g font-family="JetBrains Mono, monospace" font-size="12">
-            <rect x="20" y="84" width="130" height="58" rx="10" fill="#cffafe" stroke="#06b6d4" stroke-width="1.5"/>
-            <text x="85" y="109" text-anchor="middle" font-weight="700" fill="#155e63">Pull Request</text>
-            <text x="85" y="128" text-anchor="middle" fill="#6b6b7e" font-size="10">feature → main</text>
-
-            <rect x="280" y="40" width="160" height="146" rx="12" fill="#fde7c7" stroke="#d97706" stroke-width="1.6"/>
-            <text x="360" y="66" text-anchor="middle" font-family="Syne, sans-serif" font-weight="700" fill="#7c2d12">Branch Policies</text>
-            <text x="360" y="92" text-anchor="middle" fill="#7c2d12" font-size="10">✓ 最少 reviewer 數</text>
-            <text x="360" y="110" text-anchor="middle" fill="#7c2d12" font-size="10">✓ 關聯 work item</text>
-            <text x="360" y="128" text-anchor="middle" fill="#7c2d12" font-size="10">✓ comment 已解決</text>
-            <text x="360" y="146" text-anchor="middle" fill="#7c2d12" font-size="10">✓ build validation</text>
-            <text x="360" y="168" text-anchor="middle" fill="#7c2d12" font-size="10">⇒ 全數通過才放行</text>
-
-            <rect x="570" y="84" width="130" height="58" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
-            <text x="635" y="109" text-anchor="middle" font-weight="700" fill="#166534">main</text>
-            <text x="635" y="128" text-anchor="middle" fill="#6b6b7e" font-size="10">合併完成</text>
-
-            <line x1="150" y1="113" x2="280" y2="113" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arrG)"/>
-            <line x1="440" y1="113" x2="570" y2="113" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arrG)"/>
-
-            <text x="360" y="212" text-anchor="middle" fill="#6b6b7e" font-size="11">直接 push 到 main 會被拒絕,必須走 PR 並通過所有原則</text>
-          </g>
-        </svg>
-        <div class="diagram-caption">圖 3.2 — 分支原則作為合併進主線前的關卡</div>
-      </div>
-
-      <p>常見可設定的原則如下:</p>
-
-      <table>
-        <thead>
-          <tr><th>原則</th><th>作用</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>最少核准數</strong></td><td>合併前須有指定數量的 reviewer 投 Approve</td></tr>
-          <tr><td><strong>要求關聯 work item</strong></td><td>PR 必須連結至少一個 work item 方可合併,確保需求可追蹤</td></tr>
-          <tr><td><strong>要求 comment 已解決</strong></td><td>所有審查留言須標記為 Resolved,避免意見被忽略</td></tr>
-          <tr><td><strong>Build validation</strong></td><td>合併前須通過指定的 pipeline build 與測試,失敗則無法合併</td></tr>
-          <tr><td><strong>限制合併類型</strong></td><td>強制只能用某種合併策略 (如僅允許 squash),統一主線歷史風格</td></tr>
-        </tbody>
-      </table>
-
-      <p>其中 <strong>build validation</strong> 把 Pipelines 與 Repos 串起來:每個 PR 都會先跑一次 build 與測試,確認不會把壞掉的程式碼併入主線。這正是下一堂 Pipelines 與本堂 PR 流程的交會點。</p>
-
-      <div class="callout callout-danger">
-        <div class="callout-icon">!</div>
-        <div class="callout-body">
-          <strong>不可對受保護分支強行繞過原則或 force push</strong>
-          以 <code>--force</code> 改寫受保護分支的歷史,或用權限繞過分支原則直接合併,會破壞團隊共用的歷史與審查紀律,且難以追究與還原。受保護分支的任何變更都應走正規 PR 流程;確有例外需求時,應透過正式的權限調整與紀錄,而非私下強推。
-        </div>
-      </div>
-    </section>
-
-    <section id="tags">
-      <span class="section-eyebrow">07 — Tags 與可追蹤性</span>
-      <h2>標記版本點,串起整條鏈</h2>
-
-      <p>Tag 用來在歷史上標記特定的版本點,例如發行版本 <code>v1.0.0</code>。它是某個 commit 的具名指標,常用於標示「這就是當時上線的版本」。Repos 的 Tags 子頁可瀏覽、建立與刪除標籤:</p>
-
-      <div class="code-block">
-        <div class="code-block-header">
-          <span class="code-block-lang">bash</span>
-          <button class="code-copy-btn" type="button">複製</button>
-        </div>
-<pre><code><span class="tk-cm"># 為當前 commit 建立含註解的標籤並推上遠端</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> tag <span class="tk-op">-a</span> v1.0.0 <span class="tk-op">-m</span> <span class="tk-st">"release: 第一個正式版本"</span>
-<span class="tk-pn">$</span> <span class="tk-fn">git</span> push origin v1.0.0</code></pre>
-      </div>
-
-      <p>除了標籤,Repos 還提供兩項提升可追蹤性的能力。<strong>PR status</strong> 讓外部服務以程式化方式 (成功 / 失敗) 簽署 PR,例如外部掃描或合規檢查可把結果掛在 PR 上,作為合併前的額外依據。<strong>跨服務連結</strong>則讓 PR、work item 與 build 彼此互通:</p>
-
-      <ul>
-        <li>PR ↔ work item——PR 關聯需求,合併後可自動推進需求狀態。</li>
-        <li>PR ↔ build——build validation 把 Pipelines 的結果綁進 PR。</li>
-        <li>commit ↔ work item——commit message 內的 <code>#編號</code> 自動雙向連結。</li>
-      </ul>
-
-      <p>這些連結串起來,即可從上線的某個 tag 反查:它對應哪次 build、哪個 PR、解決了哪些 work item——完整重現一個版本的來龍去脈。</p>
 
       <div class="callout callout-success">
         <div class="callout-icon">✓</div>
         <div class="callout-body">
-          <strong>以 PR + 分支原則作為團隊預設</strong>
-          建議將「所有變更走 PR、main 套用分支原則」設為團隊的標準做法:最少核准數確保有人審過、build validation 確保不併入壞程式碼、關聯 work item 確保每筆變更可追溯需求。這套組合把 code review 的審查紀律,從人為約定升級為系統強制,是 Azure Repos 相較裸 Git 最值得採用的加值。
+          <strong>Repos 的價值不在 Git 本身,而在整合</strong>
+          這些子功能的操作與裸 Git 一致,真正值得採用的是跨服務連結:commit 與 PR 關聯 work item 讓需求可追蹤、分支原則把 code review 從人為約定升級為系統強制、build validation 把 Pipelines 的測試結果綁進 PR。下一堂 Pipelines 會接續這條線。
         </div>
       </div>
     </section>
