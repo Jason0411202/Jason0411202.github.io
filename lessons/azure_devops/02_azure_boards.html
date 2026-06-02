@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lesson 02｜Azure Boards — Azure DevOps 課程</title>
-<meta name="description" content="Azure Boards 全景:六個 hub (工作項目 / 看板 / 待辦清單 / 衝刺 / 查詢 / 交付計劃)、Process 範本與 Epic → Feature → User Story → Task 階層、work item 欄位、Kanban 看板與 WIP limits、Backlog 與 Sprint 規劃、Queries 與 WIQL、Delivery Plans 與端對端可追蹤性。">
+<meta name="description" content="Azure Boards 全景:七個 hub (Work items / Boards / Backlogs / Sprints / Queries / Delivery Plans / Analytics views)。涵蓋 work item 的類型與 Epic → Feature → User Story → Task 階層、Kanban 看板與 WIP limits、Backlog 排序、Sprint 與 Capacity 規劃、Queries 與 WIQL、Delivery Plans 跨團隊行事曆、Analytics views 報表資料,以及端對端可追蹤性。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../_shared.css">
@@ -17,10 +17,10 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 02 · Azure DevOps 實戰篇</div>
     <h1 class="hero-title">Azure Boards<span> 規劃與追蹤工作</span></h1>
-    <p class="hero-desc">上一課建立了 Azure DevOps 的全景。本課深入第一個服務 Boards——一套以網頁為介面的敏捷規劃與追蹤工具。從六個 hub 的分工、work item 階層,到看板、Backlog、Sprint 與查詢,逐步說明如何把需求拆解、排序並追蹤到上線。</p>
+    <p class="hero-desc">上一課建立了 Azure DevOps 的全景。本課深入第一個服務 Boards——一套以網頁為介面的敏捷規劃與追蹤工具。依序走過七個 hub:從 work item 的類型與階層,到 Boards、Backlogs、Sprints、Queries、Delivery Plans 與 Analytics views,逐步說明如何把需求拆解、排序、追蹤到上線。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 2 / 5 堂</span>
-      <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>約 16 分鐘</span>
       <span class="hero-badge"><span class="dot"></span>Azure DevOps</span>
     </div>
   </div>
@@ -30,13 +30,14 @@
   <div class="sticky-nav-inner">
     <span class="toc-label">章節</span>
     <ul class="toc-list">
-      <li><a class="toc-link" href="#hubs">Boards 全景與六個 hub</a></li>
-      <li><a class="toc-link" href="#hierarchy">Work Item 階層</a></li>
-      <li><a class="toc-link" href="#workitems">工作項目</a></li>
-      <li><a class="toc-link" href="#kanban">看板</a></li>
-      <li><a class="toc-link" href="#backlog">待辦清單與衝刺</a></li>
-      <li><a class="toc-link" href="#queries">查詢</a></li>
-      <li><a class="toc-link" href="#plans">交付計劃與可追蹤性</a></li>
+      <li><a class="toc-link" href="#hubs">Boards 全景與七個 hub</a></li>
+      <li><a class="toc-link" href="#workitems">Work items</a></li>
+      <li><a class="toc-link" href="#kanban">Boards</a></li>
+      <li><a class="toc-link" href="#backlog">Backlogs</a></li>
+      <li><a class="toc-link" href="#sprints">Sprints</a></li>
+      <li><a class="toc-link" href="#queries">Queries</a></li>
+      <li><a class="toc-link" href="#plans">Delivery Plans</a></li>
+      <li><a class="toc-link" href="#analytics">Analytics views</a></li>
     </ul>
   </div>
 </nav>
@@ -45,16 +46,16 @@
   <article class="lesson-article">
 
     <section id="hubs">
-      <span class="section-eyebrow">01 — Boards 全景與六個 hub</span>
-      <h2>一個服務,六個協作的 hub</h2>
+      <span class="section-eyebrow">01 — Boards 全景與七個 hub</span>
+      <h2>一個服務,七個協作的 hub</h2>
 
       <p>Azure Boards 是一套以網頁為介面的服務,用於<strong>規劃、追蹤與討論整個開發生命週期的工作</strong>,並原生支援敏捷流程。它把「需求是什麼」「目前做到哪」「誰負責」「何時完成」這些問題,集中在同一處呈現。</p>
 
-      <p>進入 Boards 後,左側會展開六個 hub,各自負責一種檢視角度。理解這六者的分工,是熟悉整個服務的起點:</p>
+      <p>進入 Boards 後,左側會展開七個 hub,各自負責一種檢視角度。這七個 hub 並非七套獨立的資料,而是<strong>同一批 work item 的不同呈現方式</strong>——在任一 hub 修改,其餘 hub 都會同步反映。理解這七者的分工,是熟悉整個服務的起點:</p>
 
       <div class="diagram">
-        <img src="assets/azure/boards-hubs.png" alt="Azure Boards 中樞選單,含工作項目、看板、待辦清單、衝刺、查詢、交付計劃" class="shot-sm">
-        <div class="diagram-caption">圖 2.1 — Azure Boards 的六個 hub (來源:Microsoft Learn)</div>
+        <img src="assets/azure/boards-hubs.png" alt="Azure Boards 中樞選單,含 Work items、Boards、Backlogs、Sprints、Queries、Delivery Plans 與 Analytics views" class="shot-sm">
+        <div class="diagram-caption">圖 2.1 — Azure Boards 的七個 hub (來源:Microsoft Learn)</div>
       </div>
 
       <table>
@@ -62,69 +63,103 @@
           <tr><th>Hub</th><th>負責什麼</th></tr>
         </thead>
         <tbody>
-          <tr><td><strong>工作項目 (Work items)</strong></td><td>所有 work item 的篩選清單,可依指派對象、狀態、類型快速檢索</td></tr>
-          <tr><td><strong>看板 (Boards)</strong></td><td>以卡片呈現 work item,拖放即更新狀態,實施 Kanban 流程管理</td></tr>
-          <tr><td><strong>待辦清單 (Backlogs)</strong></td><td>規劃與排序的清單,涵蓋 product backlog 與 portfolio backlog</td></tr>
-          <tr><td><strong>衝刺 (Sprints)</strong></td><td>管理 sprint/iteration,提供 task board 與 capacity 規劃</td></tr>
-          <tr><td><strong>查詢 (Queries)</strong></td><td>儲存可重複使用的篩選條件,並可產出趨勢圖與 widget 資料</td></tr>
-          <tr><td><strong>交付計劃 (Delivery Plans)</strong></td><td>以行事曆檢視跨團隊的交付與相依,觀察 Feature/Epic 的彙整進度</td></tr>
+          <tr><td><strong>Work items</strong></td><td>列出所有工作項目 (work item) 的清單,可依負責人、狀態或類型篩選,用來快速找到想看的工作</td></tr>
+          <tr><td><strong>Boards</strong></td><td>用卡片呈現每一件工作,把卡片拖到下一欄,就代表這件工作的進度往前推進</td></tr>
+          <tr><td><strong>Backlogs</strong></td><td>一份由上往下排好優先順序的工作清單,愈上面表示愈該先做</td></tr>
+          <tr><td><strong>Sprints</strong></td><td>規劃在一個 sprint (一段固定長度的開發週期,通常一至四週) 內要完成哪些工作,並追蹤進度</td></tr>
+          <tr><td><strong>Queries</strong></td><td>把常用的篩選條件存下來重複使用,結果還能放到儀表板上變成圖表</td></tr>
+          <tr><td><strong>Delivery Plans</strong></td><td>用月曆的形式,把多個團隊的工作排在時間軸上,看清楚誰在什麼時候交付</td></tr>
+          <tr><td><strong>Analytics views</strong></td><td>把工作資料整理成適合製作報表與統計圖表的格式</td></tr>
         </tbody>
       </table>
 
-      <div class="callout callout-info">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>同一份資料,多種檢視</strong>
-          六個 hub 並非六套獨立的資料,而是<strong>同一批 work item 的不同呈現方式</strong>。同一個 User Story 既出現在 Backlog 的排序清單,也出現在看板的某一欄,還能被查詢檢索。在哪個 hub 修改,其他 hub 都會同步反映。
+      <h3>work item 串起整個開發流程</h3>
+
+      <p>Boards 真正的價值,不只在於管理需求,更在於它讓一個 work item <strong>一路連結到實作與驗證它的每個產物</strong>,與其他 Azure DevOps 服務串成端對端的可追蹤性。以一個 User Story #1234「使用者可用 email 與密碼註冊」為例,看它如何串起整條鏈:</p>
+
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-num">1</div>
+          <div class="timeline-content">
+            <div class="timeline-title">從 work item 建立分支</div>
+            <div class="timeline-desc">在 #1234 頁面點「Create a branch」,Azure DevOps 建立 <code>users/jason/1234-user-registration</code> 分支,並自動與該需求關聯。分支自第一行程式碼起便連回需求。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">2</div>
+          <div class="timeline-content">
+            <div class="timeline-title">開 Pull Request 關聯需求</div>
+            <div class="timeline-desc">開發完成後開 Pull Request,在 PR 的 Work Items 欄位掛上 #1234。PR 合併後,#1234 的狀態依設定自動由 Active 推進為 Resolved,無須手動更新。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">3</div>
+          <div class="timeline-content">
+            <div class="timeline-title">build 與部署連回需求</div>
+            <div class="timeline-desc">PR 合併觸發 pipeline 產出 build #58,該 build 的「Work items」清單列出本次包含的 #1234。部署至 Staging 後,從 #1234 即可反查它由哪次 build 產出、發行到哪個環境。</div>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="timeline-num">4</div>
+          <div class="timeline-content">
+            <div class="timeline-title">測試結果連回需求</div>
+            <div class="timeline-desc">QA 於 Test Plans 對 #1234 執行測試案例,結果 (Pass/Fail) 連回該需求;若失敗開出的 Bug 也連回 #1234。至此構成「需求 ↔ branch/commit ↔ PR ↔ build ↔ test」的完整鏈。</div>
+          </div>
         </div>
       </div>
+
     </section>
 
-    <section id="hierarchy">
-      <span class="section-eyebrow">02 — Work Item 階層</span>
-      <h2>Process 範本決定 work item 的類型與層次</h2>
+    <section id="workitems">
+      <span class="section-eyebrow">02 — Work items</span>
+      <h2>work item:追蹤工作的最小單位</h2>
+
+      <p>work item 是 Boards 中追蹤工作的基本單位。無論 Epic 或 Task,本質上都是一張結構化的表單,記錄一件工作的全部資訊。下圖為新增一個 work item 時的編輯畫面:</p>
+
+      <div class="diagram">
+        <img src="assets/azure/boards-workitem.png" alt="Azure Boards 新增 work item 的編輯畫面,含 Title、State/Reason、Area/Iteration、Description、Discussion、Planning、Development、Related Work 等欄位" class="shot-lg">
+        <div class="diagram-caption">圖 2.2 — 新增 work item 的編輯畫面 (來源:Microsoft Learn)</div>
+      </div>
+
+      <p>畫面上的主要欄位與作用,依其在表單中的位置整理如下:</p>
+
+      <table>
+        <thead>
+          <tr><th>欄位 / 區塊</th><th>作用</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Title</strong></td><td>一句話描述這件工作;為必填欄位,留空無法儲存</td></tr>
+          <tr><td><strong>Assigned To</strong></td><td>負責這件工作的成員</td></tr>
+          <tr><td><strong>Tags</strong></td><td>自訂關鍵字標記,便於跨類型分類與篩選</td></tr>
+          <tr><td><strong>State / Reason</strong></td><td>目前進度,實際值依範本而異 (如 Basic 的 To Do / Doing / Done、Agile 的 New / Active / Resolved / Closed);Reason 記錄進入該狀態的緣由</td></tr>
+          <tr><td><strong>Area / Iteration</strong></td><td>歸屬於哪個團隊區域 (誰),以及排在哪個 sprint/iteration (何時)</td></tr>
+          <tr><td><strong>Description</strong></td><td>需求細節、驗收條件或重現步驟</td></tr>
+          <tr><td><strong>Discussion</strong></td><td>留言串,可 @mention 成員;所有變更皆留下歷史紀錄</td></tr>
+          <tr><td><strong>Planning</strong></td><td>Priority (優先順序) 與 Effort (預估工作量),供排序與容量規劃使用</td></tr>
+          <tr><td><strong>Development</strong></td><td>連結 Azure Repos 的 commit、pull request 或 branch,直接從 work item 觀察開發狀態</td></tr>
+          <tr><td><strong>Related Work</strong></td><td>建立與其他 work item 的父子或關聯連結,例如指定某 Epic 為其 parent</td></tr>
+          <tr><td><strong>Details / History / Links / Attachments</strong></td><td>右上分頁:詳細欄位、變更歷史、關聯項目與附件;頁籤上的數字代表目前的數量</td></tr>
+        </tbody>
+      </table>
+
+      <p>建立 work item 的最直接路徑,是在 Work items hub 點選「新增工作項目」,選擇類型 (如 User Story),填入標題後即可儲存;其餘欄位可稍後補齊。</p>
+
+      <h3>work item 的類型與階層</h3>
 
       <p>建立 Project 時選擇的<strong>流程範本 (process)</strong>,決定了可用的 work item 類型與其階層關係。Azure DevOps 內建三種範本:</p>
 
-      <ul>
-        <li><strong>Basic</strong>——最精簡,只有 Epic、Issue、Task 三層,適合初次接觸或小型團隊。</li>
-        <li><strong>Agile</strong>——以 User Story 為需求單位,Bug 與 User Story 同層,適合一般敏捷團隊。</li>
-        <li><strong>Scrum</strong>——以 Product Backlog Item 為需求單位,術語貼近 Scrum 框架。</li>
-      </ul>
+      <table>
+        <thead>
+          <tr><th>範本</th><th>階層 (由大到小)</th><th>其他常見 work item</th><th>適合</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Basic</strong></td><td>Epic → Issue → Task</td><td>—</td><td>初次接觸、小型團隊</td></tr>
+          <tr><td><strong>Agile</strong></td><td>Epic → Feature → User Story → Task</td><td>Bug、Issue、Test Case</td><td>一般敏捷團隊</td></tr>
+          <tr><td><strong>Scrum</strong></td><td>Epic → Feature → Product Backlog Item → Task</td><td>Bug、Impediment、Test Case</td><td>採用 Scrum 框架的團隊</td></tr>
+        </tbody>
+      </table>
 
-      <p>以最常用的 Agile 範本為例,需求由大到小拆解為四層,另有 Bug 作為缺陷單位:</p>
-
-      <div class="diagram">
-        <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" aria-label="Azure Boards work item 階層">
-          <g font-family="JetBrains Mono, monospace" font-size="12">
-            <rect x="40" y="30" width="640" height="44" rx="8" fill="#fde7c7" stroke="#d97706" stroke-width="1.5"/>
-            <text x="60" y="58" fill="#7c2d12" font-weight="700">Epic</text>
-            <text x="180" y="58" fill="#6b6b7e" font-size="11">大型主題,跨多個 sprint;例「使用者帳號模組」</text>
-            <rect x="60" y="98" width="300" height="44" rx="8" fill="#e9d5ff" stroke="#7c3aed" stroke-width="1.5"/>
-            <text x="80" y="126" fill="#4c1d95" font-weight="700">Feature</text>
-            <text x="180" y="126" fill="#6b6b7e" font-size="11">註冊與登入</text>
-            <rect x="380" y="98" width="300" height="44" rx="8" fill="#e9d5ff" stroke="#7c3aed" stroke-width="1.5"/>
-            <text x="400" y="126" fill="#4c1d95" font-weight="700">Feature</text>
-            <text x="500" y="126" fill="#6b6b7e" font-size="11">忘記密碼與帳號找回</text>
-            <rect x="80" y="166" width="260" height="40" rx="8" fill="#cffafe" stroke="#06b6d4" stroke-width="1.5"/>
-            <text x="100" y="192" fill="#155e63" font-weight="700" font-size="11">User Story</text>
-            <text x="190" y="192" fill="#6b6b7e" font-size="10">Email/密碼註冊 + 驗證信</text>
-            <rect x="400" y="166" width="260" height="40" rx="8" fill="#cffafe" stroke="#06b6d4" stroke-width="1.5"/>
-            <text x="420" y="192" fill="#155e63" font-weight="700" font-size="11">User Story</text>
-            <text x="510" y="192" fill="#6b6b7e" font-size="10">透過 email 寄送重設連結</text>
-            <rect x="100" y="230" width="100" height="36" rx="6" fill="#dcfce7" stroke="#16a34a"/>
-            <text x="150" y="252" text-anchor="middle" fill="#166534" font-size="10" font-weight="700">Task</text>
-            <rect x="210" y="230" width="100" height="36" rx="6" fill="#dcfce7" stroke="#16a34a"/>
-            <text x="260" y="252" text-anchor="middle" fill="#166534" font-size="10" font-weight="700">Task</text>
-            <line x1="200" y1="74" x2="200" y2="98" stroke="#7c3aed" stroke-width="1.2"/>
-            <line x1="500" y1="74" x2="500" y2="98" stroke="#7c3aed" stroke-width="1.2"/>
-            <line x1="200" y1="142" x2="200" y2="166" stroke="#06b6d4" stroke-width="1.2"/>
-            <line x1="500" y1="142" x2="500" y2="166" stroke="#06b6d4" stroke-width="1.2"/>
-            <line x1="200" y1="206" x2="200" y2="230" stroke="#16a34a" stroke-width="1.2"/>
-          </g>
-        </svg>
-        <div class="diagram-caption">圖 2.2 — Agile Process 的四層 work item 階層</div>
-      </div>
+      <p>三者的需求單位不同 (Basic 用 Issue、Agile 用 User Story、Scrum 用 Product Backlog Item),但頂層的 Epic/Feature 與底層的 Task 大致共通。以下以最常用的 Agile 範本為例,看需求由大到小拆解為四層,另有 Bug 作為缺陷單位:</p>
 
       <table>
         <thead>
@@ -135,97 +170,67 @@
           <tr><td><strong>Feature</strong></td><td>數個 sprint</td><td>Epic 之下可交付的功能集,例如「註冊與登入」</td></tr>
           <tr><td><strong>User Story</strong></td><td>一個 sprint 內</td><td>站在使用者角度的最小需求,可獨立驗收</td></tr>
           <tr><td><strong>Task</strong></td><td>數小時至一兩天</td><td>實作 User Story 所需的具體執行步驟</td></tr>
-          <tr><td><strong>Bug</strong></td><td>視嚴重度而定</td><td>缺陷;在 Agile 範本中可與 User Story 同層或視為其子項</td></tr>
+          <tr><td><strong>Bug</strong></td><td>視嚴重度而定</td><td>缺陷;可與需求項目同層,或視為其子項</td></tr>
         </tbody>
       </table>
 
-      <div class="callout callout-warn">
-        <div class="callout-icon">!</div>
-        <div class="callout-body">
-          <strong>流程範本一旦選定,事後切換成本高</strong>
-          範本決定了團隊往後使用的 work item 類型與欄位,術語也隨之固定 (Agile 用 User Story、Scrum 用 Product Backlog Item)。建立 Project 時應先與團隊確認採用哪一套流程;雖然可後續變更,但已建立的 work item 對應與報表都需重新調整。
-        </div>
-      </div>
-    </section>
-
-    <section id="workitems">
-      <span class="section-eyebrow">03 — 工作項目</span>
-      <h2>work item:追蹤工作的最小單位</h2>
-
-      <p>work item 是 Boards 中追蹤工作的基本單位。無論 Epic 或 Task,本質上都是一張結構化的表單,記錄一件工作的全部資訊。常見欄位如下:</p>
-
-      <table>
-        <thead>
-          <tr><th>欄位</th><th>作用</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>標題 (Title)</strong></td><td>一句話描述這件工作</td></tr>
-          <tr><td><strong>狀態 (State)</strong></td><td>目前進度,例如 New / Active / Resolved / Closed</td></tr>
-          <tr><td><strong>指派對象 (Assigned To)</strong></td><td>負責這件工作的成員</td></tr>
-          <tr><td><strong>Area Path / Iteration Path</strong></td><td>歸屬於哪個團隊區域 (誰)、排在哪個 iteration (何時)</td></tr>
-          <tr><td><strong>描述 (Description)</strong></td><td>需求細節、驗收條件或重現步驟</td></tr>
-          <tr><td><strong>連結 (Links)</strong></td><td>關聯父子 work item、commit、PR、build 等</td></tr>
-          <tr><td><strong>討論 (Discussion)</strong></td><td>留言串,可 @mention 成員;所有變更皆留下歷史紀錄</td></tr>
-        </tbody>
-      </table>
-
-      <p>建立一個 work item 的最直接路徑,是在「工作項目」hub 點選「新增工作項目」,選擇類型 (如 User Story),填入標題後即可儲存;其餘欄位可稍後補齊。以下為一個典型的 User Story:</p>
-
-      <ul>
-        <li><strong>標題</strong>:使用者可用 email 與密碼註冊帳號</li>
-        <li><strong>狀態</strong>:Active</li>
-        <li><strong>指派對象</strong>:後端工程師</li>
-        <li><strong>描述</strong>:提交 email 與密碼後建立帳號,並寄出驗證信;email 重複時回傳明確錯誤</li>
-        <li><strong>子項 Task</strong>:設計資料表、實作註冊 API、串接寄信服務</li>
-      </ul>
-
-      <div class="callout callout-info">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>協作與歷史內建於每一張 work item</strong>
-          每次欄位變更與留言都會記錄於「歷史」中,可回溯誰在何時改了什麼。work item 也支援附件 (每檔上限 60 MB、每張 work item 最多 100 個),讓設計稿、規格與截圖能與需求保存在一起,而非散落於外部工具。
-        </div>
-      </div>
     </section>
 
     <section id="kanban">
-      <span class="section-eyebrow">04 — 看板</span>
-      <h2>Kanban 看板:讓工作流動可視化</h2>
+      <span class="section-eyebrow">03 — Boards</span>
+      <h2>Boards:用 Kanban 讓工作流動可視化</h2>
 
-      <p>看板 (Kanban Board) 以卡片呈現 work item,每張卡片代表一個項目,每一欄對應一種<strong>狀態</strong>。將卡片由左欄拖放到右欄,即同步更新該 work item 的 state——進度的推進變成可視化的動作。</p>
+      <p>Boards 以 Kanban 看板的形式呈現 work item,每張卡片代表一個項目,每一欄對應一種<strong>狀態</strong>。將卡片由左欄拖放到右欄,即同步更新該 work item 的 state——進度的推進變成可視化的動作。</p>
 
-      <p>看板提供幾項常用的設定,協助管理工作的流動:</p>
-
-      <ul>
-        <li><strong>欄位對應狀態 (Columns)</strong>——可自訂欄位名稱與對應的 state,例如 To Do / In Progress / Code Review / Done。</li>
-        <li><strong>WIP limits (在製品上限)</strong>——為某一欄設定卡片數量上限,超過即顯示警示,避免同時開啟過多工作。</li>
-        <li><strong>泳道 (Swimlanes)</strong>——以水平列再次分組,例如把「加急」與「一般」分開檢視。</li>
-        <li><strong>卡片自訂 (Card customization)</strong>——調整卡片上顯示的欄位、顏色與標籤,讓重點一眼可辨。</li>
-      </ul>
-
-      <div class="callout callout-success">
-        <div class="callout-icon">✓</div>
-        <div class="callout-body">
-          <strong>用 WIP limits 管理流動,而非塞滿待辦</strong>
-          為「進行中」欄位設定合理的 WIP limit,是看板最有價值的實踐之一。它迫使團隊先完成手上的工作再開新的,減少同時進行造成的切換成本與半成品堆積。當某欄頻繁觸頂,正是流程瓶頸浮現的訊號。
-        </div>
+      <div class="diagram">
+        <img src="assets/azure/boards-backlogs.png" alt="Azure Boards 看板,顯示多張 work item 卡片" class="shot-md">
+        <div class="diagram-caption">圖 2.3 — Boards 看板檢視 (來源:Microsoft Learn)</div>
       </div>
     </section>
 
     <section id="backlog">
-      <span class="section-eyebrow">05 — 待辦清單與衝刺</span>
-      <h2>Backlog 排序,Sprint 認領</h2>
+      <span class="section-eyebrow">04 — Backlogs</span>
+      <h2>Backlogs:依優先順序排列的工作清單</h2>
 
-      <p>待辦清單 (Backlog) 是一份<strong>依優先順序排列的 work item 清單</strong>。看板強調「流動」,Backlog 則強調「順序」——把最該先做的項目排在最上方,團隊由上而下認領工作。</p>
+      <p>Backlogs 是一份<strong>依優先順序排列的 work item 清單</strong>。它與 Work items hub 操作同一批資料,但用途不同:Work items 偏個人視角,用來<strong>檢索</strong>指派給我或我追蹤的工作;Backlogs 偏團隊視角,用來<strong>排序與規劃</strong>。Boards 強調「流動」,Backlogs 則強調「順序」——把最該先做的項目排在最上方,團隊由上而下認領工作。</p>
 
-      <p>兩個 path 欄位決定了 work item 的歸屬,是 Backlog 與 Sprint 規劃的基礎:</p>
+      <p>Backlog 可在不同層級之間切換,分別檢視不同顆粒度的需求:由 User Story 的細項清單,逐層上推到 Feature 與 Epic 的整體規劃,讓需求的拆解與排序在同一處完成。</p>
 
-      <ul>
-        <li><strong>Iteration Path (何時)</strong>——把 work item 排入哪一個 iteration/sprint,代表預計在哪個時間區間完成。</li>
-        <li><strong>Area Path (誰)</strong>——把 work item 歸屬於哪個團隊區域,決定它出現在哪個 Team 的 backlog 與看板。</li>
-      </ul>
+      <p>決定 work item 出現在哪一份 Backlog 的關鍵,是 <strong>Area Path</strong> 欄位——它把 work item 歸屬於某個團隊區域,該項目便會出現在對應 Team 的 Backlogs 與 Boards,團隊據此只看見屬於自己的工作。</p>
 
-      <p>規劃一個 Sprint 時,典型流程如下:</p>
+      <p>清單的順序由<strong>人工拖放</strong>決定,愈上面愈優先。拖動項目時,Azure Boards 會在背景更新一個隱藏的排序欄位 (Agile/CMMI 為 Stack Rank、Scrum 為 Backlog Priority),作為優先序的真正來源。</p>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>排序與 work item 上的 Priority 欄位無關</strong>
+          Backlog 的上下順序來自 Stack Rank / Backlog Priority,而非表單 Planning 區塊那個 1–4 的 Priority 欄位 (它只是重要程度的分類標籤)。兩筆 Priority 同為 2 的項目,誰排前面仍由拖放順序決定。
+        </div>
+      </div>
+
+      <div class="diagram">
+        <img src="assets/azure/boards-backlog-list.png" alt="Azure Boards Backlogs 檢視,依優先順序由上而下排列的 work item 清單" class="shot-lg">
+        <div class="diagram-caption">圖 2.4 — Backlogs 依優先順序排列的工作清單 (來源:Microsoft Learn)</div>
+      </div>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>先排序,再認領</strong>
+          維持 Backlog 由上而下的優先序,是規劃的基礎。當清單頂端永遠是最該先做的項目,團隊認領工作便無須反覆討論優先級,Sprint 規劃也能直接從清單上方取用。
+        </div>
+      </div>
+    </section>
+
+    <section id="sprints">
+      <span class="section-eyebrow">05 — Sprints</span>
+      <h2>Sprints:在固定週期內認領並完成工作</h2>
+
+      <p>sprint (亦稱 iteration) 是一段<strong>固定長度的開發週期</strong>,通常為一至四週。團隊在每個 sprint 開始時,從 Backlog 上方挑選一批工作作為本期目標,並在週期內完成。Sprints hub 即用於規劃與追蹤這段期間的工作。</p>
+
+      <p>決定 work item 屬於哪個 sprint 的關鍵,是 <strong>Iteration Path</strong> 欄位——把它指向某個 iteration,該 work item 便納入該 sprint 的範圍。</p>
+
+      <p>規劃一個 sprint 時,典型流程如下:</p>
 
       <div class="timeline">
         <div class="timeline-step">
@@ -239,7 +244,7 @@
           <div class="timeline-num">2</div>
           <div class="timeline-content">
             <div class="timeline-title">Backlog 排序</div>
-            <div class="timeline-desc">於待辦清單拖放 work item,把優先度最高的項目排到最上方。</div>
+            <div class="timeline-desc">於 <strong>Backlogs hub</strong> 拖放 work item,把優先度最高的排到最上方 (排的是整個 backlog,不是單一 sprint)。</div>
           </div>
         </div>
         <div class="timeline-step">
@@ -252,8 +257,8 @@
         <div class="timeline-step">
           <div class="timeline-num">4</div>
           <div class="timeline-content">
-            <div class="timeline-title">拖 work item 進 Sprint</div>
-            <div class="timeline-desc">將 Backlog 上方項目的 Iteration Path 指向本 sprint,認領為本期目標。</div>
+            <div class="timeline-title">把 work item 指派到 Sprint</div>
+            <div class="timeline-desc">從排好序的 backlog 由上往下挑出本期要做的項目,點該項目的<strong>更多動作 (⋯)</strong> → Move to iteration → 本 sprint;或開啟 work item,把 <strong>Iteration</strong> 欄位設為本 sprint。Iteration Path 指向本期,該項目便成為本期目標。</div>
           </div>
         </div>
         <div class="timeline-step">
@@ -266,87 +271,57 @@
       </div>
 
       <div class="diagram">
-        <img src="assets/azure/boards-backlogs.png" alt="Azure Boards 待辦清單頁面,顯示多張 work item 卡片" class="shot-md">
-        <div class="diagram-caption">圖 2.3 — 待辦清單頁面 (來源:Microsoft Learn)</div>
+        <img src="assets/azure/boards-sprint-taskboard.png" alt="Azure Boards Sprint task board,顯示本期工作與各自的 Task" class="shot-lg">
+        <div class="diagram-caption">圖 2.5 — Sprint task board:追蹤本期工作的進度 (來源:Microsoft Learn)</div>
       </div>
 
-      <div class="callout callout-info">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>Backlog 與 Sprint 是同一批工作的兩種視角</strong>
-          Backlog 回答「接下來要做什麼、依什麼順序」,Sprint 回答「這段期間要完成哪些、由誰投入多少」。設定 Capacity 後,當 sprint 內排入的工作超過總產能,系統會以紅色提示過載,協助及早調整範圍。
-        </div>
-      </div>
     </section>
 
     <section id="queries">
-      <span class="section-eyebrow">06 — 查詢</span>
+      <span class="section-eyebrow">06 — Queries</span>
       <h2>Queries:儲存可重複使用的篩選清單</h2>
 
-      <p>查詢 (Queries) 讓 work item 的篩選條件得以儲存並重複使用。與其每次手動翻找,不如把「指派給我且尚未關閉的所有 Bug」這類條件存成一個查詢,隨時點開即得最新結果。查詢分為三種類型:</p>
+      <p>Queries 讓 work item 的篩選條件得以儲存並重複使用。與其每次手動翻找,不如把「指派給我且尚未關閉的所有 Bug」這類條件存成一筆 query,隨時點開即得最新結果。</p>
 
-      <table>
-        <thead>
-          <tr><th>查詢類型</th><th>用途</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>Flat list (平面清單)</strong></td><td>單純列出符合條件的 work item,最常用</td></tr>
-          <tr><td><strong>Work items and direct links (直接連結)</strong></td><td>顯示符合條件的項目及其直接關聯的項目</td></tr>
-          <tr><td><strong>Tree of work items (樹狀)</strong></td><td>以父子階層呈現,觀察 Epic → Feature → Story 的展開</td></tr>
-        </tbody>
-      </table>
-
-      <p>查詢依儲存位置分為 <strong>My Queries</strong> (僅自己可見) 與 <strong>Shared Queries</strong> (團隊共享)。儲存後的查詢還能<strong>餵給儀表板 widget</strong>,例如以查詢結果產出長條圖或趨勢圖,讓 Dashboard 上的數字自動更新。</p>
-
-      <p>查詢編輯器底層以 WIQL (Work Item Query Language) 描述條件,語法近似 SQL。日常使用以圖形化編輯器即可完成,進階情境才需要直接撰寫 WIQL:</p>
-
-      <div class="code-block" data-lang="wiql">
-        <pre><code>SELECT [System.Id], [System.Title], [System.State]
-FROM WorkItems
-WHERE [System.WorkItemType] = 'Bug'
-  AND [System.AssignedTo] = @Me
-  AND [System.State] &lt;&gt; 'Closed'
-ORDER BY [System.ChangedDate] DESC</code></pre>
-      </div>
-
-      <div class="callout callout-info">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>把常用視角存成 Shared Query</strong>
-          將「本 sprint 進行中的工作」「逾期未完成」「待我審查」等常用條件存為 Shared Queries,團隊成員即可共用同一份檢視,並接上儀表板形成即時報表。查詢也支援 @Me、@CurrentIteration 等動態變數,使同一個查詢對每位成員與每個 sprint 都維持正確結果。
-        </div>
+      <div class="diagram">
+        <img src="assets/azure/boards-queries.png" alt="Azure Boards Queries 頁面,列出我的最愛與內建查詢" class="shot-lg">
+        <div class="diagram-caption">圖 2.6 — Queries 頁面:管理已儲存的查詢 (來源:Microsoft Learn)</div>
       </div>
     </section>
 
     <section id="plans">
-      <span class="section-eyebrow">07 — 交付計劃與可追蹤性</span>
-      <h2>跨團隊的行事曆與端對端追蹤</h2>
+      <span class="section-eyebrow">07 — Delivery Plans</span>
+      <h2>Delivery Plans:跨團隊的交付行事曆</h2>
 
-      <p>交付計劃 (Delivery Plans) 以<strong>行事曆檢視</strong>呈現跨多個團隊、跨多個 sprint 的交付排程。它把各團隊的 Feature 或 Epic 攤在時間軸上,協助觀察彼此的相依關係與時程衝突,適合用於跨團隊的版本規劃與里程碑對齊。</p>
+      <p>Delivery Plans 以<strong>行事曆檢視</strong>呈現跨多個團隊、跨多個 sprint 的交付排程。它把各團隊的 Feature 或 Epic 攤在時間軸上,協助觀察彼此的相依關係與時程衝突,適合用於跨團隊的版本規劃與里程碑對齊。</p>
 
-      <p>Boards 真正的價值,在於它與其他 Azure DevOps 服務串成的<strong>端對端可追蹤性</strong>。一個 work item 可以一路連結到實作與驗證它的每個產物:</p>
-
-      <ul>
-        <li>從 work item 直接<strong>建立分支</strong>,使分支自始即與需求關聯。</li>
-        <li>開 Pull Request 時<strong>關聯 work item</strong>,合併後狀態可自動推進。</li>
-        <li>build 與發行<strong>連回 work item</strong>,得知某個需求由哪次 build 產出、部署到哪個環境。</li>
-        <li>測試結果連回需求,構成「需求 ↔ branch/commit ↔ PR ↔ build ↔ test」的完整鏈。</li>
-      </ul>
-
-      <p>Boards 也能<strong>連結 GitHub 儲存庫</strong>:在 commit message 或 PR 中以特定語法引用 work item 編號,即可把 GitHub 的 commit、PR 與 issue 連回 Azure Boards 的 work item,讓需求管理留在 Boards、程式碼留在 GitHub 的團隊同樣享有可追蹤性。</p>
+      <p>相較於 Backlog 與 Sprint 著眼於單一團隊自身的工作,Delivery Plans 提供的是<strong>跨團隊的鳥瞰視角</strong>:哪個團隊的哪項 Feature 預計在哪個 sprint 交付,在同一條時間軸上一眼可辨。</p>
 
       <div class="diagram">
-        <img src="assets/azure/boards-dashboard.png" alt="Azure Boards 儀表板,含團隊狀態與衝刺燃盡 widget" class="shot-md">
-        <div class="diagram-caption">圖 2.4 — 由查詢與 work item 餵養的儀表板 (來源:Microsoft Learn)</div>
+        <img src="assets/azure/boards-delivery-plans.png" alt="Azure Boards Delivery Plans 行事曆檢視,多個團隊的工作排在時間軸上" class="shot-lg">
+        <div class="diagram-caption">圖 2.7 — Delivery Plans 的行事曆檢視 (來源:Microsoft Learn)</div>
       </div>
 
-      <div class="callout callout-success">
-        <div class="callout-icon">✓</div>
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>讓每件工作都能往回追溯來源</strong>
-          建立 work item 後養成「從需求建分支、開 PR 關聯需求」的習慣,整條鏈便會自動成形。日後檢視任一筆部署或一個 Bug,都能反查其需求、負責人與測試紀錄。下一課將進入 Repos,看這些分支與 Pull Request 如何在 Azure DevOps 中運作。
+          <strong>適合用於跨團隊的版本對齊</strong>
+          當多個團隊共同推進一個版本,Delivery Plans 能把各自的交付時程疊在同一條時間軸上,讓相依與瓶頸提前浮現,而非等到 sprint 結束才發現對不上。
         </div>
       </div>
+    </section>
+
+    <section id="analytics">
+      <span class="section-eyebrow">08 — Analytics views</span>
+      <h2>Analytics views:報表與圖表的資料來源</h2>
+
+      <p>這頁只負責定義「Power BI 會拉到哪些資料」;要把數字看成圖表,得到 Power BI 端去做。</p>
+
+      <div class="diagram">
+        <img src="assets/azure/boards-dashboard.png" alt="Azure Boards 儀表板,含團隊狀態與 sprint burndown widget" class="shot-md">
+        <div class="diagram-caption">圖 2.8 — 由 query 與 Analytics 資料餵養的儀表板 (來源:Microsoft Learn)</div>
+      </div>
+
     </section>
 
     <nav class="lesson-nav" aria-label="上一課/下一課">
