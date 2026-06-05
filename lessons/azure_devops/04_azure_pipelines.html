@@ -19,7 +19,7 @@
     <h1 class="hero-title">Azure Pipelines<span> CI/CD 自動化</span></h1>
     <p class="hero-desc">原始碼進入 Repos 後,下一步是讓 build、測試與部署不再依賴人工執行。本課介紹 Azure Pipelines:先釐清 CI/CD 的概念,再認識 pipeline 的層級結構,接著以一份完整的 YAML 範例走過第一條自動化流程,最後說明觸發時機、執行環境與 production 的核准關卡。</p>
     <div class="hero-badges">
-      <span class="hero-badge"><span class="dot"></span>第 4 / 5 堂</span>
+      <span class="hero-badge"><span class="dot"></span>第 4 / 4 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 15 分鐘</span>
       <span class="hero-badge"><span class="dot"></span>Azure DevOps</span>
     </div>
@@ -51,7 +51,7 @@
       <p>Azure Pipelines 是 Azure DevOps 中負責 CI/CD 自動化的服務。所謂 CI/CD,由兩個概念組成:</p>
 
       <ul>
-        <li><strong>持續整合 (Continuous Integration, CI)</strong>——每當有人提交程式碼,系統便自動將變更與主線合併並執行測試。問題在最早期就被發現,避免缺陷累積到上線前才爆發。CI 同時產出可供後續部署使用的 artifact。</li>
+        <li><strong>持續整合 (Continuous Integration, CI)</strong>——開發者頻繁地將各自的變更整合進共用主線,而每一次提交 (push 或 Pull Request) 都會觸發系統自動 build 並執行測試。問題在最早期即被發現,避免缺陷累積。CI 系統負責的是驗證而非合併——是否併入主線,仍由 push 或 PR 審查決定。CI 同時產出可供後續部署使用的 artifact。</li>
         <li><strong>持續交付 (Continuous Delivery, CD)</strong>——將通過驗證的 artifact 自動 build、測試,並部署到一個或多個環境 (測試、預備、生產)。release 流程自動化,降低人工部署的失誤與延遲。</li>
       </ul>
 
@@ -66,7 +66,7 @@
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong>CI 與 CD 的分工</strong>
-          可以把 CI 想成「對程式碼本身的把關」——合併、編譯、測試,確保程式碼健康;CD 則是「把健康的成品送到各環境」——部署與發布。兩者銜接的關鍵是 artifact:CI 產出它,CD 取用它。
+          可以把 CI 想成「對程式碼本身的把關」——對每一次整合自動編譯、測試,確保進入主線的程式碼健康;CD 則是「把健康的成品送到各環境」——部署與發布。兩者銜接的關鍵是 artifact:CI 產出它,CD 取用它。
         </div>
       </div>
     </section>
@@ -345,9 +345,9 @@
         <div class="lesson-nav-eyebrow">← 上一課</div>
         <div class="lesson-nav-title">Lesson 03 · Azure Repos</div>
       </a>
-      <a class="lesson-nav-card lesson-nav-next" href="05_azure_test_plans.html">
+      <a class="lesson-nav-card lesson-nav-next disabled" aria-disabled="true">
         <div class="lesson-nav-eyebrow">下一課 →</div>
-        <div class="lesson-nav-title">Lesson 05 · Azure Test Plans</div>
+        <div class="lesson-nav-title">系列完結 🎉</div>
       </a>
     </nav>
 
@@ -355,13 +355,12 @@
 
   <aside class="lesson-aside">
     <div class="aside-card">
-      <div class="aside-title">5 堂課程系列 <span class="progress-pill">4 / 5</span></div>
+      <div class="aside-title">4 堂課程系列 <span class="progress-pill">4 / 4</span></div>
       <ul class="course-nav">
         <li><a class="course-nav-item" href="01_azure_overview.html"><span class="course-nav-num">01</span><span>Azure DevOps 總覽</span></a></li>
         <li><a class="course-nav-item" href="02_azure_boards.html"><span class="course-nav-num">02</span><span>Azure Boards</span></a></li>
         <li><a class="course-nav-item" href="03_azure_repos.html"><span class="course-nav-num">03</span><span>Azure Repos</span></a></li>
         <li><a class="course-nav-item current" href="04_azure_pipelines.html"><span class="course-nav-num">04</span><span>Azure Pipelines</span></a></li>
-        <li><a class="course-nav-item" href="05_azure_test_plans.html"><span class="course-nav-num">05</span><span>Azure Test Plans</span></a></li>
       </ul>
     </div>
   </aside>
