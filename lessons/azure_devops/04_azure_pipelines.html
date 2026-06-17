@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lesson 04｜Azure Pipelines — Azure DevOps 課程</title>
-<meta name="description" content="Azure Pipelines CI/CD 自動化:CI 與 CD 概念、YAML 與 Classic 兩種定義方式、pipeline → stage → job → step 層級結構、第一條 YAML pipeline、triggers、agents 與 environments 核准關卡。">
+<meta name="description" content="Azure Pipelines CI/CD 自動化:CI 與 CD 概念、pipeline → stage → job → step 層級結構,並依 Pipelines 服務三個頁面——Pipelines (YAML、triggers、agents)、Environments (部署目標與核准)、Library (變數群組與安全檔案) 逐一講解。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../_shared.css">
@@ -17,10 +17,10 @@
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
     <div class="hero-eyebrow">Lesson 04 · Azure DevOps 實戰篇</div>
     <h1 class="hero-title">Azure Pipelines<span> CI/CD 自動化</span></h1>
-    <p class="hero-desc">原始碼進入 Repos 後,下一步是讓 build、測試與部署不再依賴人工執行。本課介紹 Azure Pipelines:先釐清 CI/CD 的概念,再認識 pipeline 的層級結構,接著以一份完整的 YAML 範例走過第一條自動化流程,最後說明觸發時機、執行環境與 production 的核准關卡。</p>
+    <p class="hero-desc">原始碼進入 Repos 後,下一步是讓 build、測試與部署不再依賴人工執行。本課介紹 Azure Pipelines:先釐清 CI/CD 的概念與 pipeline 的層級結構,再依 Pipelines 服務的三個頁面——Pipelines、Environments、Library——分別講解流程的定義與執行、部署目標與核准關卡,以及跨 pipeline 共用的變數群組與安全檔案。</p>
     <div class="hero-badges">
       <span class="hero-badge"><span class="dot"></span>第 4 / 4 堂</span>
-      <span class="hero-badge"><span class="dot"></span>約 15 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>約 18 分鐘</span>
       <span class="hero-badge"><span class="dot"></span>Azure DevOps</span>
     </div>
   </div>
@@ -31,12 +31,9 @@
     <span class="toc-label">章節</span>
     <ul class="toc-list">
       <li><a class="toc-link" href="#what">什麼是 CI/CD</a></li>
-      <li><a class="toc-link" href="#yaml-classic">YAML 還是 Classic</a></li>
-      <li><a class="toc-link" href="#hierarchy">核心詞彙與層級</a></li>
-      <li><a class="toc-link" href="#first">第一條 Pipeline</a></li>
-      <li><a class="toc-link" href="#triggers">Triggers 觸發時機</a></li>
-      <li><a class="toc-link" href="#agents">Agents 執行環境</a></li>
-      <li><a class="toc-link" href="#environments">環境與核准</a></li>
+      <li><a class="toc-link" href="#pipelines">Pipelines</a></li>
+      <li><a class="toc-link" href="#environments">Environments</a></li>
+      <li><a class="toc-link" href="#library">Library</a></li>
     </ul>
   </div>
 </nav>
@@ -51,58 +48,33 @@
       <p>Azure Pipelines 是 Azure DevOps 中負責 CI/CD 自動化的服務。所謂 CI/CD,由兩個概念組成:</p>
 
       <ul>
-        <li><strong>持續整合 (Continuous Integration, CI)</strong>——開發者頻繁地將各自的變更整合進共用主線,而每一次提交 (push 或 Pull Request) 都會觸發系統自動 build 並執行測試。問題在最早期即被發現,避免缺陷累積。CI 系統負責的是驗證而非合併——是否併入主線,仍由 push 或 PR 審查決定。CI 同時產出可供後續部署使用的 artifact。</li>
+        <li><strong>持續整合 (Continuous Integration, CI)</strong>——開發者頻繁地將各自的變更整合進共用主線,並透過設定觸發條件 (trigger),讓提交 (push 或 Pull Request) 自動進行 build 與測試。問題在最早期即被發現,避免缺陷累積。CI 同時產出可供後續部署使用的 artifact (如 Docker image)。</li>
         <li><strong>持續交付 (Continuous Delivery, CD)</strong>——將通過驗證的 artifact 自動 build、測試,並部署到一個或多個環境 (測試、預備、生產)。release 流程自動化,降低人工部署的失誤與延遲。</li>
       </ul>
 
-      <p>Azure Pipelines 結合 CI、持續測試與 CD 於同一服務,<strong>支援所有主要語言與專案類型</strong>,並可在 Windows、Linux、macOS 上平行執行。部署目標也相當廣:虛擬機器、container、地端伺服器、雲端與 PaaS 皆可,甚至能將行動 app 發行到應用商店。唯一的前提是<strong>原始碼必須置於版本控制之下</strong> (支援 Azure Repos 與 GitHub)。</p>
+      <p>Azure Pipelines 將 CI、持續測試與 CD 整合於同一服務,支援主要語言、專案類型與部署目標,並可跨平台平行執行。唯一前提是<strong>原始碼須置於版本控制之下</strong> (Azure Repos 或 GitHub)。</p>
 
       <div class="diagram">
         <img src="assets/azure/pipelines-overview.png" alt="Azure Pipelines 概觀圖" class="shot-md">
         <div class="diagram-caption">圖 4.1 — Azure Pipelines 概觀:從原始碼到部署的自動化流程 (來源:Microsoft Learn)</div>
       </div>
 
-      <div class="callout callout-info">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>CI 與 CD 的分工</strong>
-          可以把 CI 想成「對程式碼本身的把關」——對每一次整合自動編譯、測試,確保進入主線的程式碼健康;CD 則是「把健康的成品送到各環境」——部署與發布。兩者銜接的關鍵是 artifact:CI 產出它,CD 取用它。
-        </div>
+      <p>左側選單的 <strong>Pipelines</strong> 服務展開後分為三個頁面,本課接下來三章即依序展開:<strong>Pipelines</strong> 列出專案中所有 pipeline 與每次執行的狀態,是定義與觀察流程的起點;<strong>Environments</strong> 管理部署的目標環境,並可為 production 等關鍵環境設定核准關卡;<strong>Library</strong> 則保管可跨 pipeline 共用的變數群組與安全檔案。</p>
+
+      <div class="diagram">
+        <img src="assets/azure/pipelines-landing.png" alt="Azure Pipelines 最近執行的管線清單" class="shot-md">
+        <div class="diagram-caption">圖 4.2 — Pipelines 頁面列出最近執行的管線與其狀態 (來源:Microsoft Learn)</div>
       </div>
+
     </section>
 
-    <section id="yaml-classic">
-      <span class="section-eyebrow">02 — YAML 還是 Classic?</span>
-      <h2>兩種定義 pipeline 的方式</h2>
+    <section id="pipelines">
+      <span class="section-eyebrow">02 — Pipelines:定義並執行流程</span>
+      <h2>撰寫並執行一條 pipeline</h2>
 
-      <p>Azure Pipelines 提供兩種定義流程的方式。理解差異,有助於選對起點:</p>
+      <p>Azure Pipelines 以一份 <code>azure-pipelines.yml</code> 檔案描述整條流程,與程式碼一同存放於 repo、接受版本控管——誰在何時改了什麼,都能在 commit 歷史中追溯,也能透過 Pull Request 審查。這種「pipeline as code」是官方推薦的做法;本課與後續範例皆以 YAML 撰寫。</p>
 
-      <table>
-        <thead>
-          <tr><th>方式</th><th>如何定義</th><th>特性</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>YAML</strong></td><td>以 <code>azure-pipelines.yml</code> 檔案描述流程,存放於 repo 內</td><td>pipeline as code、隨程式碼一起版本控管、可審查與重現;官方推薦</td></tr>
-          <tr><td><strong>Classic</strong></td><td>透過 Web UI 的拖拉式編輯器設定</td><td>不需撰寫 YAML、上手快,但定義不在 repo 內、難以追蹤變更歷史;屬舊式做法</td></tr>
-        </tbody>
-      </table>
-
-      <p>兩者最大的差別在於<strong>「定義放在哪裡」</strong>。YAML 把流程定義當作程式碼的一部分,放進 repo 並接受版本控管——誰改了什麼、何時改的,都能在 commit 歷史中查到,也能透過 Pull Request 審查。Classic 的設定則存於 UI,脫離了原始碼的追蹤鏈。</p>
-
-      <p>基於可重現性與可追蹤性,<strong>本課聚焦於 YAML 方式</strong>,後續範例皆以 YAML 撰寫。</p>
-
-      <div class="callout callout-success">
-        <div class="callout-icon">✓</div>
-        <div class="callout-body">
-          <strong>新專案直接採用 YAML</strong>
-          除非維護的是早已存在的 Classic pipeline,新建立的流程建議一律使用 YAML。流程定義與程式碼同步演進,回溯與複製到其他 repo 都更為單純。
-        </div>
-      </div>
-    </section>
-
-    <section id="hierarchy">
-      <span class="section-eyebrow">03 — 核心詞彙:pipeline → stage → job → step</span>
-      <h2>由大到小的四層結構</h2>
+      <h3>核心詞彙:pipeline → stage → job → step</h3>
 
       <p>YAML pipeline 的結構由外而內分為四層。先建立這張層級圖,後續閱讀任何 pipeline 定義時都能對應到正確的層級:</p>
 
@@ -138,7 +110,7 @@
             <text x="204" y="273" text-anchor="middle" fill="#7c2d12">step:部署到 production</text>
           </g>
         </svg>
-        <div class="diagram-caption">圖 4.2 — pipeline &gt; stage &gt; job &gt; step 的巢狀層級</div>
+        <div class="diagram-caption">圖 4.3 — pipeline &gt; stage &gt; job &gt; step 的巢狀層級</div>
       </div>
 
       <p>四個層級加上幾個常用的關聯概念,整理如下:</p>
@@ -166,13 +138,9 @@
           step 是 job 內動作的統稱;<code>script</code> 與 <code>task</code> 都是 step 的形式。<code>script</code> 直接跑命令列指令,適合簡單操作;<code>task</code> 是封裝好的可重用元件,封裝了較複雜的邏輯與參數 (如版本選擇、相依設定)。
         </div>
       </div>
-    </section>
+      <h3>第一條 azure-pipelines.yml</h3>
 
-    <section id="first">
-      <span class="section-eyebrow">04 — 第一條 Pipeline (YAML 範例)</span>
-      <h2>一份可讀懂的 azure-pipelines.yml</h2>
-
-      <p>下面是一份完整、可直接理解的 Node.js 專案 pipeline。它在每次 push 到 <code>main</code> 時,於一台乾淨的 Linux 機器上安裝 Node.js、裝相依套件、跑測試並 build 專案:</p>
+      <p>下面是一份完整、可直接理解的 Node.js 專案 pipeline。它在每次 push 到 <code>main</code> 時,於一台乾淨的 Linux 機器上安裝 Node.js、裝相依套件、執行測試並 build 專案:</p>
 
       <div class="code-block">
         <div class="code-block-header">
@@ -219,13 +187,10 @@
           YAML 以縮排表達層級,且僅接受空格、不可使用 Tab。縮排錯誤是初學者最容易忽略的細節,常導致 pipeline 無法解析。建議在編輯器中啟用「顯示空白字元」並統一以兩個空格縮排。
         </div>
       </div>
-    </section>
 
-    <section id="triggers">
-      <span class="section-eyebrow">05 — Triggers — 何時觸發</span>
-      <h2>四種啟動 pipeline 的時機</h2>
+      <h3>Triggers — 何時觸發</h3>
 
-      <p>trigger 決定 pipeline 何時自動執行。常見的觸發方式有四種:</p>
+      <p>trigger 決定 pipeline 何時自動執行,是設定出來的條件而非固定規則。常見的觸發方式有四種:</p>
 
       <table>
         <thead>
@@ -269,11 +234,8 @@
           CI trigger 在程式碼「已合併」後驗證主線健康;PR trigger 則在程式碼「尚未合併」時先行檢查,讓問題在進入主線前就被攔下。多數團隊兩者並用,構成合併前後的雙重防線。
         </div>
       </div>
-    </section>
 
-    <section id="agents">
-      <span class="section-eyebrow">06 — Agents — 在哪裡跑</span>
-      <h2>代管 agent 與自架 agent</h2>
+      <h3>Agents — 在哪裡執行</h3>
 
       <p>pipeline 的每個 job 都需要一台 agent 來執行。agent 分為兩類:</p>
 
@@ -299,10 +261,26 @@
     </section>
 
     <section id="environments">
-      <span class="section-eyebrow">07 — 環境與核准 (Environments &amp; Approvals)</span>
+      <span class="section-eyebrow">03 — Environments:部署目標與核准關卡</span>
       <h2>部署到 environment,為 production 設關卡</h2>
 
-      <p>當 pipeline 進入部署階段,目標通常是一個 <strong>environment</strong> (例如 <code>staging</code> 或 <code>production</code>)。部署到環境的工作須使用特殊的 <strong>deployment job</strong>,而非一般 job——它會記錄每次部署的歷程,讓「哪個版本部署到哪個環境」可被追蹤。</p>
+      <p>environment 是部署的<strong>邏輯目標</strong>——一個具名的資源集合,常見命名如 <code>Dev</code>、<code>Test</code>、<code>Staging</code>、<code>Production</code>。環境底下的資源代表實際的部署對象,目前支援 <strong>Kubernetes</strong> 與<strong>虛擬機器</strong>兩種資源類型 (Classic pipeline 不支援 environment,改以 deployment group 達成類似功能)。</p>
+
+      <p>相較於直接把成品推上伺服器,透過 environment 部署可換得四項效益:</p>
+
+      <table>
+        <thead>
+          <tr><th>效益</th><th>說明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>部署歷程</strong></td><td>記錄每次部署的 pipeline 與執行細節;多條 pipeline 部署到同一環境時,可追溯每次變更的來源</td></tr>
+          <tr><td><strong>可追蹤性</strong></td><td>檢視部署到該環境的 commit 與 work item,追蹤某段程式碼或某個需求是否已抵達該環境</td></tr>
+          <tr><td><strong>資源健康</strong></td><td>驗證應用程式是否處於預期的運作狀態</td></tr>
+          <tr><td><strong>安全控管</strong></td><td>指定哪些使用者與哪些 pipeline 可部署到該環境</td></tr>
+        </tbody>
+      </table>
+
+      <p>部署到環境的工作須使用特殊的 <strong>deployment job</strong>,而非一般 job——它會記錄每次部署的歷程,讓「哪個版本部署到哪個環境」可被追蹤。若 YAML 引用了尚未建立的環境,且操作者身分可辨識,Azure Pipelines 會自動建立該環境。</p>
 
       <p>更重要的是,environment 可附加<strong>核准關卡 (approval gate)</strong>。對 <code>production</code> 設定核准後,pipeline 執行到部署步驟會暫停,等待指定的人員在 UI 上手動核准,才繼續執行。這道關卡讓自動化流程在最關鍵的一步保留人工把關。</p>
 
@@ -326,16 +304,80 @@
 
       <p>核准本身不在 YAML 中設定,而是在 Azure DevOps 的 <strong>Environments</strong> 頁面,針對該環境加入「Approvals and checks」。如此一來,YAML 只負責描述「部署到哪個環境」,而誰能核准、需要幾人核准等治理規則,則由環境設定集中管理。</p>
 
-      <div class="diagram">
-        <img src="assets/azure/pipelines-landing.png" alt="Azure Pipelines 最近執行的管線清單" class="shot-md">
-        <div class="diagram-caption">圖 4.3 — Pipelines 頁面列出最近執行的管線與其狀態 (來源:Microsoft Learn)</div>
-      </div>
-
       <div class="callout callout-success">
         <div class="callout-icon">✓</div>
         <div class="callout-body">
           <strong>pipeline 隨程式碼版控,production 設核准關卡</strong>
           建議將 <code>azure-pipelines.yml</code> 與程式碼放在同一 repo 一起版本控管,讓流程定義可審查、可回溯;同時為 production 環境設定核准關卡,在自動化的便利與部署的安全之間取得平衡。自動化負責重複勞動,人工保留最後一道判斷。
+        </div>
+      </div>
+    </section>
+
+    <section id="library">
+      <span class="section-eyebrow">04 — Library:跨 pipeline 共用的資產</span>
+      <h2>變數群組與安全檔案</h2>
+
+      <p>Library 是專案層級的資產集合,存放可在多條 pipeline 之間共用的設定與檔案,避免把同一份組態或機密重複寫進各個 pipeline、甚至 commit 進 repo。它收納兩類資產:<strong>變數群組 (variable groups)</strong> 與<strong>安全檔案 (secure files)</strong>。</p>
+
+      <h3>變數群組 (Variable Groups)</h3>
+
+      <p>變數群組把一組變數集中管理,供多條 pipeline 引用;在群組中修改一次,所有連結的 pipeline 自動取得新值。群組內的變數可為一般值,也可標記為<strong>機密 (secret)</strong>——機密以加密形式儲存,在 UI 上以鎖頭圖示表示。群組亦可<strong>連結 Azure Key Vault</strong>,將 Key Vault 中的 secret 當作變數帶入,使機密的儲存與輪替集中由 Key Vault 管理。</p>
+
+      <p>在 YAML 中以群組名稱引用整個變數群組,之後即可像一般變數一樣以 <code>$(變數名)</code> 取用:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-fn">variables</span>:
+  - <span class="tk-fn">group</span>: my-variable-group   <span class="tk-cm"># 引用 Library 中的變數群組</span>
+
+<span class="tk-fn">steps</span>:
+  - <span class="tk-fn">script</span>: echo $(app-name)        <span class="tk-cm"># 取用群組內的變數</span></code></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>變數群組須先授權,機密不可直接在 script 取用</strong>
+          YAML pipeline 必須先在變數群組的「Pipeline permissions」中獲得授權,才能使用該群組,否則任何能 push 程式碼的人都可能取出其中機密。此外,機密變數無法在 script 中直接展開,須以參數形式傳入 task。
+        </div>
+      </div>
+
+      <h3>安全檔案 (Secure Files)</h3>
+
+      <p>安全檔案用來存放<strong>不應 commit 進 repo</strong> 的敏感檔案,並在多條 pipeline 間共用。典型例子包括簽章憑證 (signing certificate)、Apple provisioning profile、Android keystore 與 SSH 金鑰。檔案以加密形式儲存於伺服器,僅能從 pipeline task 取用,且僅限授權的 pipeline 存取;單一檔案上限 10 MB,上傳後內容不可修改 (需更新時刪除後重新上傳)。</p>
+
+      <p>取用安全檔案透過 <code>DownloadSecureFile@1</code> task,下載後以該 task 的 <code>secureFilePath</code> 輸出取得實際路徑:</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">yaml</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-fn">steps</span>:
+  - <span class="tk-fn">task</span>: DownloadSecureFile@1
+    <span class="tk-fn">name</span>: caCert
+    <span class="tk-fn">inputs</span>:
+      <span class="tk-fn">secureFile</span>: <span class="tk-st">'myCACertificate.pem'</span>
+
+  - <span class="tk-fn">script</span>: echo 憑證已下載於 $(caCert.secureFilePath)</code></pre>
+      </div>
+
+      <div class="callout callout-danger">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>機密絕不 commit 進 repo</strong>
+          切勿將 API 金鑰、連線字串、憑證等機密直接寫入 YAML 或 commit 進 repo。一旦進入 git 歷史,即使事後刪除仍可能被還原,等同永久外洩。應改放入變數群組 (標記為 secret) 或安全檔案,由 Library 加密保管並控管存取。
+        </div>
+      </div>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>三個頁面,各司其職</strong>
+          Pipelines 定義並執行流程、Environments 管理部署目標與核准、Library 保管跨 pipeline 共用的變數與檔案。三者合起來,構成 Azure Pipelines 從 build 到安全部署的完整骨架。
         </div>
       </div>
     </section>
