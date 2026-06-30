@@ -345,7 +345,7 @@ a.inline-link:hover { color: var(--accent); border-bottom-color: var(--accent); 
   color: var(--white);
 }
 .callout-body { flex: 1; }
-.callout-body strong { display: block; margin-bottom: 2px; }
+.callout-body > strong:first-child { display: block; margin-bottom: 2px; }
 .callout-info    { background: var(--info-bg);    border-color: var(--info);    color: #134e4a; }
 .callout-info    .callout-icon { background: var(--info); }
 .callout-warn    { background: var(--warn-bg);    border-color: var(--warn);    color: #78350f; }

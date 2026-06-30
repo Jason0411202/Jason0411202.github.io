@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lesson 07｜錯誤處理與 Status Codes — gRPC 課程</title>
-<meta name="description" content="掌握 gRPC 16 種 status codes 的語意、用 status.Errorf 回傳結構化錯誤、用 status.WithDetails 帶 protobuf payload、client 端怎麼正確解碼錯誤。">
+<title>Lesson 06｜錯誤處理與 Status Codes — gRPC 課程</title>
+<meta name="description" content="掌握 gRPC 16 種錯誤碼的語意、用 status.Errorf 回傳結構化錯誤、用 status.WithDetails 帶 protobuf payload、client 端怎麼正確解碼錯誤。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../_shared.css">
@@ -15,11 +15,11 @@
 <header class="lesson-hero">
   <div class="hero-inner">
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
-    <div class="hero-eyebrow">Lesson 07 · 錯誤處理</div>
+    <div class="hero-eyebrow">Lesson 06 · 錯誤處理</div>
     <h1 class="hero-title">錯誤處理與<span>Status Codes</span></h1>
     <p class="hero-desc">gRPC 定義 16 種錯誤碼，選擇正確的代碼較撰寫詳細的 message 更為重要。<strong>掌握此設計後，client 才能依錯誤類型決定後續處理：retry、提示使用者，或僅記錄 log。</strong></p>
     <div class="hero-badges">
-      <span class="hero-badge"><span class="dot"></span>第 7 / 10 堂</span>
+      <span class="hero-badge"><span class="dot"></span>第 6 / 9 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 13 分鐘</span>
       <span class="hero-badge"><span class="dot"></span>中階</span>
     </div>
@@ -46,7 +46,7 @@
     <section id="why">
       <span class="section-eyebrow">01 — 為什麼有自己的 codes</span>
       <h2>HTTP status code 不夠用</h2>
-      <p>REST 用 HTTP code(404、500、503…)表示錯誤。但 HTTP 本來就被瀏覽器、proxy、CDN 用走了 — 你的 backend 回 503 與 LB 回 503 client 區分不出來。所以 gRPC 自己定義一套<strong>跑在 HTTP body 上的</strong>錯誤碼,共 16 個,放在 trailer 的 <code>grpc-status</code> header。</p>
+      <p>REST 以 HTTP code(404、500、503…)表示錯誤。但 HTTP code 早已被瀏覽器、proxy、CDN 占用 — backend 回傳 503 與 LB 回傳 503,client 無從區分。因此 gRPC 另行定義一套<strong>承載於 HTTP body 的</strong>錯誤碼,共 16 個(對照表另列出表示成功的 OK,合計 17 種 status code),放在 trailer 的 <code>grpc-status</code> header。</p>
 
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
@@ -68,20 +68,20 @@
         <tbody>
           <tr><td><code>OK</code></td><td>0</td><td>成功</td><td>handler return nil</td></tr>
           <tr><td><code>CANCELLED</code></td><td>1</td><td>呼叫方取消</td><td>client cancel、ctx done</td></tr>
-          <tr><td><code>UNKNOWN</code></td><td>2</td><td>不明錯誤</td><td>handler panic 被 recover、第三方錯不認得</td></tr>
-          <tr><td><code>INVALID_ARGUMENT</code></td><td>3</td><td>參數本身有問題</td><td>email 格式錯、必填欄空</td></tr>
+          <tr><td><code>UNKNOWN</code></td><td>2</td><td>不明錯誤</td><td>handler panic 被 recover、無法辨識的第三方錯誤</td></tr>
+          <tr><td><code>INVALID_ARGUMENT</code></td><td>3</td><td>參數本身有問題</td><td>email 格式錯、必填 field 空</td></tr>
           <tr><td><code>DEADLINE_EXCEEDED</code></td><td>4</td><td>超時</td><td>處理時間超過 deadline</td></tr>
           <tr><td><code>NOT_FOUND</code></td><td>5</td><td>資源不存在</td><td>查不到 user_id=42</td></tr>
           <tr><td><code>ALREADY_EXISTS</code></td><td>6</td><td>已存在</td><td>email 重複註冊</td></tr>
-          <tr><td><code>PERMISSION_DENIED</code></td><td>7</td><td>沒權限</td><td>已認證但無權限做這事</td></tr>
-          <tr><td><code>RESOURCE_EXHAUSTED</code></td><td>8</td><td>配額/資源耗盡</td><td>rate limit、quota 用完</td></tr>
-          <tr><td><code>FAILED_PRECONDITION</code></td><td>9</td><td>系統狀態不滿足</td><td>要刪非空目錄、未綁定卡片不能扣款</td></tr>
+          <tr><td><code>PERMISSION_DENIED</code></td><td>7</td><td>無權限</td><td>已認證但無此操作權限</td></tr>
+          <tr><td><code>RESOURCE_EXHAUSTED</code></td><td>8</td><td>配額/資源耗盡</td><td>rate limit、quota 耗盡</td></tr>
+          <tr><td><code>FAILED_PRECONDITION</code></td><td>9</td><td>系統狀態不滿足</td><td>刪除非空目錄、未綁定卡片無法扣款</td></tr>
           <tr><td><code>ABORTED</code></td><td>10</td><td>並發衝突</td><td>樂觀鎖失敗、transaction 衝突</td></tr>
           <tr><td><code>OUT_OF_RANGE</code></td><td>11</td><td>超出有效範圍</td><td>seek 超過檔案結尾、page 號超過總頁數</td></tr>
           <tr><td><code>UNIMPLEMENTED</code></td><td>12</td><td>未實作</td><td>新版 client 呼叫舊版 server 的新 method</td></tr>
           <tr><td><code>INTERNAL</code></td><td>13</td><td>內部錯誤</td><td>不變式被破壞、無法分類的 server 內部 bug</td></tr>
           <tr><td><code>UNAVAILABLE</code></td><td>14</td><td>暫時不可用</td><td>server overload、正在重啟、connection 斷</td></tr>
-          <tr><td><code>DATA_LOSS</code></td><td>15</td><td>資料毀損</td><td>checksum 對不上、不可逆的資料丟失</td></tr>
+          <tr><td><code>DATA_LOSS</code></td><td>15</td><td>資料毀損</td><td>checksum 不符、不可逆的資料丟失</td></tr>
           <tr><td><code>UNAUTHENTICATED</code></td><td>16</td><td>未認證</td><td>無 token / token 失效</td></tr>
         </tbody>
       </table>
@@ -92,15 +92,15 @@
         <div class="compare-card compare-good">
           <div class="compare-label"><span class="compare-icon">A</span>UNAUTHENTICATED</div>
           <div class="compare-body">
-            <strong>「你是誰?」沒問清楚</strong>
-            <p style="font-size:13px;margin-top:0.4rem;">沒帶 token、token 過期、簽章無效。</p>
+            <strong>身份尚未確認</strong>
+            <p style="font-size:13px;margin-top:0.4rem;">未帶 token、token 過期、簽章無效。</p>
           </div>
         </div>
         <div class="compare-card compare-good">
           <div class="compare-label"><span class="compare-icon">B</span>PERMISSION_DENIED</div>
           <div class="compare-body">
-            <strong>身份知道,但無權限</strong>
-            <p style="font-size:13px;margin-top:0.4rem;">已登入,但這個 endpoint 你不能存取。</p>
+            <strong>身份已知,但無權限</strong>
+            <p style="font-size:13px;margin-top:0.4rem;">已登入,但無權存取此 endpoint。</p>
           </div>
         </div>
       </div>
@@ -110,14 +110,14 @@
           <div class="compare-label"><span class="compare-icon">A</span>INVALID_ARGUMENT</div>
           <div class="compare-body">
             <strong>參數本身就錯</strong>
-            <p style="font-size:13px;margin-top:0.4rem;">不論系統什麼狀態,這個輸入都會錯(格式、範圍)。</p>
+            <p style="font-size:13px;margin-top:0.4rem;">無論系統處於何種狀態,此輸入皆不合法(格式、範圍)。</p>
           </div>
         </div>
         <div class="compare-card compare-good">
           <div class="compare-label"><span class="compare-icon">B</span>FAILED_PRECONDITION</div>
           <div class="compare-body">
             <strong>輸入本身合法,但系統狀態不對</strong>
-            <p style="font-size:13px;margin-top:0.4rem;">「刪這個資料夾」合法,但它不是空的。</p>
+            <p style="font-size:13px;margin-top:0.4rem;">「刪除此資料夾」的 request 合法,但該資料夾並非空的。</p>
           </div>
         </div>
       </div>
@@ -126,15 +126,15 @@
         <div class="compare-card compare-good">
           <div class="compare-label"><span class="compare-icon">A</span>UNAVAILABLE</div>
           <div class="compare-body">
-            <strong>暫時的,直接 retry 該成功</strong>
-            <p style="font-size:13px;margin-top:0.4rem;">server overload、連線斷。client 該<strong>立刻 retry(指數退避)</strong>。</p>
+            <strong>暫時性故障,retry 即可恢復</strong>
+            <p style="font-size:13px;margin-top:0.4rem;">server overload、connection 中斷。client 應<strong>立即 retry(指數退避)</strong>。</p>
           </div>
         </div>
         <div class="compare-card compare-good">
           <div class="compare-label"><span class="compare-icon">B</span>FAILED_PRECONDITION</div>
           <div class="compare-body">
-            <strong>狀態問題,retry 也是錯</strong>
-            <p style="font-size:13px;margin-top:0.4rem;">先去把系統狀態修對,才該重試。盲 retry 只是浪費。</p>
+            <strong>狀態問題,retry 同樣失敗</strong>
+            <p style="font-size:13px;margin-top:0.4rem;">須先修正系統狀態,才應 retry。盲目 retry 徒勞無功。</p>
           </div>
         </div>
       </div>
@@ -164,7 +164,7 @@
         <span class="tk-kw">return</span> <span class="tk-kw">nil</span>, status.Errorf(codes.NotFound, <span class="tk-st">"user %s not found"</span>, req.GetId())
     }
     <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
-        <span class="tk-cm">// 不要把 DB error 直接吐給 client</span>
+        <span class="tk-cm">// 不要將 DB error 直接回傳給 client</span>
         log.Printf(<span class="tk-st">"db error: %v"</span>, err)
         <span class="tk-kw">return</span> <span class="tk-kw">nil</span>, status.Error(codes.Internal, <span class="tk-st">"internal error"</span>)
     }
@@ -175,8 +175,8 @@
       <div class="callout callout-warn">
         <div class="callout-icon">!</div>
         <div class="callout-body">
-          <strong>不要把 raw error 吐給 client</strong>
-          <code>return nil, err</code> 直接傳原始 Go error 會被 gRPC 包成 <code>Unknown</code>,client 拿到也沒幫助。<strong>handler 邊界務必轉成 status.Error</strong>,並把細節 log 在 server 端(別洩漏到 client 形成資訊洩漏)。
+          <strong>不要將 raw error 直接回傳給 client</strong>
+          <code>return nil, err</code> 直接傳原始 Go error,會被 gRPC 包成 <code>Unknown</code>,對 client 並無助益。<strong>handler 邊界務必轉成 status.Error</strong>,並將細節 log 於 server 端(避免細節外流至 client,形成資訊洩漏)。
         </div>
       </div>
     </section>
@@ -184,7 +184,7 @@
     <section id="details">
       <span class="section-eyebrow">04 — 帶結構化 details</span>
       <h2>用 <code>status.WithDetails</code> 帶 protobuf payload</h2>
-      <p>單純的 message 字串不夠用 — client 想知道「哪一個欄位錯了」「retry 多久後再試」。<code>WithDetails</code> 可以塞 protobuf message 進錯誤裡。</p>
+      <p>單純的 message 字串不足以表達完整資訊 — client 需要得知「哪一個 field 錯誤」「retry 應延遲多久」。<code>WithDetails</code> 可將 protobuf message 附加至錯誤中。</p>
 
       <p>Google 提供標準的 error details(<code>google.rpc.*</code>)放在 <code>google.golang.org/genproto/googleapis/rpc/errdetails</code>:</p>
 
@@ -215,7 +215,7 @@ st, err := st.WithDetails(br)
           <tr><th>類型</th><th>用途</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>BadRequest</code></td><td>逐欄位的驗證錯誤</td></tr>
+          <tr><td><code>BadRequest</code></td><td>逐 field 的驗證錯誤</td></tr>
           <tr><td><code>RetryInfo</code></td><td>建議 retry 延遲</td></tr>
           <tr><td><code>QuotaFailure</code></td><td>配額被耗盡的細節</td></tr>
           <tr><td><code>ErrorInfo</code></td><td>錯誤分類(reason / domain / metadata)</td></tr>
@@ -266,7 +266,7 @@ st, err := st.WithDetails(br)
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong>快速取 code 用 <code>status.Code(err)</code></strong>
-          只想知道 code、不取 details 時用這個 helper:<code>if status.Code(err) == codes.NotFound { ... }</code> — 對非 gRPC 錯誤會回 <code>codes.Unknown</code>,不需先 check ok。
+          僅需取得 code、無須取出 details 時,使用此 helper:<code>if status.Code(err) == codes.NotFound { ... }</code> — 對非 gRPC 錯誤會回傳 <code>codes.Unknown</code>,無須事先檢查 ok。
         </div>
       </div>
     </section>
@@ -281,11 +281,11 @@ st, err := st.WithDetails(br)
           <tr><th>Code</th><th>建議</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>UNAVAILABLE</code></td><td>「<em>client can retry just the failing call</em>」 — 直接重試該 call</td></tr>
-          <tr><td><code>ABORTED</code></td><td>「<em>client should retry at a higher level</em>」 — 在更外層重試(整個 transaction)</td></tr>
-          <tr><td><code>FAILED_PRECONDITION</code></td><td>「<em>client should not retry until system state has been explicitly fixed</em>」 — 修了狀態才重試</td></tr>
-          <tr><td><code>DEADLINE_EXCEEDED</code> / <code>CANCELLED</code></td><td>視情境,通常要重新建 ctx + 重試</td></tr>
-          <tr><td><code>INVALID_ARGUMENT</code> / <code>NOT_FOUND</code> / <code>ALREADY_EXISTS</code> / <code>PERMISSION_DENIED</code></td><td><strong>不要 retry</strong>(這次沒成功,下次也不會)</td></tr>
+          <tr><td><code>UNAVAILABLE</code></td><td>「<em>client can retry just the failing call</em>」 — 直接 retry 該 call</td></tr>
+          <tr><td><code>ABORTED</code></td><td>「<em>client should retry at a higher level</em>」 — 在更外層 retry(整個 transaction)</td></tr>
+          <tr><td><code>FAILED_PRECONDITION</code></td><td>「<em>client should not retry until system state has been explicitly fixed</em>」 — 修正系統狀態後始可 retry</td></tr>
+          <tr><td><code>DEADLINE_EXCEEDED</code> / <code>CANCELLED</code></td><td>視情境而定,通常須重新建立 ctx 後再 retry</td></tr>
+          <tr><td><code>INVALID_ARGUMENT</code> / <code>NOT_FOUND</code> / <code>ALREADY_EXISTS</code> / <code>PERMISSION_DENIED</code></td><td><strong>不要 retry</strong>(此次失敗,retry 亦不會成功)</td></tr>
         </tbody>
       </table>
 
@@ -293,19 +293,19 @@ st, err := st.WithDetails(br)
         <div class="callout-icon">!</div>
         <div class="callout-body">
           <strong>retry 前確認 idempotency</strong>
-          只有<strong>等冪</strong>(idempotent)的操作能安全 retry。「建立 user」可能 retry 後重複建;「扣款」可能扣兩次。寫 method 時就要思考是否 idempotent,server 可以靠 idempotency-key(metadata)去重。第 10 課會看 grpc-go 的 retry policy(透過 service config)。
+          只有<strong>等冪</strong>(idempotent)的操作能安全 retry。「建立 user」於 retry 後可能重複建立;「扣款」可能扣款兩次。設計 method 時即須思考是否 idempotent,server 可藉由 idempotency-key(metadata)進行去重。第 9 課將介紹 grpc-go 的 retry policy(透過 service config 設定)。
         </div>
       </div>
     </section>
 
     <nav class="lesson-nav" aria-label="上一課/下一課">
-      <a class="lesson-nav-card lesson-nav-prev" href="grpc_06_context_metadata.html">
+      <a class="lesson-nav-card lesson-nav-prev" href="grpc_05_context_metadata.html">
         <div class="lesson-nav-eyebrow">← 上一課</div>
-        <div class="lesson-nav-title">Lesson 06 · Context / Metadata / Deadline</div>
+        <div class="lesson-nav-title">Lesson 05 · Context、Metadata、Deadline</div>
       </a>
-      <a class="lesson-nav-card lesson-nav-next" href="grpc_08_interceptors.html">
+      <a class="lesson-nav-card lesson-nav-next" href="grpc_07_interceptors.html">
         <div class="lesson-nav-eyebrow">下一課 →</div>
-        <div class="lesson-nav-title">Lesson 08 · Interceptors</div>
+        <div class="lesson-nav-title">Lesson 07 · Interceptors 中介層</div>
       </a>
     </nav>
 
@@ -313,25 +313,24 @@ st, err := st.WithDetails(br)
 
   <aside class="lesson-aside">
     <div class="aside-card">
-      <div class="aside-title">10 堂 gRPC 系列 <span class="progress-pill">7 / 10</span></div>
+      <div class="aside-title">9 堂 gRPC 系列 <span class="progress-pill">6 / 9</span></div>
       <ul class="course-nav">
         <li><a class="course-nav-item" href="grpc_01_intro.html"><span class="course-nav-num">01</span><span>gRPC 是什麼</span></a></li>
-        <li><a class="course-nav-item" href="grpc_02_setup.html"><span class="course-nav-num">02</span><span>環境安裝與工具鏈</span></a></li>
-        <li><a class="course-nav-item" href="grpc_03_protobuf_syntax.html"><span class="course-nav-num">03</span><span>Protobuf 語法</span></a></li>
-        <li><a class="course-nav-item" href="grpc_04_unary_rpc.html"><span class="course-nav-num">04</span><span>Unary RPC 實戰</span></a></li>
-        <li><a class="course-nav-item" href="grpc_05_streaming_rpc.html"><span class="course-nav-num">05</span><span>三種 Streaming</span></a></li>
-        <li><a class="course-nav-item" href="grpc_06_context_metadata.html"><span class="course-nav-num">06</span><span>Context / Metadata</span></a></li>
-        <li><a class="course-nav-item current" href="grpc_07_error_handling.html"><span class="course-nav-num">07</span><span>錯誤處理</span></a></li>
-        <li><a class="course-nav-item" href="grpc_08_interceptors.html"><span class="course-nav-num">08</span><span>Interceptors</span></a></li>
-        <li><a class="course-nav-item" href="grpc_09_tls_auth.html"><span class="course-nav-num">09</span><span>TLS / Auth</span></a></li>
-        <li><a class="course-nav-item" href="grpc_10_connection_lifecycle.html"><span class="course-nav-num">10</span><span>連線生命週期</span></a></li>
+        <li><a class="course-nav-item" href="grpc_02_protobuf_syntax.html"><span class="course-nav-num">02</span><span>Protobuf 語法</span></a></li>
+        <li><a class="course-nav-item" href="grpc_03_unary_rpc.html"><span class="course-nav-num">03</span><span>Unary RPC 實戰</span></a></li>
+        <li><a class="course-nav-item" href="grpc_04_streaming_rpc.html"><span class="course-nav-num">04</span><span>三種 Streaming</span></a></li>
+        <li><a class="course-nav-item" href="grpc_05_context_metadata.html"><span class="course-nav-num">05</span><span>Context / Metadata</span></a></li>
+        <li><a class="course-nav-item current" href="grpc_06_error_handling.html"><span class="course-nav-num">06</span><span>錯誤處理</span></a></li>
+        <li><a class="course-nav-item" href="grpc_07_interceptors.html"><span class="course-nav-num">07</span><span>Interceptors</span></a></li>
+        <li><a class="course-nav-item" href="grpc_08_tls_auth.html"><span class="course-nav-num">08</span><span>TLS / Auth</span></a></li>
+        <li><a class="course-nav-item" href="grpc_09_connection_lifecycle.html"><span class="course-nav-num">09</span><span>connection 生命週期</span></a></li>
       </ul>
     </div>
   </aside>
 </main>
 
 <footer class="lesson-footer">
-  Jason 的 gRPC 課程系列 · Lesson 07
+  Jason 的 gRPC 課程系列 · Lesson 06
 </footer>
 
 <script src="../_shared.js"></script>

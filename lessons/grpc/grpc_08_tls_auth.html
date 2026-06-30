@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lesson 09｜TLS、mTLS、Token-based Auth — gRPC 課程</title>
-<meta name="description" content="從 insecure 升級到 production:單向 TLS 加密、mTLS 雙向驗證、用 PerRPCCredentials 帶 OAuth/JWT token,以及 transport 層 vs call 層 credentials 的分工。">
+<title>Lesson 08｜TLS、mTLS、Token-based Auth — gRPC 課程</title>
+<meta name="description" content="從 insecure 升級到 production:單向 TLS 加密、mTLS mutual authentication、用 PerRPCCredentials 帶 OAuth/JWT token,以及 transport 層 vs call 層 credentials 的分工。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../_shared.css">
@@ -15,11 +15,11 @@
 <header class="lesson-hero">
   <div class="hero-inner">
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
-    <div class="hero-eyebrow">Lesson 09 · 安全</div>
+    <div class="hero-eyebrow">Lesson 08 · 安全</div>
     <h1 class="hero-title">TLS、mTLS、<span>Token-based Auth</span></h1>
-    <p class="hero-desc">完整介紹上線前須完成的安全配置：server-only TLS、mTLS 雙向驗證、PerRPCCredentials 帶入 token。<strong>理解 transport credentials 與 per-RPC credentials 的職責劃分。</strong></p>
+    <p class="hero-desc">完整介紹上線前須完成的安全配置：server-only TLS、mTLS mutual authentication、PerRPCCredentials 帶入 token。<strong>理解 transport credentials 與 per-RPC credentials 的職責劃分。</strong></p>
     <div class="hero-badges">
-      <span class="hero-badge"><span class="dot"></span>第 9 / 10 堂</span>
+      <span class="hero-badge"><span class="dot"></span>第 8 / 9 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 16 分鐘</span>
       <span class="hero-badge"><span class="dot"></span>進階</span>
     </div>
@@ -31,7 +31,7 @@
     <span class="toc-label">章節</span>
     <ul class="toc-list">
       <li><a class="toc-link" href="#two-layers">兩層 credentials</a></li>
-      <li><a class="toc-link" href="#cert">準備憑證</a></li>
+      <li><a class="toc-link" href="#cert">準備 certificate</a></li>
       <li><a class="toc-link" href="#tls">單向 TLS</a></li>
       <li><a class="toc-link" href="#mtls">mTLS</a></li>
       <li><a class="toc-link" href="#per-rpc">PerRPC token</a></li>
@@ -55,7 +55,7 @@
         <tbody>
           <tr>
             <td><strong>Transport credentials</strong></td>
-            <td>「<em>連線本身要不要加密、雙方身份驗不驗</em>」 — 對應到 TLS 層</td>
+            <td>「<em>connection 本身是否加密、雙方身份是否驗證</em>」 — 對應到 TLS 層</td>
             <td><code>credentials.NewTLS(...)</code>、<code>insecure.NewCredentials()</code></td>
           </tr>
           <tr>
@@ -70,14 +70,14 @@
         <div class="callout-icon">i</div>
         <div class="callout-body">
           <strong>兩層獨立、可組合</strong>
-          一個生產系統典型搭配:transport 用 TLS(對外)或 mTLS(內部),plus PerRPC 用 OAuth bearer token 帶 user identity。三件事有清楚分工,不要混用。
+          一個生產系統典型搭配:transport 用 TLS(對外)或 mTLS(內部),再加上 PerRPC 用 OAuth bearer token 帶 user identity。兩層有清楚分工,不要混用。
         </div>
       </div>
     </section>
 
     <section id="cert">
-      <span class="section-eyebrow">02 — 準備憑證</span>
-      <h2>本機練習用 self-signed 憑證</h2>
+      <span class="section-eyebrow">02 — 準備 certificate</span>
+      <h2>本機練習用 self-signed certificate</h2>
       <p>Production 應該用 Let's Encrypt 或公司內部 CA。本機練習可以用 <code>openssl</code> 或更方便的 <a class="inline-link" href="https://github.com/FiloSottile/mkcert" target="_blank" rel="noopener">mkcert</a>:</p>
 
       <div class="code-block">
@@ -85,7 +85,7 @@
           <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm"># 用 mkcert(推薦)— 自動裝信任根 + 簽 server 憑證</span>
+<pre><code><span class="tk-cm"># 用 mkcert(推薦)— 自動裝信任根 + 簽 server certificate</span>
 <span class="tk-pn">$</span> <span class="tk-fn">brew</span> install mkcert
 <span class="tk-pn">$</span> <span class="tk-fn">mkcert</span> <span class="tk-op">-install</span>
 <span class="tk-pn">$</span> <span class="tk-fn">mkcert</span> localhost 127.0.0.1
@@ -100,8 +100,8 @@
 
     <section id="tls">
       <span class="section-eyebrow">03 — 單向 TLS</span>
-      <h2>Server-only TLS:加密連線、驗 server</h2>
-      <p>最常見的 production 設定 — 像瀏覽器連網站一樣,只驗 server 身份,連線加密。</p>
+      <h2>Server-only TLS:加密 connection、驗 server</h2>
+      <p>最常見的 production 設定 — 像瀏覽器連網站一樣,只驗 server 身份,connection 加密。</p>
 
       <h3>Server 端</h3>
       <div class="code-block">
@@ -127,7 +127,7 @@ s.Serve(lis)</code></pre>
           <span class="code-block-lang">go (client)</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm">// 簡單版:從檔案讀 CA 憑證,信任這個 CA 簽的 cert</span>
+<pre><code><span class="tk-cm">// 簡單版:從檔案讀 CA certificate,信任這個 CA 簽的 cert</span>
 creds, err := credentials.NewClientTLSFromFile(<span class="tk-st">"server.crt"</span>, <span class="tk-st">"localhost"</span>)
 <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
     log.Fatalf(<span class="tk-st">"load tls: %v"</span>, err)
@@ -142,7 +142,7 @@ conn, err := grpc.NewClient(<span class="tk-st">"localhost:50051"</span>, grpc.W
           <span class="code-block-lang">go (client)</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-cm">// 信任系統根憑證池(對 Let's Encrypt 等公開 CA 用這個)</span>
+<pre><code><span class="tk-cm">// 信任系統根 certificate 池(對 Let's Encrypt 等公開 CA 用這個)</span>
 pool, err := x509.SystemCertPool()
 <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> { log.Fatal(err) }
 
@@ -158,8 +158,8 @@ conn, err := grpc.NewClient(<span class="tk-st">"api.example.com:443"</span>, gr
 
     <section id="mtls">
       <span class="section-eyebrow">04 — mTLS</span>
-      <h2>mTLS:雙方都出示憑證</h2>
-      <p>內部 service-to-service 常用 mTLS:不只 client 驗 server,server 也驗 client 的憑證。沒有對應 cert 連都連不進來。</p>
+      <h2>mTLS:雙方都出示 certificate</h2>
+      <p>內部 service-to-service 常用 mTLS:不只 client 驗 server,server 也驗 client 的 certificate。沒有對應 cert 的 connection 連都連不進來。</p>
 
       <h3>Server 端 — 同時要求 client 出示 cert</h3>
       <div class="code-block">
@@ -254,7 +254,7 @@ conn, err := grpc.NewClient(addr,
       <div class="callout callout-warn">
         <div class="callout-icon">!</div>
         <div class="callout-body">
-          <strong>token 在裸 HTTP/2 上是<strong>明文</strong></strong>
+          <strong>token 在裸 HTTP/2 上是明文</strong>
           PerRPCCredentials 把 token 放 metadata,沒 TLS 等於明文傳。實作 <code>RequireTransportSecurity() bool</code> 回 <code>true</code>,grpc-go 會在 connection 沒有 TLS 時直接拒絕掛上去 — 這是基礎安全保護。
         </div>
       </div>
@@ -302,13 +302,13 @@ conn, err := grpc.NewClient(addr,
     </section>
 
     <nav class="lesson-nav" aria-label="上一課/下一課">
-      <a class="lesson-nav-card lesson-nav-prev" href="grpc_08_interceptors.html">
+      <a class="lesson-nav-card lesson-nav-prev" href="grpc_07_interceptors.html">
         <div class="lesson-nav-eyebrow">← 上一課</div>
-        <div class="lesson-nav-title">Lesson 08 · Interceptors</div>
+        <div class="lesson-nav-title">Lesson 07 · Interceptors 中介層</div>
       </a>
-      <a class="lesson-nav-card lesson-nav-next" href="grpc_10_connection_lifecycle.html">
+      <a class="lesson-nav-card lesson-nav-next" href="grpc_09_connection_lifecycle.html">
         <div class="lesson-nav-eyebrow">下一課 →</div>
-        <div class="lesson-nav-title">Lesson 10 · 連線生命週期(完結)</div>
+        <div class="lesson-nav-title">Lesson 09 · connection 生命週期</div>
       </a>
     </nav>
 
@@ -316,25 +316,24 @@ conn, err := grpc.NewClient(addr,
 
   <aside class="lesson-aside">
     <div class="aside-card">
-      <div class="aside-title">10 堂 gRPC 系列 <span class="progress-pill">9 / 10</span></div>
+      <div class="aside-title">9 堂 gRPC 系列 <span class="progress-pill">8 / 9</span></div>
       <ul class="course-nav">
         <li><a class="course-nav-item" href="grpc_01_intro.html"><span class="course-nav-num">01</span><span>gRPC 是什麼</span></a></li>
-        <li><a class="course-nav-item" href="grpc_02_setup.html"><span class="course-nav-num">02</span><span>環境安裝與工具鏈</span></a></li>
-        <li><a class="course-nav-item" href="grpc_03_protobuf_syntax.html"><span class="course-nav-num">03</span><span>Protobuf 語法</span></a></li>
-        <li><a class="course-nav-item" href="grpc_04_unary_rpc.html"><span class="course-nav-num">04</span><span>Unary RPC 實戰</span></a></li>
-        <li><a class="course-nav-item" href="grpc_05_streaming_rpc.html"><span class="course-nav-num">05</span><span>三種 Streaming</span></a></li>
-        <li><a class="course-nav-item" href="grpc_06_context_metadata.html"><span class="course-nav-num">06</span><span>Context / Metadata</span></a></li>
-        <li><a class="course-nav-item" href="grpc_07_error_handling.html"><span class="course-nav-num">07</span><span>錯誤處理</span></a></li>
-        <li><a class="course-nav-item" href="grpc_08_interceptors.html"><span class="course-nav-num">08</span><span>Interceptors</span></a></li>
-        <li><a class="course-nav-item current" href="grpc_09_tls_auth.html"><span class="course-nav-num">09</span><span>TLS / Auth</span></a></li>
-        <li><a class="course-nav-item" href="grpc_10_connection_lifecycle.html"><span class="course-nav-num">10</span><span>連線生命週期</span></a></li>
+        <li><a class="course-nav-item" href="grpc_02_protobuf_syntax.html"><span class="course-nav-num">02</span><span>Protobuf 語法</span></a></li>
+        <li><a class="course-nav-item" href="grpc_03_unary_rpc.html"><span class="course-nav-num">03</span><span>Unary RPC 實戰</span></a></li>
+        <li><a class="course-nav-item" href="grpc_04_streaming_rpc.html"><span class="course-nav-num">04</span><span>三種 Streaming</span></a></li>
+        <li><a class="course-nav-item" href="grpc_05_context_metadata.html"><span class="course-nav-num">05</span><span>Context / Metadata</span></a></li>
+        <li><a class="course-nav-item" href="grpc_06_error_handling.html"><span class="course-nav-num">06</span><span>錯誤處理</span></a></li>
+        <li><a class="course-nav-item" href="grpc_07_interceptors.html"><span class="course-nav-num">07</span><span>Interceptors</span></a></li>
+        <li><a class="course-nav-item current" href="grpc_08_tls_auth.html"><span class="course-nav-num">08</span><span>TLS / Auth</span></a></li>
+        <li><a class="course-nav-item" href="grpc_09_connection_lifecycle.html"><span class="course-nav-num">09</span><span>connection 生命週期</span></a></li>
       </ul>
     </div>
   </aside>
 </main>
 
 <footer class="lesson-footer">
-  Jason 的 gRPC 課程系列 · Lesson 09
+  Jason 的 gRPC 課程系列 · Lesson 08
 </footer>
 
 <script src="../_shared.js"></script>

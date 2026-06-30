@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lesson 05｜三種 Streaming RPC — gRPC 課程</title>
-<meta name="description" content="Server streaming、Client streaming、Bidirectional streaming 三種模式各一個完整可跑的範例,搭配 io.EOF 收尾、stream.Send/Recv 用法,以及對應的實際應用場景。">
+<title>Lesson 04｜三種 Streaming RPC — gRPC 課程</title>
+<meta name="description" content="從建立專案、定義 proto、protoc 生成,到 server 與 client 完整實作並跑通 Server / Client / Bidirectional 三種 streaming RPC,涵蓋 stream.Send/Recv、io.EOF 收尾與常見陷阱。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../_shared.css">
@@ -15,12 +15,12 @@
 <header class="lesson-hero">
   <div class="hero-inner">
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
-    <div class="hero-eyebrow">Lesson 05 · Streaming 三模式</div>
+    <div class="hero-eyebrow">Lesson 04 · Streaming 三模式</div>
     <h1 class="hero-title">三種 <span>Streaming RPC</span></h1>
-    <p class="hero-desc">完整介紹 Server streaming、Client streaming 與 Bidirectional streaming，並理解 <code>io.EOF</code> 於 stream 收尾的角色。<strong>完成此堂後，即具備實作即時推送、檔案上傳與雙向協商功能的能力。</strong></p>
+    <p class="hero-desc">從建立專案、撰寫 proto，一路到 server 與 client 完整實作並實際跑通三種 streaming：Server streaming、Client streaming 與 Bidirectional。<strong>完成本課後，即具備實作即時推送、批次上傳與雙向協商的能力，並理解 <code>io.EOF</code> 於 stream 收尾的角色。</strong></p>
     <div class="hero-badges">
-      <span class="hero-badge"><span class="dot"></span>第 5 / 10 堂</span>
-      <span class="hero-badge"><span class="dot"></span>約 17 分鐘</span>
+      <span class="hero-badge"><span class="dot"></span>第 4 / 9 堂</span>
+      <span class="hero-badge"><span class="dot"></span>約 28 分鐘</span>
       <span class="hero-badge"><span class="dot"></span>中階 · 動手</span>
     </div>
   </div>
@@ -30,13 +30,14 @@
   <div class="sticky-nav-inner">
     <span class="toc-label">章節</span>
     <ul class="toc-list">
-      <li><a class="toc-link" href="#overview">三種模式對照</a></li>
-      <li><a class="toc-link" href="#proto">proto 怎麼寫</a></li>
-      <li><a class="toc-link" href="#server-stream">Server streaming</a></li>
-      <li><a class="toc-link" href="#client-stream">Client streaming</a></li>
-      <li><a class="toc-link" href="#bidi">Bidirectional</a></li>
+      <li><a class="toc-link" href="#overview">流程總覽</a></li>
+      <li><a class="toc-link" href="#proto">定義 proto</a></li>
+      <li><a class="toc-link" href="#generate">生成 stub</a></li>
+      <li><a class="toc-link" href="#server">寫 Server</a></li>
+      <li><a class="toc-link" href="#client">寫 Client</a></li>
+      <li><a class="toc-link" href="#run">跑起來</a></li>
       <li><a class="toc-link" href="#eof">io.EOF 的角色</a></li>
-      <li><a class="toc-link" href="#pitfalls">常見坑</a></li>
+      <li><a class="toc-link" href="#pitfalls">常見陷阱</a></li>
     </ul>
   </div>
 </nav>
@@ -45,221 +46,298 @@
   <article class="lesson-article">
 
     <section id="overview">
-      <span class="section-eyebrow">01 — 三種模式對照</span>
-      <h2>關鍵字:<code>stream</code></h2>
-      <p>protobuf 在 RPC 定義裡用 <code>stream</code> 關鍵字標記哪一邊是 streaming。三種 streaming 模式對應三種 <code>stream</code> 位置:</p>
-
-      <table>
-        <thead>
-          <tr><th>模式</th><th>proto</th><th>典型場景</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Server streaming</td><td><code>rpc M (Req) returns (stream Resp);</code></td><td>log tail、訂閱、大查詢分批送</td></tr>
-          <tr><td>Client streaming</td><td><code>rpc M (stream Req) returns (Resp);</code></td><td>檔案分塊上傳、批次寫入、彙總</td></tr>
-          <tr><td>Bidirectional</td><td><code>rpc M (stream Req) returns (stream Resp);</code></td><td>即時聊天、雙向同步、雙向協商</td></tr>
-        </tbody>
-      </table>
-
-      <div class="callout callout-info">
-        <div class="callout-icon">i</div>
-        <div class="callout-body">
-          <strong>Streaming 共通模式</strong>
-          所有 streaming handler 都拿到一個 <code>stream</code> 物件,提供 <code>Send(msg)</code> 與 <code>Recv() (msg, error)</code>。對方關掉 stream 時 <code>Recv</code> 會回 <code>io.EOF</code> — 這是 Go 的慣例,代表「正常結束」(error 但不是 error)。
+      <span class="section-eyebrow">01 — 流程總覽</span>
+      <h2>從 0 到跑通三種 streaming</h2>
+      <h3>專案目錄</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">tree</span>
+          <button class="code-copy-btn" type="button">複製</button>
         </div>
+<pre><code>mychat/
+├── go.mod
+├── proto/
+│   ├── mychat.proto
+│   ├── mychat.pb.go        <span class="tk-cm"># 自動生成</span>
+│   └── mychat_grpc.pb.go   <span class="tk-cm"># 自動生成</span>
+├── server/
+│   └── main.go
+└── client/
+    └── main.go</code></pre>
+      </div>
+
+      <h3>建立專案</h3>
+      <p>先建立專案資料夾、初始化 Go module，並開出存放 proto、server、client 的目錄：</p>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 建立專案資料夾並進入</span>
+<span class="tk-pn">$</span> <span class="tk-fn">mkdir</span> mychat <span class="tk-op">&amp;&amp;</span> <span class="tk-fn">cd</span> mychat
+<span class="tk-cm"># 初始化 Go module(產生 go.mod)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">go</span> mod init example.com/mychat
+<span class="tk-cm"># 建立放 proto、server、client 的資料夾</span>
+<span class="tk-pn">$</span> <span class="tk-fn">mkdir</span> proto server client</code></pre>
       </div>
     </section>
 
     <section id="proto">
-      <span class="section-eyebrow">02 — proto 怎麼寫</span>
-      <h2>三個 service method,一份 proto</h2>
+      <span class="section-eyebrow">02 — 定義 proto</span>
+      <h3>Step 1 — 寫 <code>proto/mychat.proto</code></h3>
 
       <div class="code-block">
         <div class="code-block-header">
-          <span class="code-block-lang">proto/chat.proto</span>
+          <span class="code-block-lang">proto/mychat.proto</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-kw">syntax</span> = <span class="tk-st">"proto3"</span>;
-<span class="tk-kw">package</span> chat.v1;
-<span class="tk-kw">option</span> go_package = <span class="tk-st">"example.com/chat/proto;chatpb"</span>;
+<pre><code><span class="tk-cm">// 使用 proto3 語法</span>
+<span class="tk-kw">syntax</span> = <span class="tk-st">"proto3"</span>;
 
-<span class="tk-kw">service</span> Chat {
-  <span class="tk-cm">// 1. Server streaming:訂閱頻道,server 一直推訊息</span>
-  <span class="tk-kw">rpc</span> Subscribe (SubscribeRequest) <span class="tk-kw">returns</span> (<span class="tk-kw">stream</span> Message);
+<span class="tk-cm">// package 名稱(以 .v1 標示版本,利於日後相容演進)</span>
+<span class="tk-kw">package</span> mychat.v1;
 
-  <span class="tk-cm">// 2. Client streaming:批次上傳,server 收完後給總結</span>
-  <span class="tk-kw">rpc</span> UploadLogs (<span class="tk-kw">stream</span> LogLine) <span class="tk-kw">returns</span> (UploadSummary);
+<span class="tk-cm">// 生成 Go 檔的 import path(必填)</span>
+<span class="tk-kw">option</span> go_package = <span class="tk-st">"example.com/mychat/proto;mychatpb"</span>;
 
-  <span class="tk-cm">// 3. Bidirectional:雙向聊天</span>
-  <span class="tk-kw">rpc</span> ChatRoom (<span class="tk-kw">stream</span> Message) <span class="tk-kw">returns</span> (<span class="tk-kw">stream</span> Message);
+<span class="tk-cm">// 定義 MyChat service 及其三個 streaming method</span>
+<span class="tk-kw">service</span> MyChat {
+  <span class="tk-cm">// 1. Server streaming:訂閱頻道,server 持續推送 message</span>
+  <span class="tk-kw">rpc</span> MySubscribe (MySubscribeRequest) <span class="tk-kw">returns</span> (<span class="tk-kw">stream</span> MyMessage);
+
+  <span class="tk-cm">// 2. Client streaming:批次上傳,server 接收完畢後回傳總結</span>
+  <span class="tk-kw">rpc</span> MyUploadLogs (<span class="tk-kw">stream</span> MyLogLine) <span class="tk-kw">returns</span> (MyUploadSummary);
+
+  <span class="tk-cm">// 3. Bidirectional:雙向聊天,message 可交錯傳輸</span>
+  <span class="tk-kw">rpc</span> MyChatRoom (<span class="tk-kw">stream</span> MyMessage) <span class="tk-kw">returns</span> (<span class="tk-kw">stream</span> MyMessage);
 }
 
-<span class="tk-kw">message</span> SubscribeRequest { <span class="tk-kw">string</span> channel = <span class="tk-num">1</span>; }
-<span class="tk-kw">message</span> Message          { <span class="tk-kw">string</span> from = <span class="tk-num">1</span>; <span class="tk-kw">string</span> text = <span class="tk-num">2</span>; }
-<span class="tk-kw">message</span> LogLine          { <span class="tk-kw">string</span> line = <span class="tk-num">1</span>; }
-<span class="tk-kw">message</span> UploadSummary    { <span class="tk-kw">int32</span> count = <span class="tk-num">1</span>; <span class="tk-kw">int64</span> bytes = <span class="tk-num">2</span>; }</code></pre>
+<span class="tk-cm">// 訂閱 request:指定頻道</span>
+<span class="tk-kw">message</span> MySubscribeRequest { <span class="tk-kw">string</span> my_channel = <span class="tk-num">1</span>; }
+<span class="tk-cm">// 聊天 message:來源與內容</span>
+<span class="tk-kw">message</span> MyMessage          { <span class="tk-kw">string</span> my_from = <span class="tk-num">1</span>; <span class="tk-kw">string</span> my_text = <span class="tk-num">2</span>; }
+<span class="tk-cm">// 單行 log</span>
+<span class="tk-kw">message</span> MyLogLine          { <span class="tk-kw">string</span> my_line = <span class="tk-num">1</span>; }
+<span class="tk-cm">// 上傳總結:筆數與位元組數</span>
+<span class="tk-kw">message</span> MyUploadSummary    { <span class="tk-kw">int32</span> my_count = <span class="tk-num">1</span>; <span class="tk-kw">int64</span> my_bytes = <span class="tk-num">2</span>; }</code></pre>
       </div>
     </section>
 
-    <section id="server-stream">
-      <span class="section-eyebrow">03 — Server streaming</span>
-      <h2>Server 推、Client 收</h2>
-      <p>場景:client 訂閱一個頻道,server 持續推訊息給它。</p>
+    <section id="generate">
+      <span class="section-eyebrow">03 — 生成 stub</span>
+      <h3>Step 2 — 執行 protoc 與安裝套件</h3>
 
-      <h3>Server 端</h3>
       <div class="code-block">
         <div class="code-block-header">
-          <span class="code-block-lang">go (server)</span>
+          <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-kw">func</span> (s *server) Subscribe(req *pb.SubscribeRequest, stream pb.Chat_SubscribeServer) <span class="tk-kw">error</span> {
-    <span class="tk-cm">// handler 簽名:(req *Req, stream XxxServer) error</span>
-    <span class="tk-cm">// stream 物件已經帶了 ctx,可用 stream.Context()</span>
+<pre><code><span class="tk-cm"># 在 mychat/ 根目錄,加入 grpc-go 與 protobuf runtime</span>
+<span class="tk-pn">$</span> <span class="tk-fn">go</span> get google.golang.org/grpc@latest
+<span class="tk-pn">$</span> <span class="tk-fn">go</span> get google.golang.org/protobuf@latest
 
-    <span class="tk-kw">for</span> i := <span class="tk-num">1</span>; i &lt;= <span class="tk-num">5</span>; i++ {
-        msg := &amp;pb.Message{
-            From: <span class="tk-st">"server"</span>,
-            Text: fmt.Sprintf(<span class="tk-st">"#%s msg %d"</span>, req.GetChannel(), i),
-        }
-        <span class="tk-kw">if</span> err := stream.Send(msg); err != <span class="tk-kw">nil</span> {
-            <span class="tk-kw">return</span> err  <span class="tk-cm">// client 斷線會在這邊 return error</span>
-        }
-        time.Sleep(time.Second)
-    }
-    <span class="tk-kw">return</span> <span class="tk-kw">nil</span>  <span class="tk-cm">// return nil = 結束 stream(client 那邊會收到 io.EOF)</span>
-}</code></pre>
+<span class="tk-cm"># 生成 stub</span>
+<span class="tk-pn">$</span> <span class="tk-fn">protoc</span> <span class="tk-op">\</span>
+    <span class="tk-op">--go_out=.</span> <span class="tk-op">--go_opt=paths=source_relative</span> <span class="tk-op">\</span>
+    <span class="tk-op">--go-grpc_out=.</span> <span class="tk-op">--go-grpc_opt=paths=source_relative</span> <span class="tk-op">\</span>
+    proto/mychat.proto</code></pre>
       </div>
 
-      <h3>Client 端</h3>
+      <p><code>protoc</code> 本身僅負責解析 <code>.proto</code>,實際生成程式碼則委派給各 <code>--xxx_out</code> 對應的 plugin — 此運作機制已於<a href="grpc_03_unary_rpc.html#generate">第 3 課</a>圖解說明,此處不再重複。</p>
+
+      <p>執行後,proto 資料夾內應出現兩個生成檔:</p>
       <div class="code-block">
         <div class="code-block-header">
-          <span class="code-block-lang">go (client)</span>
+          <span class="code-block-lang">bash</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code>stream, err := client.Subscribe(ctx, &amp;pb.SubscribeRequest{Channel: <span class="tk-st">"general"</span>})
-<span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
-    log.Fatal(err)
-}
-
-<span class="tk-kw">for</span> {
-    msg, err := stream.Recv()
-    <span class="tk-kw">if</span> err == io.EOF {
-        <span class="tk-kw">break</span>  <span class="tk-cm">// server 結束 stream</span>
-    }
-    <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
-        log.Fatalf(<span class="tk-st">"recv error: %v"</span>, err)
-    }
-    log.Printf(<span class="tk-st">"got: %s"</span>, msg.GetText())
-}</code></pre>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">ls</span> proto/
+mychat.proto
+mychat.pb.go        <span class="tk-cm"># message 生成的 Go struct</span>
+mychat_grpc.pb.go   <span class="tk-cm"># service 生成的 gRPC stub</span></code></pre>
       </div>
+
+      <h4>生成檔提供哪些內容</h4>
+      <p><code>mychat_grpc.pb.go</code> 會包含:</p>
+      <ul>
+        <li><code>MyChatServer</code> — server 端須實作的 interface(含 MySubscribe / MyUploadLogs / MyChatRoom 三個 method)</li>
+        <li><code>MyChatClient</code> — client 呼叫用的 interface</li>
+        <li><code>RegisterMyChatServer(s *grpc.Server, srv MyChatServer)</code> — server 註冊</li>
+        <li><code>NewMyChatClient(cc *grpc.ClientConn) MyChatClient</code> — client 建構</li>
+        <li><code>MyChat_MySubscribeServer</code>、<code>MyChat_MyUploadLogsServer</code>、<code>MyChat_MyChatRoomServer</code> 等 stream type — handler 收送 message 用</li>
+        <li><code>UnimplementedMyChatServer</code> — 必須 embed 進 server struct(處理 forward compatibility)</li>
+      </ul>
 
       <div class="callout callout-info">
         <div class="callout-icon">i</div>
         <div class="callout-body">
-          <strong>真實場景:訂閱、log tail、cursor-based 分頁</strong>
-          server streaming 是「一次請求、長時間回應」 — 比起一直 polling REST endpoint,在「等通知」的場景上效率天差地遠。第 10 課會教 keepalive / health check 確保長連線穩。
+          <strong>每次改動 .proto 都需重新生成</strong>
+          <code>*.pb.go</code> 是 <code>.proto</code> 的衍生產物。日後若調整 message field 或 service method，須重新執行本步驟使生成碼同步，切勿手動修改生成檔（下次生成時會被覆寫）。實務上常將此指令寫入 <code>Makefile</code> 或腳本，以單一指令完成生成。
         </div>
       </div>
     </section>
 
-    <section id="client-stream">
-      <span class="section-eyebrow">04 — Client streaming</span>
-      <h2>Client 推、Server 收完給總結</h2>
-      <p>場景:client 把一堆 log line 上傳,server 統計後回一個總結。</p>
+    <section id="server">
+      <span class="section-eyebrow">04 — 寫 Server</span>
+      <h3>Step 3 — <code>server/main.go</code></h3>
+      <p>server 須 embed <code>UnimplementedMyChatServer</code>，實作三個 streaming method，再於 <code>main()</code> 啟動 listener。以下先看共用骨架，再逐一補上三個 handler。</p>
 
-      <h3>Server 端</h3>
       <div class="code-block">
         <div class="code-block-header">
-          <span class="code-block-lang">go (server)</span>
+          <span class="code-block-lang">go (server) · 骨架</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-kw">func</span> (s *server) UploadLogs(stream pb.Chat_UploadLogsServer) <span class="tk-kw">error</span> {
-    <span class="tk-cm">// handler 簽名:(stream XxxServer) error</span>
-    <span class="tk-cm">// 沒有 req 參數,因為 req 是 stream 來的</span>
+<pre><code><span class="tk-kw">package</span> main
 
-    <span class="tk-kw">var</span> count int32
-    <span class="tk-kw">var</span> bytes int64
-    <span class="tk-kw">for</span> {
-        line, err := stream.Recv()
-        <span class="tk-kw">if</span> err == io.EOF {
-            <span class="tk-cm">// client 結束 stream → 用 SendAndClose 回應 + 關閉</span>
-            <span class="tk-kw">return</span> stream.SendAndClose(&amp;pb.UploadSummary{
-                Count: count,
-                Bytes: bytes,
-            })
-        }
-        <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
-            <span class="tk-kw">return</span> err
-        }
-        count++
-        bytes += int64(len(line.GetLine()))
+<span class="tk-kw">import</span> (
+    <span class="tk-st">"fmt"</span>
+    <span class="tk-st">"io"</span>
+    <span class="tk-st">"log"</span>
+    <span class="tk-st">"net"</span>
+    <span class="tk-st">"time"</span>
+
+    <span class="tk-st">"google.golang.org/grpc"</span>
+    pb <span class="tk-st">"example.com/mychat/proto"</span>
+)
+
+<span class="tk-cm">// 定義 server type,作為 MyChat service 的實作載體。</span>
+<span class="tk-cm">// 內嵌 UnimplementedMyChatServer 取得 interface 所有 method 的</span>
+<span class="tk-cm">// 預設實作(固定寫法,提供向前相容)。</span>
+<span class="tk-kw">type</span> server <span class="tk-kw">struct</span> {
+    pb.UnimplementedMyChatServer
+}
+
+<span class="tk-cm">// 三個 streaming handler(MySubscribe / MyUploadLogs / MyChatRoom)於下方逐一實作</span>
+
+<span class="tk-kw">func</span> main() {
+    <span class="tk-cm">// 呼叫 net 套件的 Listen() function,</span>
+    <span class="tk-cm">// 回傳一個 listener(lis),</span>
+    <span class="tk-cm">// 用來接受進 :50051 的 TCP connection</span>
+    lis, err := net.Listen(<span class="tk-st">"tcp"</span>, <span class="tk-st">":50051"</span>)
+    <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
+        log.Fatalf(<span class="tk-st">"failed to listen: %v"</span>, err)
+    }
+
+    <span class="tk-cm">// 呼叫 grpc framework 的 NewServer() method,</span>
+    <span class="tk-cm">// 回傳一個 gRPC 框架的 server 物件,</span>
+    <span class="tk-cm">// 該物件負責收 connection、解碼、把 request 分派給對應 method</span>
+    grpcServer := grpc.NewServer()
+
+    <span class="tk-cm">// 呼叫生成的 RegisterMyChatServer(),</span>
+    <span class="tk-cm">// 把實作 &amp;server{} 註冊進 grpcServer,</span>
+    <span class="tk-cm">// 框架才知道三個 method 由誰處理</span>
+    pb.RegisterMyChatServer(grpcServer, &amp;server{})
+
+    log.Printf(<span class="tk-st">"server listening on %v"</span>, lis.Addr())  <span class="tk-cm">// 印出實際監聽的位址</span>
+
+    <span class="tk-cm">// 呼叫 grpcServer 的 Serve() method 開始接收 request,</span>
+    <span class="tk-cm">// 此呼叫會一直 block 直到 server 被關閉</span>
+    <span class="tk-kw">if</span> err := grpcServer.Serve(lis); err != <span class="tk-kw">nil</span> {
+        log.Fatalf(<span class="tk-st">"failed to serve: %v"</span>, err)
     }
 }</code></pre>
-      </div>
-
-      <h3>Client 端</h3>
-      <div class="code-block">
-        <div class="code-block-header">
-          <span class="code-block-lang">go (client)</span>
-          <button class="code-copy-btn" type="button">複製</button>
-        </div>
-<pre><code>stream, err := client.UploadLogs(ctx)
-<span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
-    log.Fatal(err)
-}
-
-lines := []<span class="tk-kw">string</span>{<span class="tk-st">"first"</span>, <span class="tk-st">"second"</span>, <span class="tk-st">"third"</span>}
-<span class="tk-kw">for</span> _, l := <span class="tk-kw">range</span> lines {
-    <span class="tk-kw">if</span> err := stream.Send(&amp;pb.LogLine{Line: l}); err != <span class="tk-kw">nil</span> {
-        log.Fatal(err)
-    }
-}
-
-<span class="tk-cm">// 上傳完用 CloseAndRecv 關 stream + 收 server 回應</span>
-summary, err := stream.CloseAndRecv()
-<span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
-    log.Fatal(err)
-}
-log.Printf(<span class="tk-st">"uploaded %d lines, %d bytes"</span>, summary.GetCount(), summary.GetBytes())</code></pre>
       </div>
 
       <div class="callout callout-warn">
         <div class="callout-icon">!</div>
         <div class="callout-body">
-          <strong>關 stream 的兩個 helper</strong>
-          <ul style="margin:0.4rem 0 0 1rem;">
-            <li><strong>Server:</strong><code>stream.SendAndClose(resp)</code> — 送回應 + 結束 stream</li>
-            <li><strong>Client:</strong><code>stream.CloseAndRecv()</code> — 結束 send 半邊 + 等 server 回應</li>
-          </ul>
-          這是 client streaming 才有的 helper。Server streaming 與 Bidi 的 server 端是用 <code>return nil</code> 結束。
+          <strong>務必 embed <code>pb.UnimplementedMyChatServer</code></strong>
+          這是 protoc-gen-go-grpc <strong>強制</strong>的(雖可透過 <code>require_unimplemented_servers=false</code> 停用,但<strong>不建議</strong>)。
+          其作用有二：(1) 為日後新增 method 提供「<code>Unimplemented</code> 預設回傳」，使 server 升級 proto 時不致編譯失敗；(2) 強制使 service 實作具備 forward-compatible 的特性。
         </div>
       </div>
-    </section>
 
-    <section id="bidi">
-      <span class="section-eyebrow">05 — Bidirectional</span>
-      <h2>雙向都串、可以交錯</h2>
-      <p>場景:聊天室。雙方獨立決定何時 send、何時 close,訊息交錯傳。</p>
-
-      <h3>Server 端</h3>
+      <h4>Server streaming — <code>MySubscribe</code></h4>
+      <p>client 訂閱一個頻道,server 持續向其推送 message。</p>
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">go (server)</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code><span class="tk-kw">func</span> (s *server) ChatRoom(stream pb.Chat_ChatRoomServer) <span class="tk-kw">error</span> {
-    <span class="tk-kw">for</span> {
-        in, err := stream.Recv()
-        <span class="tk-kw">if</span> err == io.EOF {
-            <span class="tk-kw">return</span> <span class="tk-kw">nil</span>  <span class="tk-cm">// client 不再送了</span>
+<pre><code><span class="tk-cm">// 實作 .proto 中定義的 MySubscribe(server streaming):</span>
+<span class="tk-cm">//   - 接收者 (s *server):把 method 掛在 server type 上</span>
+<span class="tk-cm">//   - req:client 的 request(指定要訂閱的 my_channel)</span>
+<span class="tk-cm">//   - stream:server 端 stream 物件,以 stream.Send() 持續推送 message</span>
+<span class="tk-cm">//   - 回傳:error;return nil 表示正常結束 stream</span>
+<span class="tk-kw">func</span> (s *server) MySubscribe(req *pb.MySubscribeRequest, stream pb.MyChat_MySubscribeServer) <span class="tk-kw">error</span> {
+    <span class="tk-cm">// stream 物件已帶呼叫 context,必要時可用 stream.Context() 取得</span>
+    <span class="tk-kw">for</span> i := <span class="tk-num">1</span>; i &lt;= <span class="tk-num">5</span>; i++ {
+        <span class="tk-cm">// 組出一則 message(MyFrom = "server",MyText 帶上 my_channel 與序號)</span>
+        msg := &amp;pb.MyMessage{
+            MyFrom: <span class="tk-st">"server"</span>,
+            MyText: fmt.Sprintf(<span class="tk-st">"#%s msg %d"</span>, req.GetMyChannel(), i),
         }
-        <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
+        <span class="tk-cm">// 呼叫 stream.Send() 推送一則 message,client 斷線時此處會 return error</span>
+        <span class="tk-kw">if</span> err := stream.Send(msg); err != <span class="tk-kw">nil</span> {
             <span class="tk-kw">return</span> err
         }
+        time.Sleep(time.Second)
+    }
+    <span class="tk-kw">return</span> <span class="tk-kw">nil</span>  <span class="tk-cm">// return nil = 結束 stream(client 端會收到 io.EOF)</span>
+}</code></pre>
+      </div>
 
-        <span class="tk-cm">// 簡單 echo 回去(實務可以從 broker 廣播給其他 client)</span>
-        out := &amp;pb.Message{
-            From: <span class="tk-st">"server"</span>,
-            Text: <span class="tk-st">"echo: "</span> + in.GetText(),
+      <h4>Client streaming — <code>MyUploadLogs</code></h4>
+      <p>client 將多筆 log line 上傳,server 統計後回傳一份總結。</p>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (server)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm">// 實作 .proto 中定義的 MyUploadLogs(client streaming):</span>
+<span class="tk-cm">//   - 接收者 (s *server):把 method 掛在 server type 上</span>
+<span class="tk-cm">//   - stream:server 端 stream 物件;沒有獨立 req 參數,</span>
+<span class="tk-cm">//     request 改由 stream.Recv() 逐筆取出</span>
+<span class="tk-cm">//   - 回傳:error;以 stream.SendAndClose() 回傳總結並結束</span>
+<span class="tk-kw">func</span> (s *server) MyUploadLogs(stream pb.MyChat_MyUploadLogsServer) <span class="tk-kw">error</span> {
+    <span class="tk-kw">var</span> count int32
+    <span class="tk-kw">var</span> bytes int64
+    <span class="tk-kw">for</span> {
+        <span class="tk-cm">// 呼叫 stream.Recv() 取出一筆 client 上傳的 log line</span>
+        line, err := stream.Recv()
+        <span class="tk-kw">if</span> err == io.EOF {
+            <span class="tk-cm">// client 結束 stream → 用 SendAndClose() 回傳總結並關閉</span>
+            <span class="tk-kw">return</span> stream.SendAndClose(&amp;pb.MyUploadSummary{
+                MyCount: count,
+                MyBytes: bytes,
+            })
+        }
+        <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
+            <span class="tk-kw">return</span> err  <span class="tk-cm">// 非 EOF 的真錯誤</span>
+        }
+        <span class="tk-cm">// 累計筆數與位元組數</span>
+        count++
+        bytes += int64(len(line.GetMyLine()))
+    }
+}</code></pre>
+      </div>
+
+      <h4>Bidirectional — <code>MyChatRoom</code></h4>
+      <p>雙方獨立決定何時 send、何時 close,message 交錯傳輸。</p>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (server)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm">// 實作 .proto 中定義的 MyChatRoom(bidirectional):</span>
+<span class="tk-cm">//   - 接收者 (s *server):把 method 掛在 server type 上</span>
+<span class="tk-cm">//   - stream:server 端 stream 物件,可同時 Recv() 與 Send()</span>
+<span class="tk-cm">//   - 回傳:error;收到 io.EOF 後 return nil 結束</span>
+<span class="tk-kw">func</span> (s *server) MyChatRoom(stream pb.MyChat_MyChatRoomServer) <span class="tk-kw">error</span> {
+    <span class="tk-kw">for</span> {
+        <span class="tk-cm">// 呼叫 stream.Recv() 取出 client 送來的一則 message</span>
+        in, err := stream.Recv()
+        <span class="tk-kw">if</span> err == io.EOF {
+            <span class="tk-kw">return</span> <span class="tk-kw">nil</span>  <span class="tk-cm">// client 已不再傳送,正常結束</span>
+        }
+        <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
+            <span class="tk-kw">return</span> err  <span class="tk-cm">// 非 EOF 的真錯誤</span>
+        }
+
+        <span class="tk-cm">// 組出 echo response 並回送(實務上可從 broker 廣播給其他 client)</span>
+        out := &amp;pb.MyMessage{
+            MyFrom: <span class="tk-st">"server"</span>,
+            MyText: <span class="tk-st">"echo: "</span> + in.GetMyText(),
         }
         <span class="tk-kw">if</span> err := stream.Send(out); err != <span class="tk-kw">nil</span> {
             <span class="tk-kw">return</span> err
@@ -268,60 +346,235 @@ log.Printf(<span class="tk-st">"uploaded %d lines, %d bytes"</span>, summary.Get
 }</code></pre>
       </div>
 
-      <h3>Client 端 — 用 goroutine 同時 send 與 recv</h3>
+      <div class="callout callout-warn">
+        <div class="callout-icon">!</div>
+        <div class="callout-body">
+          <strong>關閉 stream 的兩個 helper</strong>
+          <ul style="margin:0.4rem 0 0 1rem;">
+            <li><strong>Server:</strong><code>stream.SendAndClose(resp)</code> — 傳送 response 並結束 stream</li>
+            <li><strong>Client:</strong><code>stream.CloseAndRecv()</code> — 結束 send 方向並等待 server response</li>
+          </ul>
+          這是 client streaming 才有的 helper。Server streaming 與 Bidi 的 server 端是用 <code>return nil</code> 結束。
+        </div>
+      </div>
+    </section>
+
+    <section id="client">
+      <span class="section-eyebrow">05 — 寫 Client</span>
+      <h3>Step 4 — <code>client/main.go</code></h3>
+      <p>client 建立 connection、取得 stub 後,依序示範三種 RPC。先看 connection 骨架,再逐一呼叫。</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (client) · 骨架</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-kw">package</span> main
+
+<span class="tk-kw">import</span> (
+    <span class="tk-st">"context"</span>
+    <span class="tk-st">"io"</span>
+    <span class="tk-st">"log"</span>
+    <span class="tk-st">"time"</span>
+
+    <span class="tk-st">"google.golang.org/grpc"</span>
+    <span class="tk-st">"google.golang.org/grpc/credentials/insecure"</span>
+    pb <span class="tk-st">"example.com/mychat/proto"</span>
+)
+
+<span class="tk-kw">func</span> main() {
+    <span class="tk-cm">// 呼叫 grpc framework 的 NewClient() method,</span>
+    <span class="tk-cm">// 回傳一個 connection 物件 conn(lazy,此時還不會真的連線);</span>
+    <span class="tk-cm">// 第二個參數設定此 connection 不加密</span>
+    conn, err := grpc.NewClient(
+        <span class="tk-st">"localhost:50051"</span>,
+        grpc.WithTransportCredentials(insecure.NewCredentials()),
+    )
+    <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
+        log.Fatalf(<span class="tk-st">"failed to create client: %v"</span>, err)
+    }
+    <span class="tk-kw">defer</span> conn.Close()  <span class="tk-cm">// main 結束前關閉 conn</span>
+
+    <span class="tk-cm">// 呼叫生成的 NewMyChatClient(),</span>
+    <span class="tk-cm">// 用 conn 包出一個 client stub,之後用它呼叫遠端 method</span>
+    client := pb.NewMyChatClient(conn)
+
+    <span class="tk-cm">// 依序示範三種 streaming RPC</span>
+    ctx := context.Background()
+    runSubscribe(ctx, client)   <span class="tk-cm">// Server streaming</span>
+    runUploadLogs(ctx, client)  <span class="tk-cm">// Client streaming</span>
+    runChatRoom(ctx, client)    <span class="tk-cm">// Bidirectional</span>
+}</code></pre>
+      </div>
+
+      <h4>Server streaming — 呼叫 <code>MySubscribe</code></h4>
       <div class="code-block">
         <div class="code-block-header">
           <span class="code-block-lang">go (client)</span>
           <button class="code-copy-btn" type="button">複製</button>
         </div>
-<pre><code>stream, err := client.ChatRoom(ctx)
-<span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
-    log.Fatal(err)
-}
-
-<span class="tk-cm">// recv 與 send 必須在不同 goroutine — stream 的 Send/Recv 是 thread-safe 對另一方,</span>
-<span class="tk-cm">// 但同方向 (兩個 goroutine 同時 Send) 不是。</span>
-done := make(<span class="tk-kw">chan</span> <span class="tk-kw">struct</span>{})
-
-<span class="tk-kw">go</span> <span class="tk-kw">func</span>() {
-    <span class="tk-kw">defer</span> close(done)
-    <span class="tk-kw">for</span> {
-        in, err := stream.Recv()
-        <span class="tk-kw">if</span> err == io.EOF {
-            <span class="tk-kw">return</span>
-        }
-        <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
-            log.Printf(<span class="tk-st">"recv error: %v"</span>, err)
-            <span class="tk-kw">return</span>
-        }
-        log.Printf(<span class="tk-st">"got: %s"</span>, in.GetText())
-    }
-}()
-
-<span class="tk-cm">// 主 goroutine 負責送</span>
-<span class="tk-kw">for</span> _, text := <span class="tk-kw">range</span> []<span class="tk-kw">string</span>{<span class="tk-st">"hi"</span>, <span class="tk-st">"how are you"</span>, <span class="tk-st">"bye"</span>} {
-    <span class="tk-kw">if</span> err := stream.Send(&amp;pb.Message{From: <span class="tk-st">"client"</span>, Text: text}); err != <span class="tk-kw">nil</span> {
+<pre><code><span class="tk-cm">// Server streaming:呼叫一次,之後持續以 stream.Recv() 接收 server 推送</span>
+<span class="tk-kw">func</span> runSubscribe(ctx context.Context, client pb.MyChatClient) {
+    <span class="tk-cm">// 呼叫 MySubscribe() 取得 stream,request 指定要訂閱的 channel</span>
+    stream, err := client.MySubscribe(ctx, &amp;pb.MySubscribeRequest{MyChannel: <span class="tk-st">"general"</span>})
+    <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
         log.Fatal(err)
     }
-    time.Sleep(<span class="tk-num">500</span> * time.Millisecond)
-}
+    <span class="tk-kw">for</span> {
+        <span class="tk-cm">// 逐則接收 server 推送的 message</span>
+        msg, err := stream.Recv()
+        <span class="tk-kw">if</span> err == io.EOF {
+            <span class="tk-kw">break</span>  <span class="tk-cm">// server 正常結束 stream</span>
+        }
+        <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
+            log.Fatalf(<span class="tk-st">"recv error: %v"</span>, err)
+        }
+        log.Printf(<span class="tk-st">"got: %s"</span>, msg.GetMyText())
+    }
+}</code></pre>
+      </div>
 
-<span class="tk-cm">// 告訴 server「我不再送了」(server 那邊會收到 io.EOF),但仍會繼續收 server 的回覆</span>
-stream.CloseSend()
-&lt;-done</code></pre>
+      <h4>Client streaming — 呼叫 <code>MyUploadLogs</code></h4>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (client)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm">// Client streaming:連續 Send() 多筆,最後以 CloseAndRecv() 取回總結</span>
+<span class="tk-kw">func</span> runUploadLogs(ctx context.Context, client pb.MyChatClient) {
+    <span class="tk-cm">// 呼叫 MyUploadLogs() 取得 stream(client 端負責 Send)</span>
+    stream, err := client.MyUploadLogs(ctx)
+    <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
+        log.Fatal(err)
+    }
+    <span class="tk-cm">// 逐筆上傳 log line</span>
+    <span class="tk-kw">for</span> _, l := <span class="tk-kw">range</span> []<span class="tk-kw">string</span>{<span class="tk-st">"first"</span>, <span class="tk-st">"second"</span>, <span class="tk-st">"third"</span>} {
+        <span class="tk-kw">if</span> err := stream.Send(&amp;pb.MyLogLine{MyLine: l}); err != <span class="tk-kw">nil</span> {
+            log.Fatal(err)
+        }
+    }
+    <span class="tk-cm">// 上傳完成後以 CloseAndRecv() 結束 send 方向並接收 server 總結</span>
+    summary, err := stream.CloseAndRecv()
+    <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
+        log.Fatal(err)
+    }
+    log.Printf(<span class="tk-st">"uploaded %d lines, %d bytes"</span>, summary.GetMyCount(), summary.GetMyBytes())
+}</code></pre>
+      </div>
+
+      <h4>Bidirectional — 呼叫 <code>MyChatRoom</code>(goroutine 同時 send 與 recv)</h4>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">go (client)</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm">// Bidirectional:一個 goroutine 收、主 goroutine 送,兩個方向同時進行</span>
+<span class="tk-kw">func</span> runChatRoom(ctx context.Context, client pb.MyChatClient) {
+    <span class="tk-cm">// 呼叫 MyChatRoom() 取得雙向 stream</span>
+    stream, err := client.MyChatRoom(ctx)
+    <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
+        log.Fatal(err)
+    }
+
+    <span class="tk-cm">// recv 與 send 分屬不同 goroutine — 不同方向 thread-safe,同方向則否</span>
+    done := make(<span class="tk-kw">chan</span> <span class="tk-kw">struct</span>{})
+    <span class="tk-kw">go</span> <span class="tk-kw">func</span>() {
+        <span class="tk-kw">defer</span> close(done)
+        <span class="tk-kw">for</span> {
+            in, err := stream.Recv()
+            <span class="tk-kw">if</span> err == io.EOF {
+                <span class="tk-kw">return</span>
+            }
+            <span class="tk-kw">if</span> err != <span class="tk-kw">nil</span> {
+                log.Printf(<span class="tk-st">"recv error: %v"</span>, err)
+                <span class="tk-kw">return</span>
+            }
+            log.Printf(<span class="tk-st">"got: %s"</span>, in.GetMyText())
+        }
+    }()
+
+    <span class="tk-cm">// 主 goroutine 負責送</span>
+    <span class="tk-kw">for</span> _, text := <span class="tk-kw">range</span> []<span class="tk-kw">string</span>{<span class="tk-st">"hi"</span>, <span class="tk-st">"how are you"</span>, <span class="tk-st">"bye"</span>} {
+        <span class="tk-kw">if</span> err := stream.Send(&amp;pb.MyMessage{MyFrom: <span class="tk-st">"client"</span>, MyText: text}); err != <span class="tk-kw">nil</span> {
+            log.Fatal(err)
+        }
+        time.Sleep(<span class="tk-num">500</span> * time.Millisecond)
+    }
+
+    <span class="tk-cm">// 通知 server「不再傳送」(server 端會收到 io.EOF),但仍會接收 server 的回覆</span>
+    stream.CloseSend()
+    &lt;-done
+}</code></pre>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-body">
+          <strong>insecure.NewCredentials() 是什麼</strong>
+          用於告知 gRPC「此 connection 不加密」 — 純明文 HTTP/2(h2c)。<strong>僅適用於 localhost 開發、或 service mesh 內部已具備 mTLS</strong> 的情境。production 對外 connection 務必使用 TLS,第 8 課將詳述。
+        </div>
       </div>
 
       <div class="callout callout-warn">
         <div class="callout-icon">!</div>
         <div class="callout-body">
           <strong>Bidi 的 thread-safety 規則</strong>
-          <code>stream.Send</code> 與 <code>stream.Recv</code> 在不同方向是 thread-safe(可一個 goroutine 收、一個 goroutine 送),但<strong>同方向多個 goroutine 同時 Send 不是 thread-safe</strong>(同方向想多 goroutine 寫請自己加 mutex 或用 channel 串到單一 sender goroutine)。
+          <code>stream.Send</code> 與 <code>stream.Recv</code> 在不同方向是 thread-safe(可一個 goroutine 收、一個 goroutine 送),但<strong>同方向多個 goroutine 同時 Send 不是 thread-safe</strong>(同方向若需多個 goroutine 寫入,須自行加上 mutex,或以 channel 匯流至單一 sender goroutine)。
+        </div>
+      </div>
+    </section>
+
+    <section id="run">
+      <span class="section-eyebrow">06 — 跑起來</span>
+      <h3>Step 5 — 開啟兩個 terminal 執行</h3>
+
+      <p>啟動前先補齊相依,再開啟兩個 terminal 分別執行 server 與 client:</p>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-cm"># 補齊相依(protobuf runtime、insecure credentials)</span>
+<span class="tk-pn">$</span> <span class="tk-fn">go</span> mod tidy</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">terminal A</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">go</span> run ./server
+2026/04/27 11:00:00 server listening on [::]:50051</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">terminal B</span>
+          <button class="code-copy-btn" type="button">複製</button>
+        </div>
+<pre><code><span class="tk-pn">$</span> <span class="tk-fn">go</span> run ./client
+<span class="tk-cm"># Server streaming:每秒收到一則,共五則</span>
+2026/04/27 11:00:01 got: #general msg 1
+2026/04/27 11:00:05 got: #general msg 5
+<span class="tk-cm"># Client streaming:上傳完畢收到總結</span>
+2026/04/27 11:00:06 uploaded 3 lines, 16 bytes
+<span class="tk-cm"># Bidirectional:server echo 回來</span>
+2026/04/27 11:00:07 got: echo: hi
+2026/04/27 11:00:07 got: echo: how are you
+2026/04/27 11:00:08 got: echo: bye</code></pre>
+      </div>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✓</div>
+        <div class="callout-body">
+          <strong>三種 streaming 已成功跑通!</strong>
+          同一個專案內,MySubscribe(server streaming)、MyUploadLogs(client streaming)與 MyChatRoom(bidirectional)皆已運作。下一課說明 deadline、metadata、cancellation 的運作方式。
         </div>
       </div>
     </section>
 
     <section id="eof">
-      <span class="section-eyebrow">06 — io.EOF 的角色</span>
+      <span class="section-eyebrow">07 — io.EOF 的角色</span>
       <h2><code>io.EOF</code> 不是錯誤,是「正常結束」訊號</h2>
       <p>Go 的 <code>io.EOF</code> 在 streaming RPC 裡有<strong>明確語意</strong>:</p>
 
@@ -356,27 +609,27 @@ stream.CloseSend()
     </section>
 
     <section id="pitfalls">
-      <span class="section-eyebrow">07 — 常見坑</span>
-      <h2>Streaming 三個易踩雷區</h2>
+      <span class="section-eyebrow">08 — 常見陷阱</span>
+      <h2>Streaming 三個容易忽略的細節</h2>
 
       <details class="collapse">
         <summary>1. <code>stream.Send</code> 沒檢查 error <span class="collapse-tag">高頻</span></summary>
         <div class="collapse-body">
-          <p><code>Send</code> 在「對方已斷線」、「buffer 已滿」、「context 已 cancel」等情況下會回傳 error。若忽略此 error 並繼續 send，將導致訊息遺失而無法察覺。<strong>每次 Send 後皆應檢查 err</strong>，發生錯誤即 break 並進行收尾。</p>
+          <p><code>Send</code> 在「對方已斷線」、「buffer 已滿」、「context 已 cancel」等情況下會回傳 error。若忽略此 error 並繼續 send，將導致 message 遺失而無法察覺。<strong>每次 Send 後皆應檢查 err</strong>，發生錯誤即 break 並進行收尾。</p>
         </div>
       </details>
 
       <details class="collapse">
         <summary>2. Bidi 同一個 stream 用兩個 goroutine 同時 Send <span class="collapse-tag">資料毀損</span></summary>
         <div class="collapse-body">
-          <p>Send 對同方向<strong>不是</strong> thread-safe,兩個 goroutine 寫會混合 byte stream 造成 protobuf decode 失敗。要嘛只用一個 sender goroutine,要嘛用 channel 把要 send 的訊息排入單一 goroutine。</p>
+          <p>Send 對同方向<strong>不是</strong> thread-safe,兩個 goroutine 同時寫會混合 byte stream,造成 protobuf decode 失敗。解法是僅使用單一 sender goroutine,或以 channel 將待送 message 匯入單一 goroutine 依序傳送。</p>
         </div>
       </details>
 
       <details class="collapse">
         <summary>3. Server streaming handler 忘了關注 <code>stream.Context().Done()</code> <span class="collapse-tag">資源洩漏</span></summary>
         <div class="collapse-body">
-          <p>長時間 server streaming 應該 select <code>stream.Context().Done()</code>,client 取消或斷線時及時退出。否則 server 會一直跑迴圈、佔用 goroutine 與資源。</p>
+          <p>長時間執行的 server streaming 應 select <code>stream.Context().Done()</code>,在 client 取消或斷線時及時退出。否則 server 會持續空轉迴圈,佔用 goroutine 與資源。</p>
           <pre style="background:var(--paper);padding:0.6rem;border-radius:6px;font-size:13px;line-height:1.6;"><code><span class="tk-kw">for</span> {
     <span class="tk-kw">select</span> {
     <span class="tk-kw">case</span> &lt;-stream.Context().Done():
@@ -390,13 +643,13 @@ stream.CloseSend()
     </section>
 
     <nav class="lesson-nav" aria-label="上一課/下一課">
-      <a class="lesson-nav-card lesson-nav-prev" href="grpc_04_unary_rpc.html">
+      <a class="lesson-nav-card lesson-nav-prev" href="grpc_03_unary_rpc.html">
         <div class="lesson-nav-eyebrow">← 上一課</div>
-        <div class="lesson-nav-title">Lesson 04 · Unary RPC 實戰</div>
+        <div class="lesson-nav-title">Lesson 03 · 第一支 gRPC 服務:Unary RPC</div>
       </a>
-      <a class="lesson-nav-card lesson-nav-next" href="grpc_06_context_metadata.html">
+      <a class="lesson-nav-card lesson-nav-next" href="grpc_05_context_metadata.html">
         <div class="lesson-nav-eyebrow">下一課 →</div>
-        <div class="lesson-nav-title">Lesson 06 · Context / Metadata / Deadline</div>
+        <div class="lesson-nav-title">Lesson 05 · Context、Metadata、Deadline</div>
       </a>
     </nav>
 
@@ -404,25 +657,24 @@ stream.CloseSend()
 
   <aside class="lesson-aside">
     <div class="aside-card">
-      <div class="aside-title">10 堂 gRPC 系列 <span class="progress-pill">5 / 10</span></div>
+      <div class="aside-title">9 堂 gRPC 系列 <span class="progress-pill">4 / 9</span></div>
       <ul class="course-nav">
         <li><a class="course-nav-item" href="grpc_01_intro.html"><span class="course-nav-num">01</span><span>gRPC 是什麼</span></a></li>
-        <li><a class="course-nav-item" href="grpc_02_setup.html"><span class="course-nav-num">02</span><span>環境安裝與工具鏈</span></a></li>
-        <li><a class="course-nav-item" href="grpc_03_protobuf_syntax.html"><span class="course-nav-num">03</span><span>Protobuf 語法</span></a></li>
-        <li><a class="course-nav-item" href="grpc_04_unary_rpc.html"><span class="course-nav-num">04</span><span>Unary RPC 實戰</span></a></li>
-        <li><a class="course-nav-item current" href="grpc_05_streaming_rpc.html"><span class="course-nav-num">05</span><span>三種 Streaming</span></a></li>
-        <li><a class="course-nav-item" href="grpc_06_context_metadata.html"><span class="course-nav-num">06</span><span>Context / Metadata</span></a></li>
-        <li><a class="course-nav-item" href="grpc_07_error_handling.html"><span class="course-nav-num">07</span><span>錯誤處理</span></a></li>
-        <li><a class="course-nav-item" href="grpc_08_interceptors.html"><span class="course-nav-num">08</span><span>Interceptors</span></a></li>
-        <li><a class="course-nav-item" href="grpc_09_tls_auth.html"><span class="course-nav-num">09</span><span>TLS / Auth</span></a></li>
-        <li><a class="course-nav-item" href="grpc_10_connection_lifecycle.html"><span class="course-nav-num">10</span><span>連線生命週期</span></a></li>
+        <li><a class="course-nav-item" href="grpc_02_protobuf_syntax.html"><span class="course-nav-num">02</span><span>Protobuf 語法</span></a></li>
+        <li><a class="course-nav-item" href="grpc_03_unary_rpc.html"><span class="course-nav-num">03</span><span>Unary RPC 實戰</span></a></li>
+        <li><a class="course-nav-item current" href="grpc_04_streaming_rpc.html"><span class="course-nav-num">04</span><span>三種 Streaming</span></a></li>
+        <li><a class="course-nav-item" href="grpc_05_context_metadata.html"><span class="course-nav-num">05</span><span>Context / Metadata</span></a></li>
+        <li><a class="course-nav-item" href="grpc_06_error_handling.html"><span class="course-nav-num">06</span><span>錯誤處理</span></a></li>
+        <li><a class="course-nav-item" href="grpc_07_interceptors.html"><span class="course-nav-num">07</span><span>Interceptors</span></a></li>
+        <li><a class="course-nav-item" href="grpc_08_tls_auth.html"><span class="course-nav-num">08</span><span>TLS / Auth</span></a></li>
+        <li><a class="course-nav-item" href="grpc_09_connection_lifecycle.html"><span class="course-nav-num">09</span><span>connection 生命週期</span></a></li>
       </ul>
     </div>
   </aside>
 </main>
 
 <footer class="lesson-footer">
-  Jason 的 gRPC 課程系列 · Lesson 05
+  Jason 的 gRPC 課程系列 · Lesson 04
 </footer>
 
 <script src="../_shared.js"></script>

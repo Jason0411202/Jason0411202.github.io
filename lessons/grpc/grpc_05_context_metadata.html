@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lesson 06｜Context、Metadata、Deadline、Cancellation — gRPC 課程</title>
+<title>Lesson 05｜Context、Metadata、Deadline、Cancellation — gRPC 課程</title>
 <meta name="description" content="深入理解 context.Context 在 gRPC 中扮演的角色:傳 metadata、設 deadline、傳遞 cancellation。掌握 deadline propagation 與 server 端如何及時退出。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -15,11 +15,11 @@
 <header class="lesson-hero">
   <div class="hero-inner">
     <a class="hero-back" href="../../index.html">← 回到文章入口</a>
-    <div class="hero-eyebrow">Lesson 06 · 運行期核心</div>
+    <div class="hero-eyebrow">Lesson 05 · 運行期核心</div>
     <h1 class="hero-title">Context、Metadata、<span>Deadline、Cancellation</span></h1>
-    <p class="hero-desc"><code>ctx</code> 為 gRPC 每支 RPC 的核心——承載 deadline、metadata 與 cancellation 訊號。<strong>完成此堂後，即可正確控制 timeout、傳遞認證 token 並處理 client 取消。</strong></p>
+    <p class="hero-desc"><code>ctx</code> 為 gRPC 每支 RPC 的核心——承載 deadline、metadata 與 cancellation 訊號。<strong>完成此堂後，即可正確控制 timeout、傳遞 authentication token 並處理 client 取消。</strong></p>
     <div class="hero-badges">
-      <span class="hero-badge"><span class="dot"></span>第 6 / 10 堂</span>
+      <span class="hero-badge"><span class="dot"></span>第 5 / 9 堂</span>
       <span class="hero-badge"><span class="dot"></span>約 14 分鐘</span>
       <span class="hero-badge"><span class="dot"></span>中階</span>
     </div>
@@ -69,7 +69,7 @@
             <text x="580" y="135" text-anchor="middle" fill="#6b6b7e" font-size="10">(client 主動取消、斷線)</text>
           </g>
         </svg>
-        <div class="diagram-caption">圖 18.1 — ctx 三件事</div>
+        <div class="diagram-caption">圖 5.1 — ctx 三件事</div>
       </div>
 
       <div class="callout callout-tip">
@@ -84,7 +84,7 @@
     <section id="metadata-send">
       <span class="section-eyebrow">02 — 送 metadata</span>
       <h2>Client 端:把 metadata 塞進 outgoing ctx</h2>
-      <p>Metadata 是 RPC 的 header,結構是 <code>map[string][]string</code>(同一 key 可以有多值)。最常見的用法:傳認證 token、trace id、locale。</p>
+      <p>Metadata 是 RPC 的 header,結構是 <code>map[string][]string</code>(同一 key 可以有多值)。最常見的用法:傳 authentication token、trace id、locale。</p>
 
       <div class="code-block">
         <div class="code-block-header">
@@ -161,8 +161,8 @@ resp, err := client.SayHello(ctx, &amp;pb.HelloRequest{Name: <span class="tk-st"
           <tr><th>類型</th><th>送出時機</th><th>典型用途</th></tr>
         </thead>
         <tbody>
-          <tr><td><strong>Header</strong></td><td>RPC 一開始(回應 body 之前)</td><td>server 版本、quota 餘額、rate limit 提示</td></tr>
-          <tr><td><strong>Trailer</strong></td><td>RPC 結束(回應 body 之後)</td><td>處理時長、debug info</td></tr>
+          <tr><td><strong>Header</strong></td><td>RPC 一開始(response body 之前)</td><td>server 版本、quota 餘額、rate limit 提示</td></tr>
+          <tr><td><strong>Trailer</strong></td><td>RPC 結束(response body 之後)</td><td>處理時長、debug info</td></tr>
         </tbody>
       </table>
 
@@ -258,7 +258,7 @@ resp, err := client.SayHello(ctx, &amp;pb.HelloRequest{Name: <span class="tk-st"
             <text x="360" y="155" text-anchor="middle" fill="#6b6b7e" font-size="11">Service A 把 ctx 傳給 B 時,B 拿到的是「剩餘時間」,不是新的 2 秒</text>
           </g>
         </svg>
-        <div class="diagram-caption">圖 18.2 — deadline 是「絕對時間」,跨服務不會 reset</div>
+        <div class="diagram-caption">圖 5.2 — deadline 是「絕對時間」,跨服務不會 reset</div>
       </div>
 
       <div class="code-block">
@@ -332,13 +332,13 @@ resp, err := client.SayHello(ctx, &amp;pb.HelloRequest{Name: <span class="tk-st"
     </section>
 
     <nav class="lesson-nav" aria-label="上一課/下一課">
-      <a class="lesson-nav-card lesson-nav-prev" href="grpc_05_streaming_rpc.html">
+      <a class="lesson-nav-card lesson-nav-prev" href="grpc_04_streaming_rpc.html">
         <div class="lesson-nav-eyebrow">← 上一課</div>
-        <div class="lesson-nav-title">Lesson 05 · 三種 Streaming RPC</div>
+        <div class="lesson-nav-title">Lesson 04 · 三種 Streaming RPC</div>
       </a>
-      <a class="lesson-nav-card lesson-nav-next" href="grpc_07_error_handling.html">
+      <a class="lesson-nav-card lesson-nav-next" href="grpc_06_error_handling.html">
         <div class="lesson-nav-eyebrow">下一課 →</div>
-        <div class="lesson-nav-title">Lesson 07 · 錯誤處理與 Status Codes</div>
+        <div class="lesson-nav-title">Lesson 06 · 錯誤處理與 Status Codes</div>
       </a>
     </nav>
 
@@ -346,25 +346,24 @@ resp, err := client.SayHello(ctx, &amp;pb.HelloRequest{Name: <span class="tk-st"
 
   <aside class="lesson-aside">
     <div class="aside-card">
-      <div class="aside-title">10 堂 gRPC 系列 <span class="progress-pill">6 / 10</span></div>
+      <div class="aside-title">9 堂 gRPC 系列 <span class="progress-pill">5 / 9</span></div>
       <ul class="course-nav">
         <li><a class="course-nav-item" href="grpc_01_intro.html"><span class="course-nav-num">01</span><span>gRPC 是什麼</span></a></li>
-        <li><a class="course-nav-item" href="grpc_02_setup.html"><span class="course-nav-num">02</span><span>環境安裝與工具鏈</span></a></li>
-        <li><a class="course-nav-item" href="grpc_03_protobuf_syntax.html"><span class="course-nav-num">03</span><span>Protobuf 語法</span></a></li>
-        <li><a class="course-nav-item" href="grpc_04_unary_rpc.html"><span class="course-nav-num">04</span><span>Unary RPC 實戰</span></a></li>
-        <li><a class="course-nav-item" href="grpc_05_streaming_rpc.html"><span class="course-nav-num">05</span><span>三種 Streaming</span></a></li>
-        <li><a class="course-nav-item current" href="grpc_06_context_metadata.html"><span class="course-nav-num">06</span><span>Context / Metadata</span></a></li>
-        <li><a class="course-nav-item" href="grpc_07_error_handling.html"><span class="course-nav-num">07</span><span>錯誤處理</span></a></li>
-        <li><a class="course-nav-item" href="grpc_08_interceptors.html"><span class="course-nav-num">08</span><span>Interceptors</span></a></li>
-        <li><a class="course-nav-item" href="grpc_09_tls_auth.html"><span class="course-nav-num">09</span><span>TLS / Auth</span></a></li>
-        <li><a class="course-nav-item" href="grpc_10_connection_lifecycle.html"><span class="course-nav-num">10</span><span>連線生命週期</span></a></li>
+        <li><a class="course-nav-item" href="grpc_02_protobuf_syntax.html"><span class="course-nav-num">02</span><span>Protobuf 語法</span></a></li>
+        <li><a class="course-nav-item" href="grpc_03_unary_rpc.html"><span class="course-nav-num">03</span><span>Unary RPC 實戰</span></a></li>
+        <li><a class="course-nav-item" href="grpc_04_streaming_rpc.html"><span class="course-nav-num">04</span><span>三種 Streaming</span></a></li>
+        <li><a class="course-nav-item current" href="grpc_05_context_metadata.html"><span class="course-nav-num">05</span><span>Context / Metadata</span></a></li>
+        <li><a class="course-nav-item" href="grpc_06_error_handling.html"><span class="course-nav-num">06</span><span>錯誤處理</span></a></li>
+        <li><a class="course-nav-item" href="grpc_07_interceptors.html"><span class="course-nav-num">07</span><span>Interceptors</span></a></li>
+        <li><a class="course-nav-item" href="grpc_08_tls_auth.html"><span class="course-nav-num">08</span><span>TLS / Auth</span></a></li>
+        <li><a class="course-nav-item" href="grpc_09_connection_lifecycle.html"><span class="course-nav-num">09</span><span>connection 生命週期</span></a></li>
       </ul>
     </div>
   </aside>
 </main>
 
 <footer class="lesson-footer">
-  Jason 的 gRPC 課程系列 · Lesson 06
+  Jason 的 gRPC 課程系列 · Lesson 05
 </footer>
 
 <script src="../_shared.js"></script>

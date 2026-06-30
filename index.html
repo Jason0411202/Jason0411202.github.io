@@ -517,10 +517,10 @@ a { color: inherit; text-decoration: none; }
 
       <div class="side-card">
         <div class="side-title">課程系列：gRPC (Go)</div>
-        <div class="side-text">10 堂由淺到深，從概念、環境安裝、Protobuf 語法、四種 RPC、Context/Metadata、錯誤處理、Interceptors、TLS/Auth、連線生命週期。所有 API 使用 grpc-go v1.80 (2026/04) 的最新版本。</div>
+        <div class="side-text">9 堂由淺到深，從概念與環境安裝、Protobuf 語法、四種 RPC、Context/Metadata、錯誤處理、Interceptors、TLS/Auth、connection 生命週期。所有 API 使用 grpc-go v1.80 (2026/04) 的最新版本。</div>
         <div class="side-list">
           <div>· gRPC 概念 + HTTP/2 + 工具鏈安裝</div>
-          <div>· Protobuf 語法完整版 (含欄位編號)</div>
+          <div>· Protobuf 語法完整版 (含 field number)</div>
           <div>· Unary + 三種 Streaming RPC</div>
           <div>· Context / Metadata / Deadline / Cancellation</div>
           <div>· Status Codes + 結構化錯誤處理</div>
@@ -612,16 +612,15 @@ const azureLessons = [
 ];
 
 const grpcLessons = [
-  { n: '01', file: 'lessons/grpc/grpc_01_intro.html',                title: 'gRPC 是什麼:HTTP/2 上的 RPC',         desc: 'RPC 心智模型、HTTP/2 多工、Protobuf 序列化、四種 RPC 模式、何時不該用 gRPC — 純概念建立詞彙。',           minutes: 14, tags: ['gRPC', '概念'] },
-  { n: '02', file: 'lessons/grpc/grpc_02_setup.html',                title: '環境安裝與工具鏈',                     desc: 'Go + protoc + protoc-gen-go + protoc-gen-go-grpc 一次裝齊,跑通第一個 .proto → .pb.go。順帶介紹 buf。', minutes: 12, tags: ['gRPC', '安裝'] },
-  { n: '03', file: 'lessons/grpc/grpc_03_protobuf_syntax.html',      title: 'Protobuf 語法完整版',                  desc: 'message / 欄位編號 / scalar / repeated / optional / enum / oneof / map / reserved / 巢狀 / import。',     minutes: 16, tags: ['gRPC', 'Protobuf'] },
-  { n: '04', file: 'lessons/grpc/grpc_04_unary_rpc.html',            title: '第一支 gRPC 服務:Unary RPC',           desc: '從 proto 寫到完整可跑的 server / client。使用新 API grpc.NewClient(取代 deprecated 的 grpc.Dial)。',  minutes: 15, tags: ['gRPC', 'Unary'] },
-  { n: '05', file: 'lessons/grpc/grpc_05_streaming_rpc.html',        title: '三種 Streaming RPC',                   desc: 'Server streaming / Client streaming / Bidirectional 三種模式各一範例,搭配 io.EOF 收尾的慣用模式。',      minutes: 17, tags: ['gRPC', 'Streaming'] },
-  { n: '06', file: 'lessons/grpc/grpc_06_context_metadata.html',     title: 'Context、Metadata、Deadline、Cancellation', desc: 'context.Context 在 gRPC 的角色、metadata 收送、deadline propagation、client 取消怎麼傳到 server。', minutes: 14, tags: ['gRPC', 'Context'] },
-  { n: '07', file: 'lessons/grpc/grpc_07_error_handling.html',       title: '錯誤處理與 Status Codes',              desc: 'gRPC 16 種 status codes、status.Errorf、結構化 error details、client 端 status.FromError 解碼。',        minutes: 13, tags: ['gRPC', '錯誤處理'] },
-  { n: '08', file: 'lessons/grpc/grpc_08_interceptors.html',         title: 'Interceptors 中介層',                  desc: 'Unary / Stream interceptor 簽名、ChainUnaryInterceptor 順序、實作 logging/recovery/auth/timing 四件組。', minutes: 16, tags: ['gRPC', 'Middleware'] },
-  { n: '09', file: 'lessons/grpc/grpc_09_tls_auth.html',             title: 'TLS、mTLS、Token-based Auth',          desc: '單向 TLS、mTLS 雙向驗證、PerRPCCredentials 帶 OAuth/JWT token。Transport vs PerRPC 兩層分工。',         minutes: 16, tags: ['gRPC', '安全'] },
-  { n: '10', file: 'lessons/grpc/grpc_10_connection_lifecycle.html', title: '連線生命週期:Channel、Keepalive、LB、Health', desc: 'ClientConn 狀態機、keepalive、name resolver、round_robin LB、grpc.health.v1、retry policy via service config。', minutes: 18, tags: ['gRPC', '上線'] }
+  { n: '01', file: 'lessons/grpc/grpc_01_intro.html',                title: 'gRPC 是什麼與環境安裝',                desc: 'RPC 心智模型、HTTP/2 多工、漏抽象的本質,並一次裝齊 Go + protoc + 兩個 plugin,跑通第一個 .proto → .pb.go。', minutes: 26, tags: ['gRPC', '概念', '安裝'] },
+  { n: '02', file: 'lessons/grpc/grpc_02_protobuf_syntax.html',      title: 'Protobuf 語法完整版',                  desc: 'message / field number / scalar / repeated / optional / enum / oneof / map / reserved / 巢狀 / import。',     minutes: 16, tags: ['gRPC', 'Protobuf'] },
+  { n: '03', file: 'lessons/grpc/grpc_03_unary_rpc.html',            title: '第一支 gRPC service:Unary RPC',           desc: '從 proto 寫到完整可跑的 server / client。使用新 API grpc.NewClient(取代 deprecated 的 grpc.Dial)。',  minutes: 15, tags: ['gRPC', 'Unary'] },
+  { n: '04', file: 'lessons/grpc/grpc_04_streaming_rpc.html',        title: '三種 Streaming RPC',                   desc: 'Server streaming / Client streaming / Bidirectional 三種模式各一範例,搭配 io.EOF 收尾的慣用模式。',      minutes: 17, tags: ['gRPC', 'Streaming'] },
+  { n: '05', file: 'lessons/grpc/grpc_05_context_metadata.html',     title: 'Context、Metadata、Deadline、Cancellation', desc: 'context.Context 在 gRPC 的角色、metadata 收送、deadline propagation、client 取消怎麼傳到 server。', minutes: 14, tags: ['gRPC', 'Context'] },
+  { n: '06', file: 'lessons/grpc/grpc_06_error_handling.html',       title: '錯誤處理與 Status Codes',              desc: 'gRPC 16 種 status codes、status.Errorf、結構化 error details、client 端 status.FromError 解碼。',        minutes: 13, tags: ['gRPC', '錯誤處理'] },
+  { n: '07', file: 'lessons/grpc/grpc_07_interceptors.html',         title: 'Interceptors 中介層',                  desc: 'Unary / Stream interceptor 簽名、ChainUnaryInterceptor 順序、實作 logging/recovery/auth/timing 四件組。', minutes: 16, tags: ['gRPC', 'Middleware'] },
+  { n: '08', file: 'lessons/grpc/grpc_08_tls_auth.html',             title: 'TLS、mTLS、Token-based Auth',          desc: '單向 TLS、mTLS mutual authentication、PerRPCCredentials 帶 OAuth/JWT token。Transport vs PerRPC 兩層分工。',         minutes: 16, tags: ['gRPC', '安全'] },
+  { n: '09', file: 'lessons/grpc/grpc_09_connection_lifecycle.html', title: 'connection 生命週期:Channel、Keepalive、LB、Health', desc: 'ClientConn 狀態機、keepalive、name resolver、round_robin LB、grpc.health.v1、retry policy via service config。', minutes: 18, tags: ['gRPC', '上線'] }
 ];
 
 const devopsLessons = [
@@ -689,7 +688,7 @@ const posts = [
     minutes: l.minutes,
     tags: l.tags,
     category: 'gRPC',
-    series: `第 ${l.n} / 10 堂`
+    series: `第 ${l.n} / ${grpcLessons.length} 堂`
   })),
   ...devopsLessons.map((l) => ({
     title: l.title,
